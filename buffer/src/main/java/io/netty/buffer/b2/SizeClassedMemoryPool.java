@@ -8,9 +8,9 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 
 import static java.lang.invoke.MethodHandles.*;
 
-abstract class SizeClassedMemoryPool implements Allocator, Drop<ByteBuf> {
+abstract class SizeClassedMemoryPool implements Allocator, Drop<BBuf> {
     private static final VarHandle CLOSE = Statics.findVarHandle(lookup(), SizeClassedMemoryPool.class, "closed", boolean.class);
-    private final ConcurrentHashMap<Long, ConcurrentLinkedQueue<Send<ByteBuf>>> pool;
+    private final ConcurrentHashMap<Long, ConcurrentLinkedQueue<Send<BBuf>>> pool;
     @SuppressWarnings("unused")
     private volatile boolean closed;
 
@@ -19,13 +19,13 @@ abstract class SizeClassedMemoryPool implements Allocator, Drop<ByteBuf> {
     }
 
     @Override
-    public ByteBuf allocate(long size) {
+    public BBuf allocate(long size) {
         var sizeClassPool = getSizeClassPool(size);
-        Send<ByteBuf> send = sizeClassPool.poll();
+        Send<BBuf> send = sizeClassPool.poll();
         if (send != null) {
             return send.receive();
         }
-        return new ByteBuf(createMemorySegment(size), this);
+        return new BBuf(createMemorySegment(size), this);
     }
 
     protected abstract MemorySegment createMemorySegment(long size);
@@ -34,7 +34,7 @@ abstract class SizeClassedMemoryPool implements Allocator, Drop<ByteBuf> {
     public void close() {
         if (CLOSE.compareAndSet(this, false, true)) {
             pool.forEach((k,v) -> {
-                Send<ByteBuf> send;
+                Send<BBuf> send;
                 while ((send = v.poll()) != null) {
                     dispose(send.receive());
                 }
@@ -43,7 +43,7 @@ abstract class SizeClassedMemoryPool implements Allocator, Drop<ByteBuf> {
     }
 
     @Override
-    public void drop(ByteBuf buf) {
+    public void drop(BBuf buf) {
         var sizeClassPool = getSizeClassPool(buf.size());
         sizeClassPool.offer(buf.send());
         if (closed) {
@@ -54,11 +54,11 @@ abstract class SizeClassedMemoryPool implements Allocator, Drop<ByteBuf> {
         }
     }
 
-    private ConcurrentLinkedQueue<Send<ByteBuf>> getSizeClassPool(long size) {
+    private ConcurrentLinkedQueue<Send<BBuf>> getSizeClassPool(long size) {
         return pool.computeIfAbsent(size, k -> new ConcurrentLinkedQueue<>());
     }
 
-    private static void dispose(ByteBuf buf) {
-        ByteBuf.SEGMENT_CLOSE.drop(buf);
+    private static void dispose(BBuf buf) {
+        BBuf.SEGMENT_CLOSE.drop(buf);
     }
 }

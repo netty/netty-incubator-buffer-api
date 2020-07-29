@@ -1,5 +1,7 @@
 package io.netty.buffer.b2;
 
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
 import io.netty.util.internal.PlatformDependent;
 import jdk.incubator.foreign.MemoryAccess;
 import jdk.incubator.foreign.MemoryAddress;
@@ -7,26 +9,44 @@ import jdk.incubator.foreign.MemorySegment;
 
 import java.lang.invoke.VarHandle;
 
-public class ByteBuf extends Rc<ByteBuf> {
-    static final Drop<ByteBuf> NO_DROP = buf -> {};
-    static final Drop<ByteBuf> SEGMENT_CLOSE = buf -> buf.segment.close();
+public class BBuf extends Rc<BBuf> {
+    static final Drop<BBuf> NO_DROP = buf -> {};
+    static final Drop<BBuf> SEGMENT_CLOSE = buf -> buf.segment.close();
     private final MemorySegment segment;
     private final MemoryAddress address;
     private long read;
     private long write;
 
-    ByteBuf(MemorySegment segment, Drop<ByteBuf> drop) {
+    BBuf(MemorySegment segment, Drop<BBuf> drop) {
         super(drop);
         this.segment = segment;
         address = segment.address();
     }
 
-    public byte get() {
+    public BBuf readerIndex(long index) {
+        read = index;
+        return this;
+    }
+
+    public BBuf touch() {
+        return this;
+    }
+
+    public byte readByte() {
         return MemoryAccess.getByteAtOffset(address, read++);
     }
 
-    public void put(byte value) {
+    public void writeByte(byte value) {
         MemoryAccess.setByteAtOffset(address, write++, value);
+    }
+
+    public BBuf setLong(long offset, long value) {
+        MemoryAccess.setLongAtOffset(address, offset, value);
+        return this;
+    }
+
+    public long getLong(long offset) {
+        return MemoryAccess.getLongAtOffset(address, offset);
     }
 
     public void fill(byte value) {
@@ -49,25 +69,29 @@ public class ByteBuf extends Rc<ByteBuf> {
         return address.segment().toByteArray();
     }
 
+    public ByteBuf view() {
+        return Unpooled.wrappedBuffer(getNativeAddress(), Math.toIntExact(size()), false);
+    }
+
     @Override
-    protected ByteBuf copy(Thread recipient, Drop<ByteBuf> drop) {
-        ByteBuf copy = new ByteBuf(segment.withOwnerThread(recipient), drop);
+    protected BBuf copy(Thread recipient, Drop<BBuf> drop) {
+        BBuf copy = new BBuf(segment.withOwnerThread(recipient), drop);
         copy.read = read;
         copy.write = write;
         return copy;
     }
 
     @Override
-    protected ByteBuf prepareSend() {
-        ByteBuf outer = this;
+    protected BBuf prepareSend() {
+        BBuf outer = this;
         MemorySegment transferSegment = segment.withOwnerThread(Lazy.TRANSFER_OWNER);
-        return new ByteBuf(transferSegment, NO_DROP) {
+        return new BBuf(transferSegment, NO_DROP) {
             @Override
-            protected ByteBuf copy(Thread recipient, Drop<ByteBuf> drop) {
+            protected BBuf copy(Thread recipient, Drop<BBuf> drop) {
                 Object scope = PlatformDependent.getObject(transferSegment, Lazy.SCOPE);
                 PlatformDependent.putObject(scope, Lazy.OWNER, recipient);
                 VarHandle.fullFence();
-                ByteBuf copy = new ByteBuf(transferSegment, drop);
+                BBuf copy = new BBuf(transferSegment, drop);
                 copy.read = outer.read;
                 copy.write = outer.write;
                 return copy;

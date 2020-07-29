@@ -1,8 +1,8 @@
 package io.netty.buffer.b2;
 
-public class DirectByteBufTest extends ByteBufTest {
+public class PooledDirectBBufTest extends BBufTest {
     @Override
     protected Allocator createAllocator() {
-        return Allocator.direct();
+        return Allocator.pooledDirect();
     }
 }

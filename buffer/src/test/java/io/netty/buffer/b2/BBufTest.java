@@ -11,45 +11,45 @@ import java.util.concurrent.SynchronousQueue;
 import static org.hamcrest.Matchers.*;
 import static org.junit.Assert.*;
 
-public abstract class ByteBufTest {
+public abstract class BBufTest {
     protected abstract Allocator createAllocator();
 
     @Test
     public void allocateAndAccessingBuffer() {
         try (Allocator allocator = createAllocator();
-             ByteBuf buf = allocator.allocate(8)) {
-            buf.put((byte) 1);
-            buf.put((byte) 2);
-            try (ByteBuf inner = buf.acquire()) {
-                inner.put((byte) 3);
-                inner.put((byte) 4);
-                inner.put((byte) 5);
-                inner.put((byte) 6);
-                inner.put((byte) 7);
-                inner.put((byte) 8);
+             BBuf buf = allocator.allocate(8)) {
+            buf.writeByte((byte) 1);
+            buf.writeByte((byte) 2);
+            try (BBuf inner = buf.acquire()) {
+                inner.writeByte((byte) 3);
+                inner.writeByte((byte) 4);
+                inner.writeByte((byte) 5);
+                inner.writeByte((byte) 6);
+                inner.writeByte((byte) 7);
+                inner.writeByte((byte) 8);
                 try {
-                    inner.put((byte) 9);
+                    inner.writeByte((byte) 9);
                     fail("Expected to be out of bounds.");
                 } catch (RuntimeException re) {
                     assertThat(re.getMessage(), containsString("bound"));
                 }
                 try {
-                    buf.put((byte) 9);
+                    buf.writeByte((byte) 9);
                     fail("Expected to be out of bounds.");
                 } catch (RuntimeException re) {
                     assertThat(re.getMessage(), containsString("bound"));
                 }
             }
-            assertEquals((byte) 1, buf.get());
-            assertEquals((byte) 2, buf.get());
-            assertEquals((byte) 3, buf.get());
-            assertEquals((byte) 4, buf.get());
-            assertEquals((byte) 5, buf.get());
-            assertEquals((byte) 6, buf.get());
-            assertEquals((byte) 7, buf.get());
-            assertEquals((byte) 8, buf.get());
+            assertEquals((byte) 1, buf.readByte());
+            assertEquals((byte) 2, buf.readByte());
+            assertEquals((byte) 3, buf.readByte());
+            assertEquals((byte) 4, buf.readByte());
+            assertEquals((byte) 5, buf.readByte());
+            assertEquals((byte) 6, buf.readByte());
+            assertEquals((byte) 7, buf.readByte());
+            assertEquals((byte) 8, buf.readByte());
             try {
-                assertEquals((byte) 9, buf.get());
+                assertEquals((byte) 9, buf.readByte());
                 fail("Expected to be out of bounds.");
             } catch (RuntimeException re) {
                 assertThat(re.getMessage(), containsString("bound"));
@@ -61,17 +61,17 @@ public abstract class ByteBufTest {
     @Test
     public void allocateAndRendesvousWithThread() throws Exception {
         try (Allocator allocator = createAllocator()) {
-            ArrayBlockingQueue<Send<ByteBuf>> queue = new ArrayBlockingQueue<>(10);
+            ArrayBlockingQueue<Send<BBuf>> queue = new ArrayBlockingQueue<>(10);
             ExecutorService executor = Executors.newSingleThreadExecutor();
             Future<Byte> future = executor.submit(() -> {
-                try (ByteBuf byteBuf = queue.take().receive()) {
-                    return byteBuf.get();
+                try (BBuf byteBuf = queue.take().receive()) {
+                    return byteBuf.readByte();
                 }
             });
             executor.shutdown();
 
-            try (ByteBuf buf = allocator.allocate(8)) {
-                buf.put((byte) 42);
+            try (BBuf buf = allocator.allocate(8)) {
+                buf.writeByte((byte) 42);
                 buf.sendTo(queue::offer);
             }
 
@@ -82,17 +82,17 @@ public abstract class ByteBufTest {
     @Test
     public void allocateAndRendesvousWithThreadViaSyncQueue() throws Exception {
         try (Allocator allocator = createAllocator()) {
-            SynchronousQueue<Send<ByteBuf>> queue = new SynchronousQueue<>();
+            SynchronousQueue<Send<BBuf>> queue = new SynchronousQueue<>();
             ExecutorService executor = Executors.newSingleThreadExecutor();
             Future<Byte> future = executor.submit(() -> {
-                try (ByteBuf byteBuf = queue.take().receive()) {
-                    return byteBuf.get();
+                try (BBuf byteBuf = queue.take().receive()) {
+                    return byteBuf.readByte();
                 }
             });
             executor.shutdown();
 
-            try (ByteBuf buf = allocator.allocate(8)) {
-                buf.put((byte) 42);
+            try (BBuf buf = allocator.allocate(8)) {
+                buf.writeByte((byte) 42);
                 buf.sendTo(e -> {
                     try {
                         queue.put(e);
@@ -109,17 +109,17 @@ public abstract class ByteBufTest {
     @Test
     public void allocateAndSendToThread() throws Exception {
         try (Allocator allocator = createAllocator()) {
-            ArrayBlockingQueue<Send<ByteBuf>> queue = new ArrayBlockingQueue<>(10);
+            ArrayBlockingQueue<Send<BBuf>> queue = new ArrayBlockingQueue<>(10);
             ExecutorService executor = Executors.newSingleThreadExecutor();
             Future<Byte> future = executor.submit(() -> {
-                try (ByteBuf byteBuf = queue.take().receive()) {
-                    return byteBuf.get();
+                try (BBuf byteBuf = queue.take().receive()) {
+                    return byteBuf.readByte();
                 }
             });
             executor.shutdown();
 
-            try (ByteBuf buf = allocator.allocate(8)) {
-                buf.put((byte) 42);
+            try (BBuf buf = allocator.allocate(8)) {
+                buf.writeByte((byte) 42);
                 assertTrue(queue.offer(buf.send()));
             }
 
@@ -130,17 +130,17 @@ public abstract class ByteBufTest {
     @Test
     public void allocateAndSendToThreadViaSyncQueue() throws Exception {
         try (Allocator allocator = createAllocator()) {
-            SynchronousQueue<Send<ByteBuf>> queue = new SynchronousQueue<>();
+            SynchronousQueue<Send<BBuf>> queue = new SynchronousQueue<>();
             ExecutorService executor = Executors.newSingleThreadExecutor();
             Future<Byte> future = executor.submit(() -> {
-                try (ByteBuf byteBuf = queue.take().receive()) {
-                    return byteBuf.get();
+                try (BBuf byteBuf = queue.take().receive()) {
+                    return byteBuf.readByte();
                 }
             });
             executor.shutdown();
 
-            try (ByteBuf buf = allocator.allocate(8)) {
-                buf.put((byte) 42);
+            try (BBuf buf = allocator.allocate(8)) {
+                buf.writeByte((byte) 42);
                 queue.put(buf.send());
             }
 

@@ -2,11 +2,11 @@ package io.netty.buffer.b2;
 
 import jdk.incubator.foreign.MemorySegment;
 
-import static io.netty.buffer.b2.ByteBuf.*;
+import static io.netty.buffer.b2.BBuf.*;
 
 public interface Allocator extends AutoCloseable {
 
-    ByteBuf allocate(long size);
+    BBuf allocate(long size);
 
     @Override
     default void close() {
@@ -15,9 +15,9 @@ public interface Allocator extends AutoCloseable {
     static Allocator heap() {
         return new Allocator() {
             @Override
-            public ByteBuf allocate(long size) {
+            public BBuf allocate(long size) {
                 var segment = MemorySegment.ofArray(new byte[Math.toIntExact(size)]);
-                return new ByteBuf(segment, SEGMENT_CLOSE);
+                return new BBuf(segment, SEGMENT_CLOSE);
             }
         };
     }
@@ -25,8 +25,8 @@ public interface Allocator extends AutoCloseable {
     static Allocator direct() {
         return new Allocator() {
             @Override
-            public ByteBuf allocate(long size) {
-                return new ByteBuf(MemorySegment.allocateNative(size), SEGMENT_CLOSE);
+            public BBuf allocate(long size) {
+                return new BBuf(MemorySegment.allocateNative(size), SEGMENT_CLOSE);
             }
         };
     }

@@ -1,8 +1,8 @@
 package io.netty.buffer.b2;
 
-public class HeapByteBufTest extends ByteBufTest {
+public class PooledHeapBBufTest extends BBufTest {
     @Override
     protected Allocator createAllocator() {
-        return Allocator.heap();
+        return Allocator.pooledHeap();
     }
 }
