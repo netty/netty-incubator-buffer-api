@@ -13,14 +13,12 @@ public class BBuf extends Rc<BBuf> {
     static final Drop<BBuf> NO_DROP = buf -> {};
     static final Drop<BBuf> SEGMENT_CLOSE = buf -> buf.segment.close();
     private final MemorySegment segment;
-    private final MemoryAddress address;
     private long read;
     private long write;
 
     BBuf(MemorySegment segment, Drop<BBuf> drop) {
         super(drop);
         this.segment = segment;
-        address = segment.address();
     }
 
     public BBuf readerIndex(long index) {
@@ -33,20 +31,20 @@ public class BBuf extends Rc<BBuf> {
     }
 
     public byte readByte() {
-        return MemoryAccess.getByteAtOffset(address, read++);
+        return MemoryAccess.getByteAtOffset(segment, read++);
     }
 
     public void writeByte(byte value) {
-        MemoryAccess.setByteAtOffset(address, write++, value);
+        MemoryAccess.setByteAtOffset(segment, write++, value);
     }
 
     public BBuf setLong(long offset, long value) {
-        MemoryAccess.setLongAtOffset(address, offset, value);
+        MemoryAccess.setLongAtOffset(segment, offset, value);
         return this;
     }
 
     public long getLong(long offset) {
-        return MemoryAccess.getLongAtOffset(address, offset);
+        return MemoryAccess.getLongAtOffset(segment, offset);
     }
 
     public void fill(byte value) {
@@ -66,7 +64,7 @@ public class BBuf extends Rc<BBuf> {
     }
 
     public byte[] debugAsByteArray() {
-        return address.segment().toByteArray();
+        return segment.toByteArray();
     }
 
     public ByteBuf view() {
