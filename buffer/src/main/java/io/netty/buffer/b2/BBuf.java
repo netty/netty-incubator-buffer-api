@@ -2,17 +2,19 @@ package io.netty.buffer.b2;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
-import io.netty.util.internal.PlatformDependent;
 import jdk.incubator.foreign.MemoryAccess;
-import jdk.incubator.foreign.MemoryAddress;
 import jdk.incubator.foreign.MemorySegment;
 
-import java.lang.invoke.VarHandle;
+import static io.netty.buffer.b2.Statics.*;
 
 public class BBuf extends Rc<BBuf> {
     static final Drop<BBuf> NO_DROP = buf -> {};
     static final Drop<BBuf> SEGMENT_CLOSE = buf -> buf.segment.close();
-    private final MemorySegment segment;
+    static final Drop<BBuf> SEGMENT_CLOSE_NATIVE = buf -> {
+        buf.segment.close();
+        MEM_USAGE_NATIVE.add(-buf.segment.byteSize());
+    };
+    final MemorySegment segment;
     private long read;
     private long write;
 
@@ -82,25 +84,16 @@ public class BBuf extends Rc<BBuf> {
     @Override
     protected BBuf prepareSend() {
         BBuf outer = this;
-        MemorySegment transferSegment = segment.withOwnerThread(Lazy.TRANSFER_OWNER);
+        MemorySegment transferSegment = segment.withOwnerThread(TRANSFER_OWNER);
         return new BBuf(transferSegment, NO_DROP) {
             @Override
             protected BBuf copy(Thread recipient, Drop<BBuf> drop) {
-                Object scope = PlatformDependent.getObject(transferSegment, Lazy.SCOPE);
-                PlatformDependent.putObject(scope, Lazy.OWNER, recipient);
-                VarHandle.fullFence();
+                overwriteMemorySegmentOwner(transferSegment, recipient);
                 BBuf copy = new BBuf(transferSegment, drop);
                 copy.read = outer.read;
                 copy.write = outer.write;
                 return copy;
             }
         };
-    }
-
-    private static class Lazy {
-        @SuppressWarnings("InstantiatingAThreadWithDefaultRunMethod")
-        private static final Thread TRANSFER_OWNER = new Thread("ByteBuf Transfer Owner");
-        private static final long SCOPE = Statics.fieldOffset("jdk.internal.foreign.AbstractMemorySegmentImpl", "scope");
-        private static final long OWNER = Statics.fieldOffset("jdk.internal.foreign.MemoryScope", "owner");
     }
 }

@@ -46,6 +46,7 @@ class RendezvousSend<T extends Rc<T>> implements Send<T> {
         }
         recipientLatch.await();
         incoming = outgoing.copy(recipient, drop);
+        drop.accept(incoming);
         sentLatch.countDown();
     }
 }

@@ -5,7 +5,6 @@ import jdk.incubator.foreign.MemorySegment;
 import static io.netty.buffer.b2.BBuf.*;
 
 public interface Allocator extends AutoCloseable {
-
     BBuf allocate(long size);
 
     @Override
@@ -26,13 +25,15 @@ public interface Allocator extends AutoCloseable {
         return new Allocator() {
             @Override
             public BBuf allocate(long size) {
-                return new BBuf(MemorySegment.allocateNative(size), SEGMENT_CLOSE);
+                var segment = MemorySegment.allocateNative(size);
+                Statics.MEM_USAGE_NATIVE.add(size);
+                return new BBuf(segment, SEGMENT_CLOSE_NATIVE);
             }
         };
     }
 
     static Allocator pooledHeap() {
-        return new SizeClassedMemoryPool() {
+        return new SizeClassedMemoryPool(false) {
             @Override
             protected MemorySegment createMemorySegment(long size) {
                 return MemorySegment.ofArray(new byte[Math.toIntExact(size)]);
@@ -41,10 +42,27 @@ public interface Allocator extends AutoCloseable {
     }
 
     static Allocator pooledDirect() {
-        return new SizeClassedMemoryPool() {
+        return new SizeClassedMemoryPool(true) {
             @Override
             protected MemorySegment createMemorySegment(long size) {
                 return MemorySegment.allocateNative(size);
+            }
+        };
+    }
+
+    static Allocator pooledDirectWithCleaner() {
+        return new SizeClassedMemoryPool(true) {
+            @Override
+            protected MemorySegment createMemorySegment(long size) {
+                return MemorySegment.allocateNative(size);
+            }
+
+            @Override
+            protected BBuf createBBuf(MemorySegment segment) {
+                var drop = new NativeMemoryCleanerDrop();
+                var buf = new BBuf(segment, drop);
+                drop.accept(buf);
+                return buf;
             }
         };
     }

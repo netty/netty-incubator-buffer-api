@@ -1,6 +1,5 @@
 package io.netty.buffer.b2;
 
-import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 
 import static io.netty.buffer.b2.Statics.*;
@@ -23,6 +22,8 @@ class TransferSend<T extends Rc<T>> implements Send<T> {
         if (!RECEIVED.compareAndSet(this, false, true)) {
             throw new IllegalStateException("This object has already been received.");
         }
-        return outgoing.copy(Thread.currentThread(), drop);
+        var copy = outgoing.copy(Thread.currentThread(), drop);
+        drop.accept(copy);
+        return copy;
     }
 }
