@@ -74,7 +74,7 @@ public class BBuf extends Rc<BBuf> {
     }
 
     @Override
-    protected BBuf copy(Thread recipient, Drop<BBuf> drop) {
+    protected BBuf transferOwnership(Thread recipient, Drop<BBuf> drop) {
         BBuf copy = new BBuf(segment.withOwnerThread(recipient), drop);
         copy.read = read;
         copy.write = write;
@@ -87,7 +87,7 @@ public class BBuf extends Rc<BBuf> {
         MemorySegment transferSegment = segment.withOwnerThread(TRANSFER_OWNER);
         return new BBuf(transferSegment, NO_DROP) {
             @Override
-            protected BBuf copy(Thread recipient, Drop<BBuf> drop) {
+            protected BBuf transferOwnership(Thread recipient, Drop<BBuf> drop) {
                 overwriteMemorySegmentOwner(transferSegment, recipient);
                 BBuf copy = new BBuf(transferSegment, drop);
                 copy.read = outer.read;

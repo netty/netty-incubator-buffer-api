@@ -1,6 +1,5 @@
 package io.netty.buffer.b2;
 
-import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 import java.util.concurrent.CountDownLatch;
 
@@ -45,7 +44,7 @@ class RendezvousSend<T extends Rc<T>> implements Send<T> {
             throw new IllegalStateException("Already sent.");
         }
         recipientLatch.await();
-        incoming = outgoing.copy(recipient, drop);
+        incoming = outgoing.transferOwnership(recipient, drop);
         drop.accept(incoming);
         sentLatch.countDown();
     }
