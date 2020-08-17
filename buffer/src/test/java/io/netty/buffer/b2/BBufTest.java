@@ -1,5 +1,6 @@
 package io.netty.buffer.b2;
 
+import org.junit.AssumptionViolatedException;
 import org.junit.Test;
 
 import java.util.concurrent.ArrayBlockingQueue;
@@ -145,6 +146,51 @@ public abstract class BBufTest {
             }
 
             assertEquals((byte) 42, future.get().byteValue());
+        }
+    }
+
+    @Test
+    public void mustThrowWhenAllocatingZeroSizedBuffer() {
+        try (Allocator allocator = createAllocator()) {
+            try {
+                allocator.allocate(0);
+                fail("Expected to throw an IllegalArgumentException.");
+            } catch (IllegalArgumentException ignore) {
+            }
+        }
+    }
+
+    @Test
+    public void mustThrowWhenAllocatingNegativeSizedBuffer() {
+        try (Allocator allocator = createAllocator()) {
+            try {
+                allocator.allocate(-1);
+                fail("Expected to throw an IllegalArgumentException.");
+            } catch (IllegalArgumentException ignore) {
+            }
+        }
+    }
+
+    @Test
+    public void mustThrowWhenAllocatingOverSizedBuffer() {
+        try (Allocator allocator = createAllocator()) {
+            try {
+                allocator.allocate(Integer.MAX_VALUE);
+                fail("Expected to throw an IllegalArgumentException.");
+            } catch (IllegalArgumentException ignore) {
+            }
+        }
+    }
+
+    @Test
+    public void mustAllowAllocatingMaxArraySizedBuffer() {
+        try (Allocator allocator = createAllocator()) {
+            try {
+                allocator.allocate(Integer.MAX_VALUE - 8).close();
+            } catch (OutOfMemoryError oome) {
+                // Mark test as ignored if this happens.
+                throw new AssumptionViolatedException("JVM does not have enough memory for this test.", oome);
+            }
         }
     }
 }

@@ -15,15 +15,15 @@ public class BBuf extends Rc<BBuf> {
         MEM_USAGE_NATIVE.add(-buf.segment.byteSize());
     };
     final MemorySegment segment;
-    private long read;
-    private long write;
+    private int read;
+    private int write;
 
     BBuf(MemorySegment segment, Drop<BBuf> drop) {
         super(drop);
         this.segment = segment;
     }
 
-    public BBuf readerIndex(long index) {
+    public BBuf readerIndex(int index) {
         read = index;
         return this;
     }
@@ -40,12 +40,12 @@ public class BBuf extends Rc<BBuf> {
         MemoryAccess.setByteAtOffset(segment, write++, value);
     }
 
-    public BBuf setLong(long offset, long value) {
+    public BBuf setLong(int offset, long value) {
         MemoryAccess.setLongAtOffset(segment, offset, value);
         return this;
     }
 
-    public long getLong(long offset) {
+    public long getLong(int offset) {
         return MemoryAccess.getLongAtOffset(segment, offset);
     }
 
