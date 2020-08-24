@@ -4,6 +4,9 @@ import jdk.incubator.foreign.MemorySegment;
 
 import static io.netty.buffer.b2.BBuf.*;
 
+/**
+ * Interface for {@link BBuf} allocators.
+ */
 @SuppressWarnings("InterfaceMayBeAnnotatedFunctional")
 public interface Allocator extends AutoCloseable {
     static void checkSize(long size) {
@@ -18,8 +21,19 @@ public interface Allocator extends AutoCloseable {
         }
     }
 
+    /**
+     * Allocate a {@link BBuf} of the given size in bytes. This method may throw an {@link OutOfMemoryError} if there is
+     * not enough free memory available to allocate a {@link BBuf} of the requested size.
+     *
+     * @param size The size of {@link BBuf} to allocate.
+     * @return The newly allocated {@link BBuf}.
+     */
     BBuf allocate(long size);
 
+    /**
+     * Close this allocator, freeing all of its internal resources. It is not specified if the allocator can still be
+     * used after this method has been called on it.
+     */
     @Override
     default void close() {
     }

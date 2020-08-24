@@ -24,6 +24,10 @@ public class BBuf extends Rc<BBuf> {
     }
 
     public BBuf readerIndex(int index) {
+        if (index < 0 || segment.byteSize() <= index) {
+            throw new IndexOutOfBoundsException(
+                    "Index " + index + " is out of bounds: [0 to " + segment.byteSize() + "].");
+        }
         read = index;
         return this;
     }
@@ -53,11 +57,11 @@ public class BBuf extends Rc<BBuf> {
         segment.fill(value);
     }
 
-    public long getNativeAddress() {
+    long getNativeAddress() {
         try {
             return segment.address().toRawLongValue();
         } catch (UnsupportedOperationException e) {
-            return 0; // This is a heap segment. Probably.
+            return 0; // This is a heap segment.
         }
     }
 

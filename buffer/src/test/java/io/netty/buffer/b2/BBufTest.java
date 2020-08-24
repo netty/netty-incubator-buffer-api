@@ -1,8 +1,10 @@
 package io.netty.buffer.b2;
 
 import org.junit.AssumptionViolatedException;
+import org.junit.Ignore;
 import org.junit.Test;
 
+import java.nio.BufferUnderflowException;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -182,6 +184,7 @@ public abstract class BBufTest {
         }
     }
 
+    @Ignore
     @Test
     public void mustAllowAllocatingMaxArraySizedBuffer() {
         try (Allocator allocator = createAllocator()) {
@@ -191,6 +194,41 @@ public abstract class BBufTest {
                 // Mark test as ignored if this happens.
                 throw new AssumptionViolatedException("JVM does not have enough memory for this test.", oome);
             }
+        }
+    }
+
+    @Test
+    public void setReaderIndexMustThrowOnNegativeIndex() {
+        try (Allocator allocator = createAllocator();
+             BBuf buf = allocator.allocate(8)) {
+            try {
+                buf.readerIndex(-1);
+                fail("Expected an exception to be thrown.");
+            } catch (IndexOutOfBoundsException e) {
+                // Good.
+            }
+        }
+    }
+
+    @Test
+    public void setReaderIndexMustThrowOnOversizedIndex() {
+        try (Allocator allocator = createAllocator();
+             BBuf buf = allocator.allocate(8)) {
+            try {
+                buf.readerIndex(8);
+                fail("Expected an exception to be thrown.");
+            } catch (IndexOutOfBoundsException e) {
+                // Good.
+            }
+        }
+    }
+
+    @Test
+    public void setReaderIndexMustNotThrowWithinBounds() {
+        try (Allocator allocator = createAllocator();
+             BBuf buf = allocator.allocate(8)) {
+            buf.readerIndex(0);
+            buf.readerIndex(7);
         }
     }
 }

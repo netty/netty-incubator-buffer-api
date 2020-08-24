@@ -3,6 +3,7 @@ package io.netty.buffer.b2;
 import jdk.incubator.foreign.MemorySegment;
 
 import java.lang.invoke.VarHandle;
+import java.util.ArrayList;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
@@ -45,12 +46,22 @@ abstract class SizeClassedMemoryPool implements Allocator, Drop<BBuf> {
     @Override
     public void close() {
         if (CLOSE.compareAndSet(this, false, true)) {
+            var capturedExceptions = new ArrayList<Exception>(4);
             pool.forEach((k,v) -> {
                 Send<BBuf> send;
                 while ((send = v.poll()) != null) {
-                    dispose(send.receive());
+                    try {
+                        dispose(send.receive());
+                    } catch (Exception e) {
+                        capturedExceptions.add(e);
+                    }
                 }
             });
+            if (!capturedExceptions.isEmpty()) {
+                var exception = new ResourceDisposeFailedException();
+                capturedExceptions.forEach(exception::addSuppressed);
+                throw exception;
+            }
         }
     }
 

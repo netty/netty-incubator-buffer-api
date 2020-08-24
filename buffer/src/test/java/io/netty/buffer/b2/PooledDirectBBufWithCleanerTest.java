@@ -1,16 +1,18 @@
 package io.netty.buffer.b2;
 
+import org.junit.Ignore;
 import org.junit.Test;
 
 import static org.hamcrest.Matchers.*;
 import static org.junit.Assert.*;
 
-public class PooledDirectBBufWithCleanerTest extends BBufTest {
+public class PooledDirectBBufWithCleanerTest extends DirectBBufTest {
     @Override
     protected Allocator createAllocator() {
         return Allocator.pooledDirectWithCleaner();
     }
 
+    @Ignore
     @Test
     public void bufferMustBeClosedByCleaner() throws InterruptedException {
         var allocator = createAllocator();
