@@ -7,7 +7,7 @@ import jdk.incubator.foreign.MemorySegment;
 
 import static io.netty.buffer.b2.Statics.*;
 
-public class BBuf extends RcSupport<BBuf> {
+public class BBuf extends RcSupport<BBuf> implements Buf<BBuf> {
     static final Drop<BBuf> NO_DROP = buf -> {};
     static final Drop<BBuf> SEGMENT_CLOSE = buf -> buf.segment.close();
     static final Drop<BBuf> SEGMENT_CLOSE_NATIVE = buf -> {
@@ -23,16 +23,27 @@ public class BBuf extends RcSupport<BBuf> {
         this.segment = segment;
     }
 
+    @Override
+    public int readerIndex() {
+        return read;
+    }
+
+    @Override
     public BBuf readerIndex(int index) {
-        if (index < 0 || segment.byteSize() <= index) {
-            throw new IndexOutOfBoundsException(
-                    "Index " + index + " is out of bounds: [0 to " + segment.byteSize() + "].");
-        }
+        checkIndexBounds(index);
         read = index;
         return this;
     }
 
-    public BBuf touch() {
+    @Override
+    public int writerIndex() {
+        return write;
+    }
+
+    @Override
+    public BBuf writerIndex(int index) {
+        checkIndexBounds(index);
+        write = index;
         return this;
     }
 
@@ -99,5 +110,16 @@ public class BBuf extends RcSupport<BBuf> {
                 return copy;
             }
         };
+    }
+
+    private void checkIndexBounds(int index) {
+        if (index < 0 || segment.byteSize() <= index) {
+            throw indexOutOfBounds(index);
+        }
+    }
+
+    private IndexOutOfBoundsException indexOutOfBounds(int index) {
+        return new IndexOutOfBoundsException(
+                "Index " + index + " is out of bounds: [0 to " + segment.byteSize() + "].");
     }
 }

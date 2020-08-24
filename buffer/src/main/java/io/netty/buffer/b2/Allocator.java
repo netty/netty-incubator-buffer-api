@@ -5,9 +5,8 @@ import jdk.incubator.foreign.MemorySegment;
 import static io.netty.buffer.b2.BBuf.*;
 
 /**
- * Interface for {@link BBuf} allocators.
+ * Interface for {@link Buf} allocators.
  */
-@SuppressWarnings("InterfaceMayBeAnnotatedFunctional")
 public interface Allocator extends AutoCloseable {
     static void checkSize(long size) {
         if (size < 1) {
@@ -22,13 +21,13 @@ public interface Allocator extends AutoCloseable {
     }
 
     /**
-     * Allocate a {@link BBuf} of the given size in bytes. This method may throw an {@link OutOfMemoryError} if there is
-     * not enough free memory available to allocate a {@link BBuf} of the requested size.
+     * Allocate a {@link Buf} of the given size in bytes. This method may throw an {@link OutOfMemoryError} if there is
+     * not enough free memory available to allocate a {@link Buf} of the requested size.
      *
-     * @param size The size of {@link BBuf} to allocate.
-     * @return The newly allocated {@link BBuf}.
+     * @param size The size of {@link Buf} to allocate.
+     * @return The newly allocated {@link Buf}.
      */
-    BBuf allocate(long size);
+    <T extends Buf<T>> T allocate(long size);
 
     /**
      * Close this allocator, freeing all of its internal resources. It is not specified if the allocator can still be
@@ -52,7 +51,7 @@ public interface Allocator extends AutoCloseable {
     static Allocator direct() {
         return new Allocator() {
             @Override
-            public BBuf allocate(long size) {
+            public Buf allocate(long size) {
                 checkSize(size);
                 var segment = MemorySegment.allocateNative(size);
                 Statics.MEM_USAGE_NATIVE.add(size);

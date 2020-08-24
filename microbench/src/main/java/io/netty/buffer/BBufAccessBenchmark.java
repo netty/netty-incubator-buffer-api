@@ -102,7 +102,7 @@ public class BBufAccessBenchmark extends AbstractMicrobenchmark {
 
     @Benchmark
     public int readBatch() {
-        buffer.readerIndex(0).touch();
+        buffer.readerIndex(0);
         int result = 0;
         // WARNING!
         // Please do not replace this sum loop with a BlackHole::consume loop:
