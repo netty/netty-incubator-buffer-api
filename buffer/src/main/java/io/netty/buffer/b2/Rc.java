@@ -13,14 +13,7 @@ import java.util.function.Consumer;
  *
  * @param <T> The concrete subtype.
  */
-public abstract class Rc<T extends Rc<T>> implements AutoCloseable {
-    private int acquires; // Closed if negative.
-    private final Drop<T> drop;
-
-    Rc(Drop<T> drop) {
-        this.drop = drop;
-    }
-
+public interface Rc<T extends Rc<T>> extends AutoCloseable {
     /**
      * Increment the reference count.
      * <p>
@@ -28,13 +21,7 @@ public abstract class Rc<T extends Rc<T>> implements AutoCloseable {
      *
      * @return This Rc instance.
      */
-    public T acquire() {
-        if (acquires < 0) {
-            throw new IllegalStateException("Resource is closed.");
-        }
-        acquires++;
-        return self();
-    }
+    T acquire();
 
     /**
      * Decrement the reference count, and despose of the resource if the last reference is closed.
@@ -44,15 +31,7 @@ public abstract class Rc<T extends Rc<T>> implements AutoCloseable {
      * @throws IllegalStateException If this Rc has already been closed.
      */
     @Override
-    public void close() {
-        if (acquires == -1) {
-            throw new IllegalStateException("Double-free: Already closed and dropped.");
-        }
-        if (acquires == 0) {
-            drop.drop(self());
-        }
-        acquires--;
-    }
+    void close();
 
     /**
      * Send this Rc instance ot another Thread, transferring the ownsership fo the recipient, using a rendesvouz
@@ -62,12 +41,7 @@ public abstract class Rc<T extends Rc<T>> implements AutoCloseable {
      * @param consumer The consumer encodes the mechanism by which the recipient recieves the Rc instance.
      * @throws InterruptedException If this thread was interrupted
      */
-    public void sendTo(Consumer<Send<T>> consumer) throws InterruptedException {
-        var send = new RendezvousSend<>(self(), drop);
-        consumer.accept(send);
-        send.finish();
-        acquires = -2; // close without dropping (also ignore future double-free attempts)
-    }
+    void sendTo(Consumer<Send<T>> consumer) throws InterruptedException;
 
     /**
      * Send this Rc instance to another Thread, transferring the ownership to the recipient. This method can be used
@@ -79,39 +53,5 @@ public abstract class Rc<T extends Rc<T>> implements AutoCloseable {
      * @implNote Not possible without hacks because we need the receiving thread in order to set the new owner in the
      * currently owning thread.
      */
-    public Send<T> send() {
-        acquires = -2; // close without dropping (also ignore future double-free attempts)
-        return new TransferSend<>(prepareSend(), drop);
-    }
-
-    /**
-     * Transfer the ownership of this Rc, to the given recipient thread. This Rc is invalidated but without disposing of
-     * its internal state. Then a new Rc with the given owner is produced in its stead.
-     * <p>
-     * This method is called by {@link Send} implementations. These implementations will ensure that the transfer of
-     * ownership (the calling of this method) happens-before the new owner begins accessing the new object. This ensures
-     * that the new Rc is safely published to the new owners.
-     *
-     * @param recipient The new owner of the state represented by this Rc.
-     * @param drop      The drop object that knows how to dispose of the state represented by this Rc.
-     * @return A new Rc instance that is exactly the same as this Rc, except it has the new owner.
-     */
-    protected abstract T transferOwnership(Thread recipient, Drop<T> drop);
-
-    /**
-     * Prepare this instance for ownsership transfer. This method is called from {@link #send()} in the sending thread.
-     * This method should put this Rc in a deactivated state where it is no longer accessible from the currently owning
-     * thread. In this state, the Rc instance should only allow a call to {@link #transferOwnership(Thread, Drop)} in
-     * the recipient thread.
-     *
-     * @return This Rc instance in a deactivated state.
-     */
-    protected T prepareSend() {
-        return self();
-    }
-
-    @SuppressWarnings("unchecked")
-    private T self() {
-        return (T) this;
-    }
+    Send<T> send();
 }

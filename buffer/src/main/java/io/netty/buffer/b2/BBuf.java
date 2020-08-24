@@ -7,7 +7,7 @@ import jdk.incubator.foreign.MemorySegment;
 
 import static io.netty.buffer.b2.Statics.*;
 
-public class BBuf extends Rc<BBuf> {
+public class BBuf extends RcSupport<BBuf> {
     static final Drop<BBuf> NO_DROP = buf -> {};
     static final Drop<BBuf> SEGMENT_CLOSE = buf -> buf.segment.close();
     static final Drop<BBuf> SEGMENT_CLOSE_NATIVE = buf -> {
@@ -78,7 +78,7 @@ public class BBuf extends Rc<BBuf> {
     }
 
     @Override
-    protected BBuf transferOwnership(Thread recipient, Drop<BBuf> drop) {
+    public BBuf transferOwnership(Thread recipient, Drop<BBuf> drop) {
         BBuf copy = new BBuf(segment.withOwnerThread(recipient), drop);
         copy.read = read;
         copy.write = write;
@@ -91,7 +91,7 @@ public class BBuf extends Rc<BBuf> {
         MemorySegment transferSegment = segment.withOwnerThread(TRANSFER_OWNER);
         return new BBuf(transferSegment, NO_DROP) {
             @Override
-            protected BBuf transferOwnership(Thread recipient, Drop<BBuf> drop) {
+            public BBuf transferOwnership(Thread recipient, Drop<BBuf> drop) {
                 overwriteMemorySegmentOwner(transferSegment, recipient);
                 BBuf copy = new BBuf(transferSegment, drop);
                 copy.read = outer.read;

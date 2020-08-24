@@ -6,7 +6,7 @@ import java.util.concurrent.CountDownLatch;
 import static io.netty.buffer.b2.Statics.*;
 import static java.lang.invoke.MethodHandles.*;
 
-class RendezvousSend<T extends Rc<T>> implements Send<T> {
+class RendezvousSend<T extends Rc<T> & Owned<T>> implements Send<T> {
     private static final VarHandle RECEIVED = findVarHandle(lookup(), RendezvousSend.class, "received", boolean.class);
     private final CountDownLatch recipientLatch;
     private final CountDownLatch sentLatch;
