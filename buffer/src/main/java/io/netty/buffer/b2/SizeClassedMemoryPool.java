@@ -1,3 +1,18 @@
+/*
+ * Copyright 2020 The Netty Project
+ *
+ * The Netty Project licenses this file to you under the Apache License,
+ * version 2.0 (the "License"); you may not use this file except in compliance
+ * with the License. You may obtain a copy of the License at:
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+ * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+ * License for the specific language governing permissions and limitations
+ * under the License.
+ */
 package io.netty.buffer.b2;
 
 import jdk.incubator.foreign.MemorySegment;
@@ -10,7 +25,8 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import static java.lang.invoke.MethodHandles.*;
 
 abstract class SizeClassedMemoryPool implements Allocator, Drop<BBuf> {
-    private static final VarHandle CLOSE = Statics.findVarHandle(lookup(), SizeClassedMemoryPool.class, "closed", boolean.class);
+    private static final VarHandle CLOSE = Statics.findVarHandle(
+            lookup(), SizeClassedMemoryPool.class, "closed", boolean.class);
     private final ConcurrentHashMap<Long, ConcurrentLinkedQueue<Send<Buf>>> pool;
     private final Drop<BBuf> disposer;
     @SuppressWarnings("unused")
@@ -47,7 +63,7 @@ abstract class SizeClassedMemoryPool implements Allocator, Drop<BBuf> {
     public void close() {
         if (CLOSE.compareAndSet(this, false, true)) {
             var capturedExceptions = new ArrayList<Exception>(4);
-            pool.forEach((k,v) -> {
+            pool.forEach((k, v) -> {
                 Send<Buf> send;
                 while ((send = v.poll()) != null) {
                     try {

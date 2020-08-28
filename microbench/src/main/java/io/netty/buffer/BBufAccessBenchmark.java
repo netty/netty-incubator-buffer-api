@@ -16,7 +16,7 @@
 package io.netty.buffer;
 
 import io.netty.buffer.b2.Allocator;
-import io.netty.buffer.b2.BBuf;
+import io.netty.buffer.b2.Buf;
 import io.netty.microbench.util.AbstractMicrobenchmark;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
@@ -40,36 +40,36 @@ public class BBufAccessBenchmark extends AbstractMicrobenchmark {
     public enum BBufType {
         UNSAFE {
             @Override
-            BBuf newBuffer() {
+            Buf newBuffer() {
                 return Allocator.direct().allocate(64);
             }
         },
 //        UNSAFE_SLICE {
 //            @Override
-//            BBuf newBuffer() {
+//            Buf newBuffer() {
 //                return UNSAFE.newBuffer().slice(16, 48);
 //            }
 //        },
         HEAP {
             @Override
-            BBuf newBuffer() {
+            Buf newBuffer() {
                 return Allocator.heap().allocate(64);
             }
         },
 //        COMPOSITE {
 //            @Override
-//            BBuf newBuffer() {
+//            Buf newBuffer() {
 //                return Unpooled.wrappedBuffer(UNSAFE.newBuffer(), HEAP.newBuffer());
 //            }
 //        },
 //        NIO {
 //            @Override
-//            BBuf newBuffer() {
+//            Buf newBuffer() {
 //                return new NioFacade(BBuffer.allocateDirect(64));
 //            }
 //        }
         ;
-        abstract BBuf newBuffer();
+        abstract Buf newBuffer();
     }
 
     @Param
@@ -83,7 +83,7 @@ public class BBufAccessBenchmark extends AbstractMicrobenchmark {
         buffer = bufferType.newBuffer();
     }
 
-    private BBuf buffer;
+    private Buf buffer;
 
     @TearDown
     public void tearDown() {
@@ -92,12 +92,12 @@ public class BBufAccessBenchmark extends AbstractMicrobenchmark {
 
     @Benchmark
     public long setGetLong() {
-        return buffer.setLong(0, 1).getLong(0);
+        return buffer.writeLong(0, 1).readLong(0);
     }
 
     @Benchmark
-    public BBuf setLong() {
-        return buffer.setLong(0, 1);
+    public Buf setLong() {
+        return buffer.writeLong(0, 1);
     }
 
     @Benchmark
