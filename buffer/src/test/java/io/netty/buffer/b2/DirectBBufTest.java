@@ -13,7 +13,7 @@ public class DirectBBufTest extends BBufTest {
     @Test
     public void directBufferMustHaveNonZeroAddress() {
         try (Allocator allocator = createAllocator();
-             BBuf buf = allocator.allocate(8)) {
+             Buf buf = allocator.allocate(8)) {
             assertNotEquals(0, buf.getNativeAddress());
         }
     }

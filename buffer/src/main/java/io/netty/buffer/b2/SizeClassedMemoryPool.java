@@ -11,7 +11,7 @@ import static java.lang.invoke.MethodHandles.*;
 
 abstract class SizeClassedMemoryPool implements Allocator, Drop<BBuf> {
     private static final VarHandle CLOSE = Statics.findVarHandle(lookup(), SizeClassedMemoryPool.class, "closed", boolean.class);
-    private final ConcurrentHashMap<Long, ConcurrentLinkedQueue<Send<BBuf>>> pool;
+    private final ConcurrentHashMap<Long, ConcurrentLinkedQueue<Send<Buf>>> pool;
     private final Drop<BBuf> disposer;
     @SuppressWarnings("unused")
     private volatile boolean closed;
@@ -22,9 +22,9 @@ abstract class SizeClassedMemoryPool implements Allocator, Drop<BBuf> {
     }
 
     @Override
-    public BBuf allocate(long size) {
+    public Buf allocate(long size) {
         var sizeClassPool = getSizeClassPool(size);
-        Send<BBuf> send = sizeClassPool.poll();
+        Send<Buf> send = sizeClassPool.poll();
         if (send != null) {
             return send.receive();
         }
@@ -48,7 +48,7 @@ abstract class SizeClassedMemoryPool implements Allocator, Drop<BBuf> {
         if (CLOSE.compareAndSet(this, false, true)) {
             var capturedExceptions = new ArrayList<Exception>(4);
             pool.forEach((k,v) -> {
-                Send<BBuf> send;
+                Send<Buf> send;
                 while ((send = v.poll()) != null) {
                     try {
                         dispose(send.receive());
@@ -67,7 +67,7 @@ abstract class SizeClassedMemoryPool implements Allocator, Drop<BBuf> {
 
     @Override
     public void drop(BBuf buf) {
-        var sizeClassPool = getSizeClassPool(buf.size());
+        var sizeClassPool = getSizeClassPool(buf.capacity());
         sizeClassPool.offer(buf.send());
         if (closed) {
             var send = sizeClassPool.poll();
@@ -77,11 +77,11 @@ abstract class SizeClassedMemoryPool implements Allocator, Drop<BBuf> {
         }
     }
 
-    private ConcurrentLinkedQueue<Send<BBuf>> getSizeClassPool(long size) {
+    private ConcurrentLinkedQueue<Send<Buf>> getSizeClassPool(long size) {
         return pool.computeIfAbsent(size, k -> new ConcurrentLinkedQueue<>());
     }
 
-    private void dispose(BBuf buf) {
-        disposer.drop(buf);
+    private void dispose(Buf buf) {
+        disposer.drop((BBuf) buf);
     }
 }

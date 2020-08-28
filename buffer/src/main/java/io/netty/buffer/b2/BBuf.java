@@ -1,13 +1,11 @@
 package io.netty.buffer.b2;
 
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
 import jdk.incubator.foreign.MemoryAccess;
 import jdk.incubator.foreign.MemorySegment;
 
 import static io.netty.buffer.b2.Statics.*;
 
-public class BBuf extends RcSupport<BBuf> implements Buf<BBuf> {
+public class BBuf extends RcSupport<Buf,BBuf> implements Buf {
     static final Drop<BBuf> NO_DROP = buf -> {};
     static final Drop<BBuf> SEGMENT_CLOSE = buf -> buf.segment.close();
     static final Drop<BBuf> SEGMENT_CLOSE_NATIVE = buf -> {
@@ -21,6 +19,11 @@ public class BBuf extends RcSupport<BBuf> implements Buf<BBuf> {
     BBuf(MemorySegment segment, Drop<BBuf> drop) {
         super(drop);
         this.segment = segment;
+    }
+
+    @Override
+    public int capacity() {
+        return (int) segment.byteSize();
     }
 
     @Override
@@ -47,28 +50,29 @@ public class BBuf extends RcSupport<BBuf> implements Buf<BBuf> {
         return this;
     }
 
-    public byte readByte() {
-        return MemoryAccess.getByteAtOffset(segment, read++);
+    @Override
+    public int readableBytes() {
+        return writerIndex() - readerIndex();
     }
 
-    public void writeByte(byte value) {
-        MemoryAccess.setByteAtOffset(segment, write++, value);
+    @Override
+    public int writableBytes() {
+        return capacity() - writerIndex();
     }
 
-    public BBuf setLong(int offset, long value) {
-        MemoryAccess.setLongAtOffset(segment, offset, value);
+    @Override
+    public Buf fill(byte value) {
+        segment.fill(value);
         return this;
     }
 
-    public long getLong(int offset) {
-        return MemoryAccess.getLongAtOffset(segment, offset);
+    @Override
+    public byte[] copy() {
+        return segment.toByteArray();
     }
 
-    public void fill(byte value) {
-        segment.fill(value);
-    }
-
-    long getNativeAddress() {
+    @Override
+    public long getNativeAddress() {
         try {
             return segment.address().toRawLongValue();
         } catch (UnsupportedOperationException e) {
@@ -76,16 +80,104 @@ public class BBuf extends RcSupport<BBuf> implements Buf<BBuf> {
         }
     }
 
-    public long size() {
-        return segment.byteSize();
+    @Override
+    public byte readByte() {
+        byte value = MemoryAccess.getByteAtOffset(segment, read);
+        read += 1;
+        return value;
     }
 
-    public byte[] debugAsByteArray() {
-        return segment.toByteArray();
+    @Override
+    public byte readByte(int index) {
+        return MemoryAccess.getByteAtOffset(segment, index);
     }
 
-    public ByteBuf view() {
-        return Unpooled.wrappedBuffer(getNativeAddress(), Math.toIntExact(size()), false);
+    @Override
+    public Buf writeByte(byte value) {
+        MemoryAccess.setByteAtOffset(segment, write, value);
+        write += 1;
+        return this;
+    }
+
+    @Override
+    public Buf writeByte(int index, byte value) {
+        MemoryAccess.setByteAtOffset(segment, index, value);
+        return this;
+    }
+
+    @Override
+    public long readLong() {
+        long value = MemoryAccess.getLongAtOffset(segment, read);
+        read += Long.BYTES;
+        return value;
+    }
+
+    @Override
+    public long readLong(int offset) {
+        return MemoryAccess.getLongAtOffset(segment, offset);
+    }
+
+    @Override
+    public Buf writeLong(long value) {
+        MemoryAccess.setLongAtOffset(segment, write, value);
+        write += Long.BYTES;
+        return this;
+    }
+
+    @Override
+    public Buf writeLong(int offset, long value) {
+        MemoryAccess.setLongAtOffset(segment, offset, value);
+        return this;
+    }
+
+    @Override
+    public int readInt() {
+        int value = MemoryAccess.getIntAtOffset(segment, read);
+        read += Integer.BYTES;
+        return value;
+    }
+
+    @Override
+    public int readInt(int offset) {
+        return MemoryAccess.getIntAtOffset(segment, offset);
+    }
+
+    @Override
+    public Buf writeInt(int value) {
+        MemoryAccess.setIntAtOffset(segment, write, value);
+        write += Integer.BYTES;
+        return this;
+    }
+
+    @Override
+    public Buf writeInt(int offset, int value) {
+        MemoryAccess.setIntAtOffset(segment, offset, value);
+        return this;
+    }
+
+    @Override
+    public short readShort() {
+        short value = MemoryAccess.getShortAtOffset(segment, read);
+        read += Short.BYTES;
+        return value;
+    }
+
+    @Override
+    public short readShort(int offset) {
+        return MemoryAccess.getShortAtOffset(segment, offset);
+    }
+
+    @Override
+    public Buf writeShort(short value) {
+        MemoryAccess.setShortAtOffset(segment, write, value);
+        write += Short.BYTES;
+        return this;
+    }
+
+    @Override
+    public Buf writeShort(int offset, short value) {
+        MemoryAccess.setShortAtOffset(segment, offset, value);
+        return this;
     }
 
     @Override

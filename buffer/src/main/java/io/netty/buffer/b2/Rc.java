@@ -11,9 +11,9 @@ import java.util.function.Consumer;
  * ideally), then the resource is desposed of, or released, or returned to the pool it came from. The precise action is
  * implemented by the {@link Drop} instance given as an argument to the Rc constructor.
  *
- * @param <T> The concrete subtype.
+ * @param <I> The concrete subtype.
  */
-public interface Rc<T extends Rc<T>> extends AutoCloseable {
+public interface Rc<I extends Rc<I>> extends AutoCloseable {
     /**
      * Increment the reference count.
      * <p>
@@ -21,7 +21,7 @@ public interface Rc<T extends Rc<T>> extends AutoCloseable {
      *
      * @return This Rc instance.
      */
-    T acquire();
+    I acquire();
 
     /**
      * Decrement the reference count, and despose of the resource if the last reference is closed.
@@ -41,7 +41,7 @@ public interface Rc<T extends Rc<T>> extends AutoCloseable {
      * @param consumer The consumer encodes the mechanism by which the recipient recieves the Rc instance.
      * @throws InterruptedException If this thread was interrupted
      */
-    void sendTo(Consumer<Send<T>> consumer) throws InterruptedException;
+    void sendTo(Consumer<Send<I>> consumer) throws InterruptedException;
 
     /**
      * Send this Rc instance to another Thread, transferring the ownership to the recipient. This method can be used
@@ -53,5 +53,5 @@ public interface Rc<T extends Rc<T>> extends AutoCloseable {
      * @implNote Not possible without hacks because we need the receiving thread in order to set the new owner in the
      * currently owning thread.
      */
-    Send<T> send();
+    Send<I> send();
 }

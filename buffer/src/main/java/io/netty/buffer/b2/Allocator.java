@@ -27,7 +27,7 @@ public interface Allocator extends AutoCloseable {
      * @param size The size of {@link Buf} to allocate.
      * @return The newly allocated {@link Buf}.
      */
-    <T extends Buf<T>> T allocate(long size);
+    Buf allocate(long size);
 
     /**
      * Close this allocator, freeing all of its internal resources. It is not specified if the allocator can still be

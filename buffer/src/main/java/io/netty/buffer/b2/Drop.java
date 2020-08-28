@@ -4,12 +4,12 @@ import java.util.function.Consumer;
 
 /**
  * The Drop interface is used by {@link Rc} instances to implement their resource disposal mechanics. The {@link
- * #drop(Rc)} method will be called by the Rc when their last reference is closed.
+ * #drop(Object)} method will be called by the Rc when their last reference is closed.
  *
  * @param <T>
  */
 @FunctionalInterface
-public interface Drop<T extends Rc<T>> extends Consumer<T> {
+public interface Drop<T> extends Consumer<T> {
     /**
      * Dispose of the resources in the given Rc.
      *

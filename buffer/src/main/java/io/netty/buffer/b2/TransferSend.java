@@ -5,7 +5,7 @@ import java.lang.invoke.VarHandle;
 import static io.netty.buffer.b2.Statics.*;
 import static java.lang.invoke.MethodHandles.*;
 
-class TransferSend<T extends Rc<T> & Owned<T>> implements Send<T> {
+class TransferSend<I extends Rc<I>, T extends Rc<I> & Owned<T>> implements Send<I> {
     private static final VarHandle RECEIVED = findVarHandle(lookup(), TransferSend.class, "received", boolean.class);
     private final T outgoing;
     private final Drop<T> drop;
@@ -18,12 +18,12 @@ class TransferSend<T extends Rc<T> & Owned<T>> implements Send<T> {
     }
 
     @Override
-    public T receive() {
+    public I receive() {
         if (!RECEIVED.compareAndSet(this, false, true)) {
             throw new IllegalStateException("This object has already been received.");
         }
         var copy = outgoing.transferOwnership(Thread.currentThread(), drop);
         drop.accept(copy);
-        return copy;
+        return (I) copy;
     }
 }

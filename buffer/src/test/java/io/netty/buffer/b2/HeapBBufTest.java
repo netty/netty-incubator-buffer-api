@@ -13,7 +13,7 @@ public class HeapBBufTest extends BBufTest {
     @Test
     public void heapBufferMustHaveZeroAddress() {
         try (Allocator allocator = createAllocator();
-             BBuf buf = allocator.allocate(8)) {
+             Buf buf = allocator.allocate(8)) {
             assertEquals(0, buf.getNativeAddress());
         }
     }

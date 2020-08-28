@@ -7,7 +7,7 @@ package io.netty.buffer.b2;
  * @param <T> The concrete type of {@link Rc} that is owned.
  */
 @SuppressWarnings("InterfaceMayBeAnnotatedFunctional")
-public interface Owned<T extends Rc<T>> {
+public interface Owned<T> {
     /**
      * Transfer the ownership of the owned Rc, to the given recipient thread. The owned Rc is invalidated but without
      * disposing of its internal state. Then a new Rc with the given owner is produced in its stead.

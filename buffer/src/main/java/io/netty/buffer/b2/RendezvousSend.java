@@ -6,7 +6,7 @@ import java.util.concurrent.CountDownLatch;
 import static io.netty.buffer.b2.Statics.*;
 import static java.lang.invoke.MethodHandles.*;
 
-class RendezvousSend<T extends Rc<T> & Owned<T>> implements Send<T> {
+class RendezvousSend<I extends Rc<I>, T extends Rc<I> & Owned<T>> implements Send<I> {
     private static final VarHandle RECEIVED = findVarHandle(lookup(), RendezvousSend.class, "received", boolean.class);
     private final CountDownLatch recipientLatch;
     private final CountDownLatch sentLatch;
@@ -15,7 +15,7 @@ class RendezvousSend<T extends Rc<T> & Owned<T>> implements Send<T> {
     @SuppressWarnings("unused")
     private volatile boolean received; // Accessed via VarHandle
     private volatile Thread recipient;
-    private volatile T incoming;
+    private volatile I incoming;
 
     RendezvousSend(T outgoing, Drop<T> drop) {
         this.outgoing = outgoing;
@@ -25,7 +25,7 @@ class RendezvousSend<T extends Rc<T> & Owned<T>> implements Send<T> {
     }
 
     @Override
-    public T receive() {
+    public I receive() {
         if (!RECEIVED.compareAndSet(this, false, true)) {
             throw new IllegalStateException("This object has already been received.");
         }
@@ -44,8 +44,9 @@ class RendezvousSend<T extends Rc<T> & Owned<T>> implements Send<T> {
             throw new IllegalStateException("Already sent.");
         }
         recipientLatch.await();
-        incoming = outgoing.transferOwnership(recipient, drop);
-        drop.accept(incoming);
+        var transferred = outgoing.transferOwnership(recipient, drop);
+        incoming = (I) transferred;
+        drop.accept(transferred);
         sentLatch.countDown();
     }
 }

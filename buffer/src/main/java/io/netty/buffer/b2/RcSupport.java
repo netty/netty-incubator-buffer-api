@@ -2,7 +2,7 @@ package io.netty.buffer.b2;
 
 import java.util.function.Consumer;
 
-public abstract class RcSupport<T extends RcSupport<T> & Owned<T>> implements Rc<T>, Owned<T> {
+public abstract class RcSupport<I extends Rc<I>, T extends RcSupport<I, T>> implements Rc<I>, Owned<T> {
     private int acquires; // Closed if negative.
     private final Drop<T> drop;
 
@@ -18,7 +18,7 @@ public abstract class RcSupport<T extends RcSupport<T> & Owned<T>> implements Rc
      * @return This Rc instance.
      */
     @Override
-    public T acquire() {
+    public I acquire() {
         if (acquires < 0) {
             throw new IllegalStateException("Resource is closed.");
         }
@@ -39,7 +39,7 @@ public abstract class RcSupport<T extends RcSupport<T> & Owned<T>> implements Rc
             throw new IllegalStateException("Double-free: Already closed and dropped.");
         }
         if (acquires == 0) {
-            drop.drop(self());
+            drop.drop(impl());
         }
         acquires--;
     }
@@ -53,8 +53,8 @@ public abstract class RcSupport<T extends RcSupport<T> & Owned<T>> implements Rc
      * @throws InterruptedException If this thread was interrupted
      */
     @Override
-    public void sendTo(Consumer<Send<T>> consumer) throws InterruptedException {
-        var send = new RendezvousSend<>(self(), drop);
+    public void sendTo(Consumer<Send<I>> consumer) throws InterruptedException {
+        var send = new RendezvousSend<I,T>(impl(), drop);
         consumer.accept(send);
         send.finish();
         acquires = -2; // close without dropping (also ignore future double-free attempts)
@@ -71,9 +71,9 @@ public abstract class RcSupport<T extends RcSupport<T> & Owned<T>> implements Rc
      * currently owning thread.
      */
     @Override
-    public Send<T> send() {
+    public Send<I> send() {
         acquires = -2; // close without dropping (also ignore future double-free attempts)
-        return new TransferSend<>(prepareSend(), drop);
+        return new TransferSend<I,T>(prepareSend(), drop);
     }
 
     /**
@@ -85,11 +85,16 @@ public abstract class RcSupport<T extends RcSupport<T> & Owned<T>> implements Rc
      * @return This Rc instance in a deactivated state.
      */
     protected T prepareSend() {
-        return self();
+        return impl();
     }
 
     @SuppressWarnings("unchecked")
-    private T self() {
+    private I self() {
+        return (I) this;
+    }
+
+    @SuppressWarnings("unchecked")
+    private T impl() {
         return (T) this;
     }
 }
