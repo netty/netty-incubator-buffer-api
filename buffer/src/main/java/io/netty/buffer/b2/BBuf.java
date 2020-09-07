@@ -21,7 +21,6 @@ import jdk.incubator.foreign.MemorySegment;
 import static io.netty.buffer.b2.Statics.*;
 
 class BBuf extends RcSupport<Buf, BBuf> implements Buf {
-    static final Drop<BBuf> NO_DROP = buf -> { };
     static final Drop<BBuf> SEGMENT_CLOSE = buf -> buf.segment.close();
     static final Drop<BBuf> SEGMENT_CLOSE_NATIVE = buf -> {
         buf.segment.close();
@@ -196,22 +195,15 @@ class BBuf extends RcSupport<Buf, BBuf> implements Buf {
     }
 
     @Override
-    public BBuf transferOwnership(Thread recipient, Drop<BBuf> drop) {
-        BBuf copy = new BBuf(segment.withOwnerThread(recipient), drop);
-        copy.read = read;
-        copy.write = write;
-        return copy;
-    }
-
-    @Override
-    protected BBuf prepareSend() {
+    protected Owned<BBuf> prepareSend() {
         BBuf outer = this;
-        MemorySegment transferSegment = segment.withOwnerThread(TRANSFER_OWNER);
-        return new BBuf(transferSegment, NO_DROP) {
+        boolean isConfined = segment.ownerThread() == null;
+        MemorySegment transferSegment = isConfined? segment : segment.withOwnerThread(null);
+        return new Owned<BBuf>() {
             @Override
             public BBuf transferOwnership(Thread recipient, Drop<BBuf> drop) {
-                overwriteMemorySegmentOwner(transferSegment, recipient);
-                BBuf copy = new BBuf(transferSegment, drop);
+                var newSegment = isConfined? transferSegment.withOwnerThread(recipient) : transferSegment;
+                BBuf copy = new BBuf(newSegment, drop);
                 copy.read = outer.read;
                 copy.write = outer.write;
                 return copy;

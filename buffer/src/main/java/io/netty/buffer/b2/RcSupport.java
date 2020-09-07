@@ -15,9 +15,7 @@
  */
 package io.netty.buffer.b2;
 
-import java.util.function.Consumer;
-
-public abstract class RcSupport<I extends Rc<I>, T extends RcSupport<I, T>> implements Rc<I>, Owned<T> {
+public abstract class RcSupport<I extends Rc<I>, T extends RcSupport<I, T>> implements Rc<I> {
     private int acquires; // Closed if negative.
     private final Drop<T> drop;
 
@@ -33,7 +31,7 @@ public abstract class RcSupport<I extends Rc<I>, T extends RcSupport<I, T>> impl
      * @return This Rc instance.
      */
     @Override
-    public I acquire() {
+    public final I acquire() {
         if (acquires < 0) {
             throw new IllegalStateException("Resource is closed.");
         }
@@ -49,7 +47,7 @@ public abstract class RcSupport<I extends Rc<I>, T extends RcSupport<I, T>> impl
      * @throws IllegalStateException If this Rc has already been closed.
      */
     @Override
-    public void close() {
+    public final void close() {
         if (acquires == -1) {
             throw new IllegalStateException("Double-free: Already closed and dropped.");
         }
@@ -57,22 +55,6 @@ public abstract class RcSupport<I extends Rc<I>, T extends RcSupport<I, T>> impl
             drop.drop(impl());
         }
         acquires--;
-    }
-
-    /**
-     * Send this Rc instance ot another Thread, transferring the ownsership fo the recipient, using a rendesvouz
-     * protocol. This method can be used when the sender wishes to block until the transfer completes. This requires
-     * that both threads be alive an running for the transfer to complete.
-     *
-     * @param consumer The consumer encodes the mechanism by which the recipient recieves the Rc instance.
-     * @throws InterruptedException If this thread was interrupted
-     */
-    @Override
-    public void sendTo(Consumer<Send<I>> consumer) throws InterruptedException {
-        var send = new RendezvousSend<I, T>(impl(), drop);
-        consumer.accept(send);
-        send.finish();
-        acquires = -2; // close without dropping (also ignore future double-free attempts)
     }
 
     /**
@@ -86,7 +68,7 @@ public abstract class RcSupport<I extends Rc<I>, T extends RcSupport<I, T>> impl
      * currently owning thread.
      */
     @Override
-    public Send<I> send() {
+    public final Send<I> send() {
         acquires = -2; // close without dropping (also ignore future double-free attempts)
         return new TransferSend<I, T>(prepareSend(), drop);
     }
@@ -94,14 +76,12 @@ public abstract class RcSupport<I extends Rc<I>, T extends RcSupport<I, T>> impl
     /**
      * Prepare this instance for ownsership transfer. This method is called from {@link #send()} in the sending thread.
      * This method should put this Rc in a deactivated state where it is no longer accessible from the currently owning
-     * thread. In this state, the Rc instance should only allow a call to {@link #transferOwnership(Thread, Drop)} in
+     * thread. In this state, the Rc instance should only allow a call to {@link Owned#transferOwnership(Thread, Drop)} in
      * the recipient thread.
      *
      * @return This Rc instance in a deactivated state.
      */
-    protected T prepareSend() {
-        return impl();
-    }
+    protected abstract Owned<T> prepareSend();
 
     @SuppressWarnings("unchecked")
     private I self() {

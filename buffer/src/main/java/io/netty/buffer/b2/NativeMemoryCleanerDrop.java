@@ -43,8 +43,7 @@ class NativeMemoryCleanerDrop implements Drop<BBuf> {
         var segment = buf.segment;
         cleanable = CLEANER.register(this, () -> {
             if (segment.isAlive()) {
-                // Clear owner so we can close from cleaner thread.
-                overwriteMemorySegmentOwner(segment, null);
+                // TODO return segment to pool, or call out to external drop, instead of closing it directly.
                 segment.close();
                 MEM_USAGE_NATIVE.add(-segment.byteSize());
             }

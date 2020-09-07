@@ -80,7 +80,7 @@ public interface Allocator extends AutoCloseable {
             @Override
             protected MemorySegment createMemorySegment(long size) {
                 checkSize(size);
-                return MemorySegment.ofArray(new byte[Math.toIntExact(size)]);
+                return MemorySegment.ofArray(new byte[Math.toIntExact(size)]).withOwnerThread(null);
             }
         };
     }
@@ -90,7 +90,7 @@ public interface Allocator extends AutoCloseable {
             @Override
             protected MemorySegment createMemorySegment(long size) {
                 checkSize(size);
-                return MemorySegment.allocateNative(size);
+                return MemorySegment.allocateNative(size).withOwnerThread(null);
             }
         };
     }
@@ -100,7 +100,7 @@ public interface Allocator extends AutoCloseable {
             @Override
             protected MemorySegment createMemorySegment(long size) {
                 checkSize(size);
-                return MemorySegment.allocateNative(size);
+                return MemorySegment.allocateNative(size).withOwnerThread(null);
             }
 
             @Override

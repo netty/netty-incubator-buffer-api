@@ -18,7 +18,6 @@ package io.netty.buffer.b2;
 import org.junit.After;
 import org.junit.AssumptionViolatedException;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import java.util.concurrent.ArrayBlockingQueue;
@@ -90,50 +89,6 @@ public abstract class BBufTest {
     }
 
     @Test
-    public void allocateAndRendesvousWithThread() throws Exception {
-        ArrayBlockingQueue<Send<Buf>> queue = new ArrayBlockingQueue<>(10);
-        ExecutorService executor = Executors.newSingleThreadExecutor();
-        Future<Byte> future = executor.submit(() -> {
-            try (Buf byteBuf = queue.take().receive()) {
-                return byteBuf.readByte();
-            }
-        });
-        executor.shutdown();
-
-        try (Buf buf = allocator.allocate(8)) {
-            buf.writeByte((byte) 42);
-            buf.sendTo(queue::offer);
-        }
-
-        assertEquals((byte) 42, future.get().byteValue());
-    }
-
-    @Test
-    public void allocateAndRendesvousWithThreadViaSyncQueue() throws Exception {
-        SynchronousQueue<Send<Buf>> queue = new SynchronousQueue<>();
-        ExecutorService executor = Executors.newSingleThreadExecutor();
-        Future<Byte> future = executor.submit(() -> {
-            try (Buf byteBuf = queue.take().receive()) {
-                return byteBuf.readByte();
-            }
-        });
-        executor.shutdown();
-
-        try (Buf buf = allocator.allocate(8)) {
-            buf.writeByte((byte) 42);
-            buf.sendTo(e -> {
-                try {
-                    queue.put(e);
-                } catch (InterruptedException ie) {
-                    throw new RuntimeException(ie);
-                }
-            });
-        }
-
-        assertEquals((byte) 42, future.get().byteValue());
-    }
-
-    @Test
     public void allocateAndSendToThread() throws Exception {
         ArrayBlockingQueue<Send<Buf>> queue = new ArrayBlockingQueue<>(10);
         ExecutorService executor = Executors.newSingleThreadExecutor();
@@ -198,7 +153,6 @@ public abstract class BBufTest {
         }
     }
 
-    @Ignore
     @Test
     public void mustAllowAllocatingMaxArraySizedBuffer() {
         try {
