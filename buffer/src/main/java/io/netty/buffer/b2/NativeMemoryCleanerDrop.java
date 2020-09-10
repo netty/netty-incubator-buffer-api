@@ -40,7 +40,7 @@ class NativeMemoryCleanerDrop implements Drop<BBuf> {
     @Override
     public void accept(BBuf buf) {
         drop(null); // Unregister old cleanable, if any, to avoid uncontrolled build-up.
-        var segment = buf.segment;
+        var segment = buf.seg;
         cleanable = CLEANER.register(this, () -> {
             if (segment.isAlive()) {
                 // TODO return segment to pool, or call out to external drop, instead of closing it directly.

@@ -15,52 +15,52 @@
  */
 package io.netty.buffer.b2;
 
-import jdk.incubator.foreign.MemoryAccess;
 import jdk.incubator.foreign.MemorySegment;
 
 import static io.netty.buffer.b2.Statics.*;
+import static jdk.incubator.foreign.MemoryAccess.*;
 
 class BBuf extends RcSupport<Buf, BBuf> implements Buf {
-    static final Drop<BBuf> SEGMENT_CLOSE = buf -> buf.segment.close();
+    static final Drop<BBuf> SEGMENT_CLOSE = buf -> buf.seg.close();
     static final Drop<BBuf> SEGMENT_CLOSE_NATIVE = buf -> {
-        buf.segment.close();
-        MEM_USAGE_NATIVE.add(-buf.segment.byteSize());
+        buf.seg.close();
+        MEM_USAGE_NATIVE.add(-buf.seg.byteSize());
     };
-    final MemorySegment segment;
-    private int read;
-    private int write;
+    final MemorySegment seg;
+    private int roff;
+    private int woff;
 
     BBuf(MemorySegment segment, Drop<BBuf> drop) {
         super(drop);
-        this.segment = segment;
+        seg = segment;
     }
 
     @Override
     public int capacity() {
-        return (int) segment.byteSize();
+        return (int) seg.byteSize();
     }
 
     @Override
     public int readerIndex() {
-        return read;
+        return roff;
     }
 
     @Override
     public BBuf readerIndex(int index) {
-        checkIndexBounds(index);
-        read = index;
+        checkRead(index, 0);
+        roff = index;
         return this;
     }
 
     @Override
     public int writerIndex() {
-        return write;
+        return woff;
     }
 
     @Override
     public BBuf writerIndex(int index) {
-        checkIndexBounds(index);
-        write = index;
+        checkWrite(index, 0);
+        woff = index;
         return this;
     }
 
@@ -76,149 +76,693 @@ class BBuf extends RcSupport<Buf, BBuf> implements Buf {
 
     @Override
     public Buf fill(byte value) {
-        segment.fill(value);
+        seg.fill(value);
         return this;
     }
 
     @Override
     public byte[] copy() {
-        return segment.toByteArray();
+        return seg.toByteArray();
     }
 
     @Override
     public long getNativeAddress() {
         try {
-            return segment.address().toRawLongValue();
+            return seg.address().toRawLongValue();
         } catch (UnsupportedOperationException e) {
             return 0; // This is a heap segment.
         }
     }
 
+    // ### CODEGEN START primitive accessors implementation
+
     @Override
     public byte readByte() {
-        byte value = MemoryAccess.getByteAtOffset(segment, read);
-        read += 1;
+        checkRead(roff, Byte.BYTES);
+        byte value = getByteAtOffset_BE(seg, roff);
+        roff += Byte.BYTES;
         return value;
     }
 
     @Override
-    public byte readByte(int index) {
-        return MemoryAccess.getByteAtOffset(segment, index);
+    public byte readByte(int roff) {
+        checkRead(roff, Byte.BYTES);
+        return getByteAtOffset_BE(seg, roff);
+    }
+
+    @Override
+    public int readUnsignedByte() {
+        checkRead(roff, Byte.BYTES);
+        int value = getByteAtOffset_BE(seg, roff) & 0xFF;
+        roff += Byte.BYTES;
+        return value;
+    }
+
+    @Override
+    public int readUnsignedByte(int roff) {
+        checkRead(roff, Byte.BYTES);
+        return getByteAtOffset_BE(seg, roff) & 0xFF;
     }
 
     @Override
     public Buf writeByte(byte value) {
-        MemoryAccess.setByteAtOffset(segment, write, value);
-        write += 1;
+        setByteAtOffset_BE(seg, woff, value);
+        woff += Byte.BYTES;
         return this;
     }
 
     @Override
-    public Buf writeByte(int index, byte value) {
-        MemoryAccess.setByteAtOffset(segment, index, value);
+    public Buf writeByte(int woff, byte value) {
+        setByteAtOffset_BE(seg, woff, value);
         return this;
     }
 
     @Override
-    public long readLong() {
-        long value = MemoryAccess.getLongAtOffset(segment, read);
-        read += Long.BYTES;
+    public Buf writeUnsignedByte(int value) {
+        setByteAtOffset_BE(seg, woff, (byte) (value & 0xFF));
+        woff += Byte.BYTES;
+        return this;
+    }
+
+    @Override
+    public Buf writeUnsignedByte(int woff, int value) {
+        setByteAtOffset_BE(seg, woff, (byte) (value & 0xFF));
+        return this;
+    }
+
+    @Override
+    public char readChar() {
+        checkRead(roff, 2);
+        char value = getCharAtOffset_BE(seg, roff);
+        roff += 2;
         return value;
     }
 
     @Override
-    public long readLong(int offset) {
-        return MemoryAccess.getLongAtOffset(segment, offset);
+    public char readChar(int roff) {
+        checkRead(roff, 2);
+        return getCharAtOffset_BE(seg, roff);
     }
 
     @Override
-    public Buf writeLong(long value) {
-        MemoryAccess.setLongAtOffset(segment, write, value);
-        write += Long.BYTES;
-        return this;
-    }
-
-    @Override
-    public Buf writeLong(int offset, long value) {
-        MemoryAccess.setLongAtOffset(segment, offset, value);
-        return this;
-    }
-
-    @Override
-    public int readInt() {
-        int value = MemoryAccess.getIntAtOffset(segment, read);
-        read += Integer.BYTES;
+    public char readCharLE() {
+        checkRead(roff, 2);
+        char value = getCharAtOffset_LE(seg, roff);
+        roff += 2;
         return value;
     }
 
     @Override
-    public int readInt(int offset) {
-        return MemoryAccess.getIntAtOffset(segment, offset);
+    public char readCharLE(int roff) {
+        checkRead(roff, 2);
+        return getCharAtOffset_LE(seg, roff);
     }
 
     @Override
-    public Buf writeInt(int value) {
-        MemoryAccess.setIntAtOffset(segment, write, value);
-        write += Integer.BYTES;
+    public Buf writeChar(char value) {
+        setCharAtOffset_BE(seg, woff, value);
+        woff += 2;
         return this;
     }
 
     @Override
-    public Buf writeInt(int offset, int value) {
-        MemoryAccess.setIntAtOffset(segment, offset, value);
+    public Buf writeChar(int woff, char value) {
+        setCharAtOffset_BE(seg, woff, value);
+        return this;
+    }
+
+    @Override
+    public Buf writeCharLE(char value) {
+        setCharAtOffset_LE(seg, woff, value);
+        woff += 2;
+        return this;
+    }
+
+    @Override
+    public Buf writeCharLE(int woff, char value) {
+        setCharAtOffset_LE(seg, woff, value);
         return this;
     }
 
     @Override
     public short readShort() {
-        short value = MemoryAccess.getShortAtOffset(segment, read);
-        read += Short.BYTES;
+        checkRead(roff, Short.BYTES);
+        short value = getShortAtOffset_BE(seg, roff);
+        roff += Short.BYTES;
         return value;
     }
 
     @Override
-    public short readShort(int offset) {
-        return MemoryAccess.getShortAtOffset(segment, offset);
+    public short readShort(int roff) {
+        checkRead(roff, Short.BYTES);
+        return getShortAtOffset_BE(seg, roff);
+    }
+
+    @Override
+    public short readShortLE() {
+        checkRead(roff, Short.BYTES);
+        short value = getShortAtOffset_LE(seg, roff);
+        roff += Short.BYTES;
+        return value;
+    }
+
+    @Override
+    public short readShortLE(int roff) {
+        checkRead(roff, Short.BYTES);
+        return getShortAtOffset_LE(seg, roff);
+    }
+
+    @Override
+    public int readUnsignedShort() {
+        checkRead(roff, Short.BYTES);
+        int value = getShortAtOffset_BE(seg, roff) & 0xFFFF;
+        roff += Short.BYTES;
+        return value;
+    }
+
+    @Override
+    public int readUnsignedShort(int roff) {
+        checkRead(roff, Short.BYTES);
+        return getShortAtOffset_BE(seg, roff) & 0xFFFF;
+    }
+
+    @Override
+    public int readUnsignedShortLE() {
+        checkRead(roff, Short.BYTES);
+        int value = getShortAtOffset_LE(seg, roff) & 0xFFFF;
+        roff += Short.BYTES;
+        return value;
+    }
+
+    @Override
+    public int readUnsignedShortLE(int roff) {
+        checkRead(roff, Short.BYTES);
+        return getShortAtOffset_LE(seg, roff) & 0xFFFF;
     }
 
     @Override
     public Buf writeShort(short value) {
-        MemoryAccess.setShortAtOffset(segment, write, value);
-        write += Short.BYTES;
+        setShortAtOffset_BE(seg, woff, value);
+        woff += Short.BYTES;
         return this;
     }
 
     @Override
-    public Buf writeShort(int offset, short value) {
-        MemoryAccess.setShortAtOffset(segment, offset, value);
+    public Buf writeShort(int woff, short value) {
+        setShortAtOffset_BE(seg, woff, value);
         return this;
     }
+
+    @Override
+    public Buf writeShortLE(short value) {
+        setShortAtOffset_LE(seg, woff, value);
+        woff += Short.BYTES;
+        return this;
+    }
+
+    @Override
+    public Buf writeShortLE(int woff, short value) {
+        setShortAtOffset_LE(seg, woff, value);
+        return this;
+    }
+
+    @Override
+    public Buf writeUnsignedShort(int value) {
+        setShortAtOffset_BE(seg, woff, (short) (value & 0xFFFF));
+        woff += Short.BYTES;
+        return this;
+    }
+
+    @Override
+    public Buf writeUnsignedShort(int woff, int value) {
+        setShortAtOffset_BE(seg, woff, (short) (value & 0xFFFF));
+        return this;
+    }
+
+    @Override
+    public Buf writeUnsignedShortLE(int value) {
+        setShortAtOffset_LE(seg, woff, (short) (value & 0xFFFF));
+        woff += Short.BYTES;
+        return this;
+    }
+
+    @Override
+    public Buf writeUnsignedShortLE(int woff, int value) {
+        setShortAtOffset_LE(seg, woff, (short) (value & 0xFFFF));
+        return this;
+    }
+
+    @Override
+    public int readMedium() {
+        checkRead(roff, 3);
+        int value = getByteAtOffset_BE(seg, roff) << 16 |
+                    (getByteAtOffset_BE(seg, roff + 1) & 0xFF) << 8 |
+                    getByteAtOffset_BE(seg, roff + 2) & 0xFF;
+        roff += 3;
+        return value;
+    }
+
+    @Override
+    public int readMedium(int roff) {
+        checkRead(roff, 3);
+        return getByteAtOffset_BE(seg, roff) << 16 |
+                    (getByteAtOffset_BE(seg, roff + 1) & 0xFF) << 8 |
+                    getByteAtOffset_BE(seg, roff + 2) & 0xFF;
+    }
+
+    @Override
+    public int readMediumLE() {
+        checkRead(roff, 3);
+        int value = getByteAtOffset_BE(seg, roff) & 0xFF |
+                    (getByteAtOffset_BE(seg, roff + 1) & 0xFF) << 8 |
+                    getByteAtOffset_BE(seg, roff + 2) << 16;
+        roff += 3;
+        return value;
+    }
+
+    @Override
+    public int readMediumLE(int roff) {
+        checkRead(roff, 3);
+        return getByteAtOffset_BE(seg, roff) & 0xFF |
+                    (getByteAtOffset_BE(seg, roff + 1) & 0xFF) << 8 |
+                    getByteAtOffset_BE(seg, roff + 2) << 16;
+    }
+
+    @Override
+    public int readUnsignedMedium() {
+        checkRead(roff, 3);
+        int value = (getByteAtOffset_BE(seg, roff) << 16 |
+                    (getByteAtOffset_BE(seg, roff + 1) & 0xFF) << 8 |
+                    getByteAtOffset_BE(seg, roff + 2) & 0xFF) & 0xFFFFFF;
+        roff += 3;
+        return value;
+    }
+
+    @Override
+    public int readUnsignedMedium(int roff) {
+        checkRead(roff, 3);
+        return (getByteAtOffset_BE(seg, roff) << 16 |
+                    (getByteAtOffset_BE(seg, roff + 1) & 0xFF) << 8 |
+                    getByteAtOffset_BE(seg, roff + 2) & 0xFF) & 0xFFFFFF;
+    }
+
+    @Override
+    public int readUnsignedMediumLE() {
+        checkRead(roff, 3);
+        int value = (getByteAtOffset_BE(seg, roff) & 0xFF |
+                    (getByteAtOffset_BE(seg, roff + 1) & 0xFF) << 8 |
+                    getByteAtOffset_BE(seg, roff + 2) << 16) & 0xFFFFFF;
+        roff += 3;
+        return value;
+    }
+
+    @Override
+    public int readUnsignedMediumLE(int roff) {
+        checkRead(roff, 3);
+        return (getByteAtOffset_BE(seg, roff) & 0xFF |
+                    (getByteAtOffset_BE(seg, roff + 1) & 0xFF) << 8 |
+                    getByteAtOffset_BE(seg, roff + 2) << 16) & 0xFFFFFF;
+    }
+
+    @Override
+    public Buf writeMedium(int value) {
+        checkWrite(woff, 3);
+        setByteAtOffset_BE(seg, woff, (byte) (value >> 16));
+        setByteAtOffset_BE(seg, woff + 1, (byte) (value >> 8 & 0xFF));
+        setByteAtOffset_BE(seg, woff + 2, (byte) (value & 0xFF));
+        woff += 3;
+        return this;
+    }
+
+    @Override
+    public Buf writeMedium(int woff, int value) {
+        checkWrite(woff, 3);
+        setByteAtOffset_BE(seg, woff, (byte) (value >> 16));
+        setByteAtOffset_BE(seg, woff + 1, (byte) (value >> 8 & 0xFF));
+        setByteAtOffset_BE(seg, woff + 2, (byte) (value & 0xFF));
+        return this;
+    }
+
+    @Override
+    public Buf writeMediumLE(int value) {
+        checkWrite(woff, 3);
+        setByteAtOffset_BE(seg, woff, (byte) (value & 0xFF));
+        setByteAtOffset_BE(seg, woff + 1, (byte) (value >> 8 & 0xFF));
+        setByteAtOffset_BE(seg, woff + 2, (byte) (value >> 16 & 0xFF));
+        woff += 3;
+        return this;
+    }
+
+    @Override
+    public Buf writeMediumLE(int woff, int value) {
+        checkWrite(woff, 3);
+        setByteAtOffset_BE(seg, woff, (byte) (value & 0xFF));
+        setByteAtOffset_BE(seg, woff + 1, (byte) (value >> 8 & 0xFF));
+        setByteAtOffset_BE(seg, woff + 2, (byte) (value >> 16 & 0xFF));
+        return this;
+    }
+
+    @Override
+    public Buf writeUnsignedMedium(int value) {
+        checkWrite(woff, 3);
+        setByteAtOffset_BE(seg, woff, (byte) (value >> 16));
+        setByteAtOffset_BE(seg, woff + 1, (byte) (value >> 8 & 0xFF));
+        setByteAtOffset_BE(seg, woff + 2, (byte) (value & 0xFF));
+        woff += 3;
+        return this;
+    }
+
+    @Override
+    public Buf writeUnsignedMedium(int woff, int value) {
+        checkWrite(woff, 3);
+        setByteAtOffset_BE(seg, woff, (byte) (value >> 16));
+        setByteAtOffset_BE(seg, woff + 1, (byte) (value >> 8 & 0xFF));
+        setByteAtOffset_BE(seg, woff + 2, (byte) (value & 0xFF));
+        return this;
+    }
+
+    @Override
+    public Buf writeUnsignedMediumLE(int value) {
+        checkWrite(woff, 3);
+        setByteAtOffset_BE(seg, woff, (byte) (value & 0xFF));
+        setByteAtOffset_BE(seg, woff + 1, (byte) (value >> 8 & 0xFF));
+        setByteAtOffset_BE(seg, woff + 2, (byte) (value >> 16 & 0xFF));
+        woff += 3;
+        return this;
+    }
+
+    @Override
+    public Buf writeUnsignedMediumLE(int woff, int value) {
+        checkWrite(woff, 3);
+        setByteAtOffset_BE(seg, woff, (byte) (value & 0xFF));
+        setByteAtOffset_BE(seg, woff + 1, (byte) (value >> 8 & 0xFF));
+        setByteAtOffset_BE(seg, woff + 2, (byte) (value >> 16 & 0xFF));
+        return this;
+    }
+
+    @Override
+    public int readInt() {
+        checkRead(roff, Integer.BYTES);
+        int value = getIntAtOffset_BE(seg, roff);
+        roff += Integer.BYTES;
+        return value;
+    }
+
+    @Override
+    public int readInt(int roff) {
+        checkRead(roff, Integer.BYTES);
+        return getIntAtOffset_BE(seg, roff);
+    }
+
+    @Override
+    public int readIntLE() {
+        checkRead(roff, Integer.BYTES);
+        int value = getIntAtOffset_LE(seg, roff);
+        roff += Integer.BYTES;
+        return value;
+    }
+
+    @Override
+    public int readIntLE(int roff) {
+        checkRead(roff, Integer.BYTES);
+        return getIntAtOffset_LE(seg, roff);
+    }
+
+    @Override
+    public long readUnsignedInt() {
+        checkRead(roff, Integer.BYTES);
+        long value = getIntAtOffset_BE(seg, roff) & 0xFFFFFFFFL;
+        roff += Integer.BYTES;
+        return value;
+    }
+
+    @Override
+    public long readUnsignedInt(int roff) {
+        checkRead(roff, Integer.BYTES);
+        return getIntAtOffset_BE(seg, roff) & 0xFFFFFFFFL;
+    }
+
+    @Override
+    public long readUnsignedIntLE() {
+        checkRead(roff, Integer.BYTES);
+        long value = getIntAtOffset_LE(seg, roff) & 0xFFFFFFFFL;
+        roff += Integer.BYTES;
+        return value;
+    }
+
+    @Override
+    public long readUnsignedIntLE(int roff) {
+        checkRead(roff, Integer.BYTES);
+        return getIntAtOffset_LE(seg, roff) & 0xFFFFFFFFL;
+    }
+
+    @Override
+    public Buf writeInt(int value) {
+        setIntAtOffset_BE(seg, woff, value);
+        woff += Integer.BYTES;
+        return this;
+    }
+
+    @Override
+    public Buf writeInt(int woff, int value) {
+        setIntAtOffset_BE(seg, woff, value);
+        return this;
+    }
+
+    @Override
+    public Buf writeIntLE(int value) {
+        setIntAtOffset_LE(seg, woff, value);
+        woff += Integer.BYTES;
+        return this;
+    }
+
+    @Override
+    public Buf writeIntLE(int woff, int value) {
+        setIntAtOffset_LE(seg, woff, value);
+        return this;
+    }
+
+    @Override
+    public Buf writeUnsignedInt(long value) {
+        setIntAtOffset_BE(seg, woff, (int) (value & 0xFFFFFFFFL));
+        woff += Integer.BYTES;
+        return this;
+    }
+
+    @Override
+    public Buf writeUnsignedInt(int woff, long value) {
+        setIntAtOffset_BE(seg, woff, (int) (value & 0xFFFFFFFFL));
+        return this;
+    }
+
+    @Override
+    public Buf writeUnsignedIntLE(long value) {
+        setIntAtOffset_LE(seg, woff, (int) (value & 0xFFFFFFFFL));
+        woff += Integer.BYTES;
+        return this;
+    }
+
+    @Override
+    public Buf writeUnsignedIntLE(int woff, long value) {
+        setIntAtOffset_LE(seg, woff, (int) (value & 0xFFFFFFFFL));
+        return this;
+    }
+
+    @Override
+    public float readFloat() {
+        checkRead(roff, Float.BYTES);
+        float value = getFloatAtOffset_BE(seg, roff);
+        roff += Float.BYTES;
+        return value;
+    }
+
+    @Override
+    public float readFloat(int roff) {
+        checkRead(roff, Float.BYTES);
+        return getFloatAtOffset_BE(seg, roff);
+    }
+
+    @Override
+    public float readFloatLE() {
+        checkRead(roff, Float.BYTES);
+        float value = getFloatAtOffset_LE(seg, roff);
+        roff += Float.BYTES;
+        return value;
+    }
+
+    @Override
+    public float readFloatLE(int roff) {
+        checkRead(roff, Float.BYTES);
+        return getFloatAtOffset_LE(seg, roff);
+    }
+
+    @Override
+    public Buf writeFloat(float value) {
+        setFloatAtOffset_BE(seg, woff, value);
+        woff += Float.BYTES;
+        return this;
+    }
+
+    @Override
+    public Buf writeFloat(int woff, float value) {
+        setFloatAtOffset_BE(seg, woff, value);
+        return this;
+    }
+
+    @Override
+    public Buf writeFloatLE(float value) {
+        setFloatAtOffset_LE(seg, woff, value);
+        woff += Float.BYTES;
+        return this;
+    }
+
+    @Override
+    public Buf writeFloatLE(int woff, float value) {
+        setFloatAtOffset_LE(seg, woff, value);
+        return this;
+    }
+
+    @Override
+    public long readLong() {
+        checkRead(roff, Long.BYTES);
+        long value = getLongAtOffset_BE(seg, roff);
+        roff += Long.BYTES;
+        return value;
+    }
+
+    @Override
+    public long readLong(int roff) {
+        checkRead(roff, Long.BYTES);
+        return getLongAtOffset_BE(seg, roff);
+    }
+
+    @Override
+    public long readLongLE() {
+        checkRead(roff, Long.BYTES);
+        long value = getLongAtOffset_LE(seg, roff);
+        roff += Long.BYTES;
+        return value;
+    }
+
+    @Override
+    public long readLongLE(int roff) {
+        checkRead(roff, Long.BYTES);
+        return getLongAtOffset_LE(seg, roff);
+    }
+
+    @Override
+    public Buf writeLong(long value) {
+        setLongAtOffset_BE(seg, woff, value);
+        woff += Long.BYTES;
+        return this;
+    }
+
+    @Override
+    public Buf writeLong(int woff, long value) {
+        setLongAtOffset_BE(seg, woff, value);
+        return this;
+    }
+
+    @Override
+    public Buf writeLongLE(long value) {
+        setLongAtOffset_LE(seg, woff, value);
+        woff += Long.BYTES;
+        return this;
+    }
+
+    @Override
+    public Buf writeLongLE(int woff, long value) {
+        setLongAtOffset_LE(seg, woff, value);
+        return this;
+    }
+
+    @Override
+    public double readDouble() {
+        checkRead(roff, Double.BYTES);
+        double value = getDoubleAtOffset_BE(seg, roff);
+        roff += Double.BYTES;
+        return value;
+    }
+
+    @Override
+    public double readDouble(int roff) {
+        checkRead(roff, Double.BYTES);
+        return getDoubleAtOffset_BE(seg, roff);
+    }
+
+    @Override
+    public double readDoubleLE() {
+        checkRead(roff, Double.BYTES);
+        double value = getDoubleAtOffset_LE(seg, roff);
+        roff += Double.BYTES;
+        return value;
+    }
+
+    @Override
+    public double readDoubleLE(int roff) {
+        checkRead(roff, Double.BYTES);
+        return getDoubleAtOffset_LE(seg, roff);
+    }
+
+    @Override
+    public Buf writeDouble(double value) {
+        setDoubleAtOffset_BE(seg, woff, value);
+        woff += Double.BYTES;
+        return this;
+    }
+
+    @Override
+    public Buf writeDouble(int woff, double value) {
+        setDoubleAtOffset_BE(seg, woff, value);
+        return this;
+    }
+
+    @Override
+    public Buf writeDoubleLE(double value) {
+        setDoubleAtOffset_LE(seg, woff, value);
+        woff += Double.BYTES;
+        return this;
+    }
+
+    @Override
+    public Buf writeDoubleLE(int woff, double value) {
+        setDoubleAtOffset_LE(seg, woff, value);
+        return this;
+    }
+    // ### CODEGEN END primitive accessors implementation
 
     @Override
     protected Owned<BBuf> prepareSend() {
         BBuf outer = this;
-        boolean isConfined = segment.ownerThread() == null;
-        MemorySegment transferSegment = isConfined? segment : segment.withOwnerThread(null);
+        boolean isConfined = seg.ownerThread() == null;
+        MemorySegment transferSegment = isConfined? seg : seg.withOwnerThread(null);
         return new Owned<BBuf>() {
             @Override
             public BBuf transferOwnership(Thread recipient, Drop<BBuf> drop) {
                 var newSegment = isConfined? transferSegment.withOwnerThread(recipient) : transferSegment;
                 BBuf copy = new BBuf(newSegment, drop);
-                copy.read = outer.read;
-                copy.write = outer.write;
+                copy.roff = outer.roff;
+                copy.woff = outer.woff;
                 return copy;
             }
         };
     }
 
-    private void checkIndexBounds(int index) {
-        if (index < 0 || segment.byteSize() <= index) {
+    private void checkRead(int index, int size) {
+        if (index < 0 || woff < index + size) {
+            throw indexOutOfBounds(index);
+        }
+    }
+
+    private void checkWrite(int index, int size) {
+        if (index < 0 || seg.byteSize() < index + size) {
             throw indexOutOfBounds(index);
         }
     }
 
     private IndexOutOfBoundsException indexOutOfBounds(int index) {
         return new IndexOutOfBoundsException(
-                "Index " + index + " is out of bounds: [0 to " + segment.byteSize() + "].");
+                "Index " + index + " is out of bounds: [read 0 to " + woff + ", write 0 to " +
+                (seg.byteSize() - 1) + "].");
     }
 }
