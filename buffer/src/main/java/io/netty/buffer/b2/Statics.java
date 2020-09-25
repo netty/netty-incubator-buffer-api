@@ -17,10 +17,14 @@ package io.netty.buffer.b2;
 
 import java.lang.invoke.MethodHandles.Lookup;
 import java.lang.invoke.VarHandle;
+import java.lang.ref.Cleaner;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.LongAdder;
 
 interface Statics {
+    Cleaner CLEANER = Cleaner.create();
     LongAdder MEM_USAGE_NATIVE = new LongAdder();
+    ConcurrentHashMap<Long,Runnable> CLEANUP_ACTIONS = new ConcurrentHashMap<>();
 
     static VarHandle findVarHandle(Lookup lookup, Class<?> recv, String name, Class<?> type) {
         try {
@@ -28,5 +32,9 @@ interface Statics {
         } catch (Exception e) {
             throw new ExceptionInInitializerError(e);
         }
+    }
+
+    static Runnable getCleanupAction(long size) {
+        return CLEANUP_ACTIONS.computeIfAbsent(size, s -> () -> MEM_USAGE_NATIVE.add(-s));
     }
 }

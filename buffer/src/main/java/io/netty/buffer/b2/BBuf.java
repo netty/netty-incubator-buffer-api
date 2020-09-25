@@ -17,15 +17,10 @@ package io.netty.buffer.b2;
 
 import jdk.incubator.foreign.MemorySegment;
 
-import static io.netty.buffer.b2.Statics.*;
 import static jdk.incubator.foreign.MemoryAccess.*;
 
 class BBuf extends RcSupport<Buf, BBuf> implements Buf {
     static final Drop<BBuf> SEGMENT_CLOSE = buf -> buf.seg.close();
-    static final Drop<BBuf> SEGMENT_CLOSE_NATIVE = buf -> {
-        buf.seg.close();
-        MEM_USAGE_NATIVE.add(-buf.seg.byteSize());
-    };
     final MemorySegment seg;
     private int roff;
     private int woff;
@@ -95,6 +90,7 @@ class BBuf extends RcSupport<Buf, BBuf> implements Buf {
     }
 
     // ### CODEGEN START primitive accessors implementation
+    // <editor-fold defaultstate="collapsed" desc="Generated primitive accessors implementation.">
 
     @Override
     public byte readByte() {
@@ -729,6 +725,7 @@ class BBuf extends RcSupport<Buf, BBuf> implements Buf {
         setDoubleAtOffset_LE(seg, woff, value);
         return this;
     }
+    // </editor-fold>
     // ### CODEGEN END primitive accessors implementation
 
     @Override

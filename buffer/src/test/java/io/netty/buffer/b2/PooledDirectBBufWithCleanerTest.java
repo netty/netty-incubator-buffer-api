@@ -29,17 +29,34 @@ public class PooledDirectBBufWithCleanerTest extends DirectBBufTest {
     @Test
     public void bufferMustBeClosedByCleaner() throws InterruptedException {
         var allocator = createAllocator();
-        double sumOfMemoryDataPoints = 0;
         allocator.close();
         int iterations = 100;
         int allocationSize = 1024;
         for (int i = 0; i < iterations; i++) {
             allocateAndForget(allocator, allocationSize);
             System.gc();
-            sumOfMemoryDataPoints += Statics.MEM_USAGE_NATIVE.sum();
+            System.runFinalization();
         }
-        double meanMemoryUsage = sumOfMemoryDataPoints / iterations;
-        assertThat(meanMemoryUsage, lessThan(allocationSize * 5.0));
+        var sum = Statics.MEM_USAGE_NATIVE.sum();
+        var totalAllocated = (long) allocationSize * iterations;
+        assertThat(sum, lessThan(totalAllocated));
+    }
+
+    @Test
+    public void buffersMustBeReusedByPoolingAllocatorEvenWhenDroppedByCleanerInsteadOfExplicitly()
+            throws InterruptedException {
+        try (var allocator = createAllocator()) {
+            int iterations = 100;
+            int allocationSize = 1024;
+            for (int i = 0; i < iterations; i++) {
+                allocateAndForget(allocator, allocationSize);
+                System.gc();
+                System.runFinalization();
+            }
+            var sum = Statics.MEM_USAGE_NATIVE.sum();
+            var totalAllocated = (long) allocationSize * iterations;
+            assertThat(sum, lessThan(totalAllocated));
+        }
     }
 
     protected void allocateAndForget(Allocator allocator, long size) {

@@ -503,16 +503,18 @@ public final class Codegen {
 
     private static Function<String, Stream<String>> processLines() {
         return new Function<String, Stream<String>>() {
-            final Pattern codegenStart = Pattern.compile("^\\s*// ### CODEGEN START (.*)$");
-            final Pattern codegenEnd = Pattern.compile("^\\s*// ### CODEGEN END (.*)$");
+            final Pattern codegenStart = Pattern.compile("^(\\s*// )### CODEGEN START (.*)$");
+            final Pattern codegenEnd = Pattern.compile("^(\\s*// )### CODEGEN END (.*)$");
             boolean inCodeGenRegion;
 
             @Override
             public Stream<String> apply(String line) {
                 if (inCodeGenRegion) {
-                    if (codegenEnd.matcher(line).find()) {
+                    var matcher = codegenEnd.matcher(line);
+                    if (matcher.find()) {
                         inCodeGenRegion = false;
-                        return Stream.of(line);
+                        String regionEnd = matcher.group(1) + "</editor-fold>";
+                        return Stream.of(regionEnd, line);
                     }
                     return Stream.empty();
                 }
@@ -520,10 +522,13 @@ public final class Codegen {
                 var matcher = codegenStart.matcher(line);
                 Stream<String> generator = Stream.empty();
                 if (matcher.find()) {
-                    String region = matcher.group(1);
+                    String region = matcher.group(2);
                     var generatorSupplier = REGION_GENERATORS.get(region);
                     if (generatorSupplier != null) {
-                        generator = generatorSupplier.get();
+                        String regionStart =
+                                matcher.group(1) + "<editor-fold defaultstate=\"collapsed\" desc=\"Generated " +
+                                region + ".\">";
+                        generator = Stream.concat(Stream.of(regionStart), generatorSupplier.get());
                         inCodeGenRegion = true;
                     }
                 }

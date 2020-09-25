@@ -96,6 +96,7 @@ public interface Buf extends Rc<Buf> {
     long getNativeAddress();
 
     // ### CODEGEN START primitive accessors interface
+    // <editor-fold defaultstate="collapsed" desc="Generated primitive accessors interface.">
 
     /**
      * Get the byte value at the current {@link Buf#readerIndex()},
@@ -1086,5 +1087,6 @@ public interface Buf extends Rc<Buf> {
      *                                   greater than or equal to {@link Buf#capacity()} minus {@link Double#BYTES}.
      */
     Buf writeDoubleLE(int woff, double value);
+    // </editor-fold>
     // ### CODEGEN END primitive accessors interface
 }

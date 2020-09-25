@@ -16,22 +16,29 @@
 package io.netty.buffer.b2;
 
 import java.lang.invoke.VarHandle;
-import java.lang.ref.Cleaner;
 import java.lang.ref.Cleaner.Cleanable;
+import java.lang.ref.WeakReference;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static io.netty.buffer.b2.Statics.*;
 import static java.lang.invoke.MethodHandles.*;
 
 class NativeMemoryCleanerDrop implements Drop<BBuf> {
-    private static final Cleaner CLEANER = Cleaner.create();
     private static final VarHandle CLEANABLE =
-            findVarHandle(lookup(), NativeMemoryCleanerDrop.class, "cleanable", Cleanable.class);
+            findVarHandle(lookup(), NativeMemoryCleanerDrop.class, "cleanable", GatedCleanable.class);
+    private final SizeClassedMemoryPool pool;
+    private final Drop<BBuf> delegate;
     @SuppressWarnings("unused")
-    private volatile Cleanable cleanable;
+    private volatile GatedCleanable cleanable;
+
+    NativeMemoryCleanerDrop(SizeClassedMemoryPool pool, Drop<BBuf> delegate) {
+        this.pool = pool;
+        this.delegate = delegate;
+    }
 
     @Override
     public void drop(BBuf buf) {
-        Cleanable c = (Cleanable) CLEANABLE.getAndSet(this, null);
+        GatedCleanable c = (GatedCleanable) CLEANABLE.getAndSet(this, null);
         if (c != null) {
             c.clean();
         }
@@ -39,14 +46,46 @@ class NativeMemoryCleanerDrop implements Drop<BBuf> {
 
     @Override
     public void accept(BBuf buf) {
-        drop(null); // Unregister old cleanable, if any, to avoid uncontrolled build-up.
-        var segment = buf.seg;
-        cleanable = CLEANER.register(this, () -> {
-            if (segment.isAlive()) {
-                // TODO return segment to pool, or call out to external drop, instead of closing it directly.
-                segment.close();
-                MEM_USAGE_NATIVE.add(-segment.byteSize());
+        // Unregister old cleanable, if any, to avoid uncontrolled build-up.
+        GatedCleanable c = (GatedCleanable) CLEANABLE.getAndSet(this, null);
+        if (c != null) {
+            c.disable();
+            c.clean();
+        }
+
+        var pool = this.pool;
+        var seg = buf.seg;
+        var delegate = this.delegate;
+        WeakReference<BBuf> ref = new WeakReference<>(buf);
+        AtomicBoolean gate = new AtomicBoolean();
+        cleanable = new GatedCleanable(gate, CLEANER.register(this, () -> {
+            if (gate.compareAndSet(false, true)) {
+                BBuf b = ref.get();
+                if (b == null) {
+                    pool.recoverLostSegment(seg);
+                } else {
+                    delegate.drop(b);
+                }
             }
-        });
+        }));
+    }
+
+    private static class GatedCleanable implements Cleanable {
+        private final AtomicBoolean gate;
+        private final Cleanable cleanable;
+
+        GatedCleanable(AtomicBoolean gate, Cleanable cleanable) {
+            this.gate = gate;
+            this.cleanable = cleanable;
+        }
+
+        public void disable() {
+            gate.set(true);
+        }
+
+        @Override
+        public void clean() {
+            cleanable.clean();
+        }
     }
 }

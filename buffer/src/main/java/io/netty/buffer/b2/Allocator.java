@@ -57,7 +57,7 @@ public interface Allocator extends AutoCloseable {
             @Override
             public BBuf allocate(long size) {
                 checkSize(size);
-                var segment = MemorySegment.ofArray(new byte[Math.toIntExact(size)]);
+                var segment = allocateHeap(size);
                 return new BBuf(segment, SEGMENT_CLOSE);
             }
         };
@@ -68,48 +68,58 @@ public interface Allocator extends AutoCloseable {
             @Override
             public Buf allocate(long size) {
                 checkSize(size);
-                var segment = MemorySegment.allocateNative(size);
-                Statics.MEM_USAGE_NATIVE.add(size);
-                return new BBuf(segment, SEGMENT_CLOSE_NATIVE);
+                var segment = allocateNative(size);
+                return new BBuf(segment, SEGMENT_CLOSE);
             }
         };
     }
 
     static Allocator pooledHeap() {
-        return new SizeClassedMemoryPool(false) {
+        return new SizeClassedMemoryPool() {
             @Override
             protected MemorySegment createMemorySegment(long size) {
                 checkSize(size);
-                return MemorySegment.ofArray(new byte[Math.toIntExact(size)]).withOwnerThread(null);
+                return allocateHeap(size).withOwnerThread(null);
             }
         };
     }
 
     static Allocator pooledDirect() {
-        return new SizeClassedMemoryPool(true) {
+        return new SizeClassedMemoryPool() {
             @Override
             protected MemorySegment createMemorySegment(long size) {
                 checkSize(size);
-                return MemorySegment.allocateNative(size).withOwnerThread(null);
+                return allocateNative(size).withOwnerThread(null);
             }
         };
     }
 
     static Allocator pooledDirectWithCleaner() {
-        return new SizeClassedMemoryPool(true) {
+        return new SizeClassedMemoryPool() {
             @Override
             protected MemorySegment createMemorySegment(long size) {
                 checkSize(size);
-                return MemorySegment.allocateNative(size).withOwnerThread(null);
+                return allocateNative(size).withOwnerThread(null);
             }
 
             @Override
             protected BBuf createBBuf(MemorySegment segment) {
-                var drop = new NativeMemoryCleanerDrop();
+                var drop = new NativeMemoryCleanerDrop(this, getDrop());
                 var buf = new BBuf(segment, drop);
                 drop.accept(buf);
                 return buf;
             }
         };
+    }
+
+    private static MemorySegment allocateHeap(long size) {
+        return MemorySegment.ofArray(new byte[Math.toIntExact(size)]);
+    }
+
+    private static MemorySegment allocateNative(long size) {
+        var segment = MemorySegment.allocateNative(size)
+                                   .withCleanupAction(Statics.getCleanupAction(size));
+        Statics.MEM_USAGE_NATIVE.add(size);
+        return segment;
     }
 }

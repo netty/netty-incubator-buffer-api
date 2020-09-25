@@ -28,13 +28,11 @@ abstract class SizeClassedMemoryPool implements Allocator, Drop<BBuf> {
     private static final VarHandle CLOSE = Statics.findVarHandle(
             lookup(), SizeClassedMemoryPool.class, "closed", boolean.class);
     private final ConcurrentHashMap<Long, ConcurrentLinkedQueue<Send<Buf>>> pool;
-    private final Drop<BBuf> disposer;
     @SuppressWarnings("unused")
     private volatile boolean closed;
 
-    protected SizeClassedMemoryPool(boolean allocatesNativeMemory) {
+    protected SizeClassedMemoryPool() {
         pool = new ConcurrentHashMap<>();
-        disposer = allocatesNativeMemory ? BBuf.SEGMENT_CLOSE_NATIVE : BBuf.SEGMENT_CLOSE;
     }
 
     @Override
@@ -45,7 +43,6 @@ abstract class SizeClassedMemoryPool implements Allocator, Drop<BBuf> {
             return send.receive();
         }
         var segment = createMemorySegment(size);
-        Statics.MEM_USAGE_NATIVE.add(size);
         return createBBuf(segment);
     }
 
@@ -86,18 +83,22 @@ abstract class SizeClassedMemoryPool implements Allocator, Drop<BBuf> {
         var sizeClassPool = getSizeClassPool(buf.capacity());
         sizeClassPool.offer(buf.send());
         if (closed) {
-            var send = sizeClassPool.poll();
-            if (send != null) {
+            Send<Buf> send;
+            while ((send = sizeClassPool.poll()) != null) {
                 dispose(send.receive());
             }
         }
+    }
+
+    void recoverLostSegment(MemorySegment segment) {
+        createBBuf(segment).close();
     }
 
     private ConcurrentLinkedQueue<Send<Buf>> getSizeClassPool(long size) {
         return pool.computeIfAbsent(size, k -> new ConcurrentLinkedQueue<>());
     }
 
-    private void dispose(Buf buf) {
-        disposer.drop((BBuf) buf);
+    private static void dispose(Buf buf) {
+        BBuf.SEGMENT_CLOSE.drop((BBuf) buf);
     }
 }

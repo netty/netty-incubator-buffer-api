@@ -296,6 +296,7 @@ public abstract class BBufTest {
     }
 
     // ### CODEGEN START primitive accessors tests
+    // <editor-fold defaultstate="collapsed" desc="Generated primitive accessors tests.">
 
     @Test
     public void relativeReadOfByteMustNotBoundsCheckWhenReadOffsetAndSizeIsEqualToWriteOffset() {
@@ -3948,6 +3949,7 @@ public abstract class BBufTest {
         assertEquals((byte) 0x02, buf.readByte());
         assertEquals((byte) 0x01, buf.readByte());
     }
+    // </editor-fold>
     // ### CODEGEN END primitive accessors tests
 
     private static void assertEquals(byte expected, byte actual) {
