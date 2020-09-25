@@ -74,6 +74,18 @@ public interface Allocator extends AutoCloseable {
         };
     }
 
+    static Allocator directWithCleaner() {
+        return new Allocator() {
+            @Override
+            public Buf allocate(long size) {
+                checkSize(size);
+                var segment = allocateNative(size);
+                segment.registerCleaner(Statics.CLEANER);
+                return new BBuf(segment, SEGMENT_CLOSE);
+            }
+        };
+    }
+
     static Allocator pooledHeap() {
         return new SizeClassedMemoryPool() {
             @Override
