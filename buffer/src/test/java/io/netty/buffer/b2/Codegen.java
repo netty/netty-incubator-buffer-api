@@ -22,50 +22,103 @@ public final class Codegen {
             "primitive accessors implementation", Codegen::primitiveAccessorsImplementation,
             "primitive accessors tests", Codegen::primitiveAccessorsTests);
 
+    enum Order {
+        DF /*default as configured for buffer*/, BE, LE;
+
+        public String suffix() {
+            return this == DF? "" : name();
+        }
+
+        public String title() {
+            switch (this) {
+            case BE: return "Big";
+            case LE: return "Little";
+            }
+            return "Default";
+        }
+
+        public String endianDesc() {
+            switch (this) {
+            case BE: return "big-endian";
+            case LE: return "little-endian";
+            }
+            return "the {@link #order() configured} default";
+        }
+    }
+
     enum Type {
         BYTE("byte", "Byte", "Byte.BYTES", Byte.BYTES, false, "two's complement 8-bit", "int"),
         CHAR("char", "Char", "2", 2, true, "2-byte UTF-16", null),
         SHORT("short", "Short", "Short.BYTES", Short.BYTES, true, "two's complement 16-bit", "int"),
         MED("int", "Medium", "3", 3, true, "two's complement 24-bit", "int") {
             @Override
-            public String load(boolean le, boolean unsigned) {
-                String indent = "                    ";
+            public String load(Order ord, boolean unsigned) {
+                String indent = " ".repeat(ord == Order.DF? 16 : 20);
                 String tailPart = unsigned? ") & 0x" + "FF".repeat(actualSize) : "";
-                if (le) {
-                    return (unsigned? "(" : "") +
-                           "getByteAtOffset_BE(seg, roff) & 0xFF |\n" +
-                           indent +
-                           "(getByteAtOffset_BE(seg, roff + 1) & 0xFF) << 8 |\n" +
-                           indent +
-                           "getByteAtOffset_BE(seg, roff + 2) << 16" +
-                           tailPart;
-                } else {
-                    return (unsigned? "(" : "") +
-                           "getByteAtOffset_BE(seg, roff) << 16 |\n" +
-                           indent +
-                           "(getByteAtOffset_BE(seg, roff + 1) & 0xFF) << 8 |\n" +
-                           indent +
-                           "getByteAtOffset_BE(seg, roff + 2) & 0xFF" +
-                           tailPart;
+                switch (ord) {
+                case BE: return loadBE(unsigned, indent, tailPart);
+                case LE: return loadLE(unsigned, indent, tailPart);
                 }
+                return "isBigEndian?\n" +
+                       loadBE(unsigned, indent, tailPart) + " : \n" +
+                       loadLE(unsigned, indent, tailPart);
+            }
+
+            private String loadBE(boolean unsigned, String indent, String tailPart) {
+                return (unsigned? "(" : "") +
+                       "getByteAtOffset_BE(seg, roff) << 16 |\n" +
+                       indent +
+                       "(getByteAtOffset_BE(seg, roff + 1) & 0xFF) << 8 |\n" +
+                       indent +
+                       "getByteAtOffset_BE(seg, roff + 2) & 0xFF" +
+                       tailPart;
+            }
+
+            private String loadLE(boolean unsigned, String indent, String tailPart) {
+                return (unsigned? "(" : "") +
+                       "getByteAtOffset_BE(seg, roff) & 0xFF |\n" +
+                       indent +
+                       "(getByteAtOffset_BE(seg, roff + 1) & 0xFF) << 8 |\n" +
+                       indent +
+                       "getByteAtOffset_BE(seg, roff + 2) << 16" +
+                       tailPart;
             }
 
             @Override
-            public String store(boolean le, boolean unsigned) {
-                String indent = "        ";
-                if (le) {
-                    return "setByteAtOffset_BE(seg, woff, (byte) (value & 0xFF));\n" +
-                           indent +
-                           "setByteAtOffset_BE(seg, woff + 1, (byte) (value >> 8 & 0xFF));\n" +
-                           indent +
-                           "setByteAtOffset_BE(seg, woff + 2, (byte) (value >> 16 & 0xFF))";
-                } else {
-                    return "setByteAtOffset_BE(seg, woff, (byte) (value >> 16));\n" +
-                           indent +
-                           "setByteAtOffset_BE(seg, woff + 1, (byte) (value >> 8 & 0xFF));\n" +
-                           indent +
-                           "setByteAtOffset_BE(seg, woff + 2, (byte) (value & 0xFF))";
+            public String store(Order ord, boolean unsigned) {
+                String indent = " ".repeat(ord == Order.DF? 12 : 8);
+                switch (ord) {
+                case BE: return storeBE(indent);
+                case LE: return storeLE(indent);
                 }
+                String indentOuter = " ".repeat(8);
+                return "if (isBigEndian) {\n" +
+                       indent +
+                       storeBE(indent) +
+                       '\n' +
+                       indentOuter +
+                       "} else {\n" +
+                       indent +
+                       storeLE(indent) +
+                       '\n' +
+                       indentOuter +
+                       '}';
+            }
+
+            private String storeBE(String indent) {
+                return "setByteAtOffset_BE(seg, woff, (byte) (value >> 16));\n" +
+                       indent +
+                       "setByteAtOffset_BE(seg, woff + 1, (byte) (value >> 8 & 0xFF));\n" +
+                       indent +
+                       "setByteAtOffset_BE(seg, woff + 2, (byte) (value & 0xFF));";
+            }
+
+            private String storeLE(String indent) {
+                return "setByteAtOffset_BE(seg, woff, (byte) (value & 0xFF));\n" +
+                       indent +
+                       "setByteAtOffset_BE(seg, woff + 1, (byte) (value >> 8 & 0xFF));\n" +
+                       indent +
+                       "setByteAtOffset_BE(seg, woff + 2, (byte) (value >> 16 & 0xFF));";
             }
         },
         INT("int", "Int", "Integer.BYTES", Integer.BYTES, true, "two's complement 32-bit", "long"),
@@ -78,68 +131,90 @@ public final class Codegen {
         protected final String title;
         protected final String size;
         protected final int actualSize;
-        protected final boolean includeLE;
+        protected final boolean includeLEBE;
         protected final String extra;
         protected final String unsignedCarrier;
 
-        Type(String type, String title, String size, int actualSize, boolean includeLE, String extra, String unsignedCarrier) {
+        Type(String type, String title, String size, int actualSize, boolean includeLEBE, String extra, String unsignedCarrier) {
             this.type = type;
             this.title = title;
             this.size = size;
             this.actualSize = actualSize;
-            this.includeLE = includeLE;
+            this.includeLEBE = includeLEBE;
             this.extra = extra;
             this.unsignedCarrier = unsignedCarrier;
         }
 
-        public String title(boolean le, boolean unsigned) {
-            return (unsigned? "Unsigned" + title : title) + (le? "LE" : "");
+        public String title(Order ord, boolean unsigned) {
+            return (unsigned? "Unsigned" + title : title) + ord.suffix();
         }
 
-        public String extraRead(boolean le, boolean unsigned) {
-            return getExtra("read", le, unsigned);
+        public String extraRead(Order ord, boolean unsigned) {
+            return getExtra("read", ord, unsigned);
         }
 
-        public String extraWrite(boolean le, boolean unsigned) {
-            return getExtra("written", le, unsigned);
+        public String extraWrite(Order ord, boolean unsigned) {
+            return getExtra("written", ord, unsigned);
         }
 
-        private String getExtra(String op, boolean le, boolean unsigned) {
+        private String getExtra(String op, Order ord, boolean unsigned) {
             return "The value is " + op + " using " +
                    (unsigned? "an unsigned " : "a ") +
                    extra +
-                   " encoding, with " +
-                   (le? "little" : "big") +
-                   "-endian byte order.";
+                   " encoding,\n" +
+                   "     * with " +
+                   ord.endianDesc() +
+                   " byte order.";
         }
 
         public String type(boolean unsigned) {
             return unsigned? unsignedCarrier : type;
         }
 
-        public String load(boolean le, boolean unsigned) {
+        public String load(Order ord, boolean unsigned) {
             boolean longCarrier = "long".equals(unsignedCarrier);
             boolean intCarrier = "int".equals(unsignedCarrier);
             return (unsigned && !longCarrier && !intCarrier? '(' + unsignedCarrier + ") (" : "") +
-                   "get" +
-                   title +
-                   "AtOffset_" +
-                   (le? "LE" : "BE") +
-                   "(seg, roff)" +
+                   getCall(ord) +
                    (unsigned? " & 0x" + "FF".repeat(actualSize) +
                               (longCarrier? 'L' : intCarrier? "" : ')') : "");
         }
 
-        public String store(boolean le, boolean unsigned) {
+        private String getCall(Order ord) {
+            if (ord == Order.DF) {
+                return "(isBigEndian? " + getCall(Order.BE) + " : " + getCall(Order.LE) + ')';
+            }
+            return "get" +
+                   title +
+                   "AtOffset_" +
+                   ord.suffix() +
+                   "(seg, roff)";
+        }
+
+        public String store(Order ord, boolean unsigned) {
+            if (ord == Order.DF) {
+                String indent = "        ";
+                return "if (isBigEndian) {\n" +
+                       indent + "    " +
+                       store(Order.BE, unsigned) +
+                       '\n' +
+                       indent +
+                       "} else {\n" +
+                       indent + "    " +
+                       store(Order.LE, unsigned) +
+                       '\n' +
+                       indent +
+                       '}';
+            }
             boolean longCarrier = "long".equals(unsignedCarrier);
             return "set" +
                    title +
                    "AtOffset_" +
-                   (le? "LE" : "BE") +
+                   ord.suffix() +
                    "(seg, woff, " +
                    (unsigned? '(' + type + ") (value & 0x" + "FF".repeat(actualSize) +
                               (longCarrier? "L)" : ")") : "value") +
-                   ')';
+                   ");";
         }
 
         public String realType(boolean unsigned) {
@@ -150,7 +225,7 @@ public final class Codegen {
     enum Template {
         INTERFACE {
             @Override
-            public String relativeRead(Type type, boolean le, boolean unsigned, boolean read) {
+            public String relativeRead(Type type, Order ord, boolean unsigned, boolean read) {
                 var tmpl = '\n' +
                        "    /**\n" +
                        "     * Get the %8$s value at the current {@link Buf#readerIndex()},\n" +
@@ -161,11 +236,11 @@ public final class Codegen {
                        "     * @throws IndexOutOfBoundsException If {@link Buf#readableBytes} is less than %3$s.\n" +
                        "     */\n" +
                        "    %1$s read%2$s();";
-                return format(tmpl, type, le, unsigned, read);
+                return format(tmpl, type, ord, unsigned, read);
             }
 
             @Override
-            public String offsetRead(Type type, boolean le, boolean unsigned, boolean read) {
+            public String offsetRead(Type type, Order ord, boolean unsigned, boolean read) {
                 var tmpl = '\n' +
                        "    /**\n" +
                        "     * Get the %8$s value at the given reader offset.\n" +
@@ -178,11 +253,11 @@ public final class Codegen {
                        "     *                                   greater than or equal to {@link Buf#capacity()} minus %3$s.\n" +
                        "     */\n" +
                        "    %1$s read%2$s(int roff);";
-                return format(tmpl, type, le, unsigned, read);
+                return format(tmpl, type, ord, unsigned, read);
             }
 
             @Override
-            public String relativeWrite(Type type, boolean le, boolean unsigned, boolean read) {
+            public String relativeWrite(Type type, Order ord, boolean unsigned, boolean read) {
                 var tmpl = '\n' +
                        "    /**\n" +
                        "     * Set the given %8$s value at the current {@link Buf#writerIndex()},\n" +
@@ -194,11 +269,11 @@ public final class Codegen {
                        "     * @throws IndexOutOfBoundsException If {@link Buf#writableBytes} is less than %3$s.\n" +
                        "     */\n" +
                        "    Buf write%2$s(%1$s value);";
-                return format(tmpl, type, le, unsigned, read);
+                return format(tmpl, type, ord, unsigned, read);
             }
 
             @Override
-            public String offsetWrite(Type type, boolean le, boolean unsigned, boolean read) {
+            public String offsetWrite(Type type, Order ord, boolean unsigned, boolean read) {
                 var tmpl = '\n' +
                        "    /**\n" +
                        "     * Set the given %8$s value at the given write offset. The {@link Buf#writerIndex()} is not modified.\n" +
@@ -211,12 +286,12 @@ public final class Codegen {
                        "     *                                   greater than or equal to {@link Buf#capacity()} minus %3$s.\n" +
                        "     */\n" +
                        "    Buf write%2$s(int woff, %1$s value);";
-                return format(tmpl, type, le, unsigned, read);
+                return format(tmpl, type, ord, unsigned, read);
             }
         },
         IMPLEMENTATION {
             @Override
-            public String relativeRead(Type type, boolean le, boolean unsigned, boolean read) {
+            public String relativeRead(Type type, Order ord, boolean unsigned, boolean read) {
                 var tmpl = '\n' +
                        "    @Override\n" +
                        "    public %1$s read%2$s() {\n" +
@@ -225,43 +300,43 @@ public final class Codegen {
                        "        roff += %5$s;\n" +
                        "        return value;\n" +
                        "    }";
-                return format(tmpl, type, le, unsigned, read);
+                return format(tmpl, type, ord, unsigned, read);
             }
 
             @Override
-            public String offsetRead(Type type, boolean le, boolean unsigned, boolean read) {
+            public String offsetRead(Type type, Order ord, boolean unsigned, boolean read) {
                 var tmpl = '\n' +
                        "    @Override\n" +
                        "    public %1$s read%2$s(int roff) {\n" +
                        "        checkRead(roff, %5$s);\n" +
                        "        return %6$s;\n" +
                        "    }";
-                return format(tmpl, type, le, unsigned, read);
+                return format(tmpl, type, ord, unsigned, read);
             }
 
             @Override
-            public String relativeWrite(Type type, boolean le, boolean unsigned, boolean read) {
+            public String relativeWrite(Type type, Order ord, boolean unsigned, boolean read) {
                 var tmpl = '\n' +
                        "    @Override\n" +
                        "    public Buf write%2$s(%1$s value) {\n" +
                        (type == Type.MED? "        checkWrite(woff, %5$s);\n" : "") +
-                       "        %7$s;\n" +
+                       "        %7$s\n" +
                        "        woff += %5$s;\n" +
                        "        return this;\n" +
                        "    }";
-                return format(tmpl, type, le, unsigned, read);
+                return format(tmpl, type, ord, unsigned, read);
             }
 
             @Override
-            public String offsetWrite(Type type, boolean le, boolean unsigned, boolean read) {
+            public String offsetWrite(Type type, Order ord, boolean unsigned, boolean read) {
                 var tmpl = '\n' +
                        "    @Override\n" +
                        "    public Buf write%2$s(int woff, %1$s value) {\n" +
                        (type == Type.MED? "        checkWrite(woff, %5$s);\n" : "") +
-                       "        %7$s;\n" +
+                       "        %7$s\n" +
                        "        return this;\n" +
                        "    }";
-                return format(tmpl, type, le, unsigned, read);
+                return format(tmpl, type, ord, unsigned, read);
             }
         },
         TESTS {
@@ -270,7 +345,7 @@ public final class Codegen {
             int bytesAvailAfter;
 
             @Override
-            public String relativeRead(Type type, boolean le, boolean unsigned, boolean read) {
+            public String relativeRead(Type type, Order ord, boolean unsigned, boolean read) {
                 prepare(type);
                 var tmpl = '\n' +
                            "    @Test\n" +
@@ -286,12 +361,13 @@ public final class Codegen {
                            "    }\n" +
                            '\n' +
                            "    @Test\n" +
-                           "    public void relativeReadOf%2$sMustReadWith" + (le? "Little" : "Big") + "EndianByteOrder() {\n" +
+                           "    public void relativeReadOf%2$sMustReadWith" + ord.title() + "EndianByteOrder() {\n" +
+                           (ord == Order.DF? "        buf.order(ByteOrder.BIG_ENDIAN);\n" : "") +
                            "        assertEquals(0, buf.readableBytes());\n" +
                            "        assertEquals(Long.BYTES, buf.writableBytes());\n" +
                            "        %1$s value = " + testValue + ";\n" +
                            "        buf.write%2$s(value);\n" +
-                           "        buf.writeByte(" + (le? type.actualSize - 1 : 0) + ", (byte) 0x10);\n" +
+                           "        buf.writeByte(" + (ord == Order.LE? type.actualSize - 1 : 0) + ", (byte) 0x10);\n" +
                            "        assertEquals(" + type.actualSize + ", buf.readableBytes());\n" +
                            "        assertEquals(" + bytesAvailAfter + ", buf.writableBytes());\n" +
                            "        assertEquals(" + testValueByteOrder + ", buf.read%2$s());\n" +
@@ -315,11 +391,11 @@ public final class Codegen {
                            "        }\n" +
                            "        assertEquals(" + (type.actualSize - 1) + ", buf.readableBytes());\n" +
                            "    }";
-                return format(tmpl, type, le, unsigned, read);
+                return format(tmpl, type, ord, unsigned, read);
             }
 
             @Override
-            public String offsetRead(Type type, boolean le, boolean unsigned, boolean read) {
+            public String offsetRead(Type type, Order ord, boolean unsigned, boolean read) {
                 prepare(type);
                 var tmpl = '\n' +
                            "    @Test\n" +
@@ -340,10 +416,11 @@ public final class Codegen {
                            "    }\n" +
                            '\n' +
                            "    @Test\n" +
-                           "    public void offsettedReadOf%2$sMustReadWith" + (le? "Little" : "Big") + "EndianByteOrder() {\n" +
+                           "    public void offsettedReadOf%2$sMustReadWith" + ord.title() + "EndianByteOrder() {\n" +
+                           (ord == Order.DF? "        buf.order(ByteOrder.BIG_ENDIAN);\n" : "") +
                            "        %1$s value = " + testValue + ";\n" +
                            "        buf.write%2$s(value);\n" +
-                           "        buf.writeByte(" + (le? type.actualSize - 1 : 0) + ", (byte) 0x10);\n" +
+                           "        buf.writeByte(" + (ord == Order.LE? type.actualSize - 1 : 0) + ", (byte) 0x10);\n" +
                            "        assertEquals(" + testValueByteOrder + ", buf.read%2$s(0));\n" +
                            "    }\n" +
                            '\n' +
@@ -368,13 +445,14 @@ public final class Codegen {
                            "            // Good.\n" +
                            "        }\n" +
                            "    }";
-                return format(tmpl, type, le, unsigned, read);
+                return format(tmpl, type, ord, unsigned, read);
             }
 
             @Override
-            public String relativeWrite(Type type, boolean le, boolean unsigned, boolean read) {
+            public String relativeWrite(Type type, Order ord, boolean unsigned, boolean read) {
                 prepare(type);
                 int size = type.actualSize;
+                boolean le = ord == Order.LE;
                 int r = le? size : 1;
                 var tmpl = '\n' +
                            "    @Test\n" +
@@ -394,7 +472,8 @@ public final class Codegen {
                            "    }\n" +
                            '\n' +
                            "    @Test\n" +
-                           "    public void relativeWriteOf%2$sMustHave" + (le? "Little" : "Big") + "EndianByteOrder() {\n" +
+                           "    public void relativeWriteOf%2$sMustHave" + ord.title() + "EndianByteOrder() {\n" +
+                           (ord == Order.DF? "        buf.order(ByteOrder.BIG_ENDIAN);\n" : "") +
                            "        %1$s value = " + testValue + ";\n" +
                            "        buf.write%2$s(value);\n" +
                            "        buf.writerIndex(Long.BYTES);\n" +
@@ -407,13 +486,14 @@ public final class Codegen {
                            "        assertEquals((byte) 0x0" + (size < 7? 0 : le? r-- : r++) + ", buf.readByte());\n" +
                            "        assertEquals((byte) 0x0" + (size < 8? 0 : r) + ", buf.readByte());\n" +
                            "    }";
-                return format(tmpl, type, le, unsigned, read);
+                return format(tmpl, type, ord, unsigned, read);
             }
 
             @Override
-            public String offsetWrite(Type type, boolean le, boolean unsigned, boolean read) {
+            public String offsetWrite(Type type, Order ord, boolean unsigned, boolean read) {
                 prepare(type);
                 int size = type.actualSize;
+                boolean le = ord == Order.LE;
                 int r = le? size : 1;
                 var tmpl = '\n' +
                            "    @Test\n" +
@@ -447,7 +527,8 @@ public final class Codegen {
                            "    }\n" +
                            '\n' +
                            "    @Test\n" +
-                           "    public void offsettedWriteOf%2$sMustHave" + (le? "Little" : "Big") + "EndianByteOrder() {\n" +
+                           "    public void offsettedWriteOf%2$sMustHave" + ord.title() + "EndianByteOrder() {\n" +
+                           (ord == Order.DF? "        buf.order(ByteOrder.BIG_ENDIAN);\n" : "") +
                            "        %1$s value = " + testValue + ";\n" +
                            "        buf.write%2$s(0, value);\n" +
                            "        buf.writerIndex(Long.BYTES);\n" +
@@ -460,7 +541,7 @@ public final class Codegen {
                            "        assertEquals((byte) 0x0" + (size < 7? 0 : le? r-- : r++) + ", buf.readByte());\n" +
                            "        assertEquals((byte) 0x0" + (size < 8? 0 : r) + ", buf.readByte());\n" +
                            "    }";
-                return format(tmpl, type, le, unsigned, read);
+                return format(tmpl, type, ord, unsigned, read);
             }
 
             private void prepare(Type type) {
@@ -481,10 +562,10 @@ public final class Codegen {
             }
         };
 
-        public abstract String relativeRead(Type type, boolean le, boolean unsigned, boolean read);
-        public abstract String offsetRead(Type type, boolean le, boolean unsigned, boolean read);
-        public abstract String relativeWrite(Type type, boolean le, boolean unsigned, boolean read);
-        public abstract String offsetWrite(Type type, boolean le, boolean unsigned, boolean read);
+        public abstract String relativeRead(Type type, Order ord, boolean unsigned, boolean read);
+        public abstract String offsetRead(Type type, Order ord, boolean unsigned, boolean read);
+        public abstract String relativeWrite(Type type, Order ord, boolean unsigned, boolean read);
+        public abstract String offsetWrite(Type type, Order ord, boolean unsigned, boolean read);
     }
 
     public static void main(String[] args) throws Exception {
@@ -552,47 +633,55 @@ public final class Codegen {
     private static Stream<String> generateAccessors(Template template, Type type) {
         Builder<String> builder = Stream.builder();
 
-        builder.add(template.relativeRead(type, false, false, true));
-        builder.add(template.offsetRead(type, false, false, true));
-        if (type.includeLE) {
-            builder.add(template.relativeRead(type, true, false, true));
-            builder.add(template.offsetRead(type, true, false, true));
+        builder.add(template.relativeRead(type, Order.DF, false, true));
+        builder.add(template.offsetRead(type, Order.DF, false, true));
+        if (type.includeLEBE) {
+            builder.add(template.relativeRead(type, Order.LE, false, true));
+            builder.add(template.offsetRead(type, Order.LE, false, true));
+            builder.add(template.relativeRead(type, Order.BE, false, true));
+            builder.add(template.offsetRead(type, Order.BE, false, true));
         }
         if (type.unsignedCarrier != null) {
-            builder.add(template.relativeRead(type, false, true, true));
-            builder.add(template.offsetRead(type, false, true, true));
-            if (type.includeLE) {
-                builder.add(template.relativeRead(type, true, true, true));
-                builder.add(template.offsetRead(type, true, true, true));
+            builder.add(template.relativeRead(type, Order.DF, true, true));
+            builder.add(template.offsetRead(type, Order.DF, true, true));
+            if (type.includeLEBE) {
+                builder.add(template.relativeRead(type, Order.LE, true, true));
+                builder.add(template.offsetRead(type, Order.LE, true, true));
+                builder.add(template.relativeRead(type, Order.BE, true, true));
+                builder.add(template.offsetRead(type, Order.BE, true, true));
             }
         }
 
-        builder.add(template.relativeWrite(type, false, false, false));
-        builder.add(template.offsetWrite(type, false, false, false));
-        if (type.includeLE) {
-            builder.add(template.relativeWrite(type, true, false, false));
-            builder.add(template.offsetWrite(type, true, false, false));
+        builder.add(template.relativeWrite(type, Order.DF, false, false));
+        builder.add(template.offsetWrite(type, Order.DF, false, false));
+        if (type.includeLEBE) {
+            builder.add(template.relativeWrite(type, Order.LE, false, false));
+            builder.add(template.offsetWrite(type, Order.LE, false, false));
+            builder.add(template.relativeWrite(type, Order.BE, false, false));
+            builder.add(template.offsetWrite(type, Order.BE, false, false));
         }
         if (type.unsignedCarrier != null) {
-            builder.add(template.relativeWrite(type, false, true, false));
-            builder.add(template.offsetWrite(type, false, true, false));
-            if (type.includeLE) {
-                builder.add(template.relativeWrite(type, true, true, false));
-                builder.add(template.offsetWrite(type, true, true, false));
+            builder.add(template.relativeWrite(type, Order.DF, true, false));
+            builder.add(template.offsetWrite(type, Order.DF, true, false));
+            if (type.includeLEBE) {
+                builder.add(template.relativeWrite(type, Order.LE, true, false));
+                builder.add(template.offsetWrite(type, Order.LE, true, false));
+                builder.add(template.relativeWrite(type, Order.BE, true, false));
+                builder.add(template.offsetWrite(type, Order.BE, true, false));
             }
         }
 
         return builder.build();
     }
 
-    private static String format(String format, Type type, boolean le, boolean unsigned, boolean read) {
+    private static String format(String format, Type type, Order ord, boolean unsigned, boolean read) {
         var carrier = type.type(unsigned);
-        var title = type.title(le, unsigned);
+        var title = type.title(ord, unsigned);
         var size = ALL_DIGITS.matcher(type.size).matches()? type.size : "{@link " + type.size.replace('.', '#') + '}';
-        var extra = read? type.extraRead(le, unsigned) : type.extraWrite(le, unsigned);
+        var extra = read? type.extraRead(ord, unsigned) : type.extraWrite(ord, unsigned);
         var realSize = type.size;
         return String.format(format, carrier, title, size, extra, realSize,
-                             type.load(le, unsigned), type.store(le, unsigned),
+                             type.load(ord, unsigned), type.store(ord, unsigned),
                              type.realType(unsigned));
     }
 }

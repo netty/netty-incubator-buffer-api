@@ -20,6 +20,7 @@ import org.junit.AssumptionViolatedException;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.nio.ByteOrder;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -311,7 +312,8 @@ public abstract class BBufTest {
     }
 
     @Test
-    public void relativeReadOfByteMustReadWithBigEndianByteOrder() {
+    public void relativeReadOfByteMustReadWithDefaultEndianByteOrder() {
+        buf.order(ByteOrder.BIG_ENDIAN);
         assertEquals(0, buf.readableBytes());
         assertEquals(Long.BYTES, buf.writableBytes());
         byte value = 0x01;
@@ -359,7 +361,8 @@ public abstract class BBufTest {
     }
 
     @Test
-    public void offsettedReadOfByteMustReadWithBigEndianByteOrder() {
+    public void offsettedReadOfByteMustReadWithDefaultEndianByteOrder() {
+        buf.order(ByteOrder.BIG_ENDIAN);
         byte value = 0x01;
         buf.writeByte(value);
         buf.writeByte(0, (byte) 0x10);
@@ -401,7 +404,8 @@ public abstract class BBufTest {
     }
 
     @Test
-    public void relativeReadOfUnsignedByteMustReadWithBigEndianByteOrder() {
+    public void relativeReadOfUnsignedByteMustReadWithDefaultEndianByteOrder() {
+        buf.order(ByteOrder.BIG_ENDIAN);
         assertEquals(0, buf.readableBytes());
         assertEquals(Long.BYTES, buf.writableBytes());
         int value = 0x01;
@@ -449,7 +453,8 @@ public abstract class BBufTest {
     }
 
     @Test
-    public void offsettedReadOfUnsignedByteMustReadWithBigEndianByteOrder() {
+    public void offsettedReadOfUnsignedByteMustReadWithDefaultEndianByteOrder() {
+        buf.order(ByteOrder.BIG_ENDIAN);
         int value = 0x01;
         buf.writeUnsignedByte(value);
         buf.writeByte(0, (byte) 0x10);
@@ -495,7 +500,8 @@ public abstract class BBufTest {
     }
 
     @Test
-    public void relativeWriteOfByteMustHaveBigEndianByteOrder() {
+    public void relativeWriteOfByteMustHaveDefaultEndianByteOrder() {
+        buf.order(ByteOrder.BIG_ENDIAN);
         byte value = 0x01;
         buf.writeByte(value);
         buf.writerIndex(Long.BYTES);
@@ -540,7 +546,8 @@ public abstract class BBufTest {
     }
 
     @Test
-    public void offsettedWriteOfByteMustHaveBigEndianByteOrder() {
+    public void offsettedWriteOfByteMustHaveDefaultEndianByteOrder() {
+        buf.order(ByteOrder.BIG_ENDIAN);
         byte value = 0x01;
         buf.writeByte(0, value);
         buf.writerIndex(Long.BYTES);
@@ -571,7 +578,8 @@ public abstract class BBufTest {
     }
 
     @Test
-    public void relativeWriteOfUnsignedByteMustHaveBigEndianByteOrder() {
+    public void relativeWriteOfUnsignedByteMustHaveDefaultEndianByteOrder() {
+        buf.order(ByteOrder.BIG_ENDIAN);
         int value = 0x01;
         buf.writeUnsignedByte(value);
         buf.writerIndex(Long.BYTES);
@@ -616,7 +624,8 @@ public abstract class BBufTest {
     }
 
     @Test
-    public void offsettedWriteOfUnsignedByteMustHaveBigEndianByteOrder() {
+    public void offsettedWriteOfUnsignedByteMustHaveDefaultEndianByteOrder() {
+        buf.order(ByteOrder.BIG_ENDIAN);
         int value = 0x01;
         buf.writeUnsignedByte(0, value);
         buf.writerIndex(Long.BYTES);
@@ -643,7 +652,8 @@ public abstract class BBufTest {
     }
 
     @Test
-    public void relativeReadOfCharMustReadWithBigEndianByteOrder() {
+    public void relativeReadOfCharMustReadWithDefaultEndianByteOrder() {
+        buf.order(ByteOrder.BIG_ENDIAN);
         assertEquals(0, buf.readableBytes());
         assertEquals(Long.BYTES, buf.writableBytes());
         char value = 0x0102;
@@ -691,7 +701,8 @@ public abstract class BBufTest {
     }
 
     @Test
-    public void offsettedReadOfCharMustReadWithBigEndianByteOrder() {
+    public void offsettedReadOfCharMustReadWithDefaultEndianByteOrder() {
+        buf.order(ByteOrder.BIG_ENDIAN);
         char value = 0x0102;
         buf.writeChar(value);
         buf.writeByte(0, (byte) 0x10);
@@ -811,6 +822,96 @@ public abstract class BBufTest {
     }
 
     @Test
+    public void relativeReadOfCharBEMustNotBoundsCheckWhenReadOffsetAndSizeIsEqualToWriteOffset() {
+        assertEquals(0, buf.readableBytes());
+        assertEquals(Long.BYTES, buf.writableBytes());
+        char value = 0x0102;
+        buf.writeCharBE(value);
+        assertEquals(2, buf.readableBytes());
+        assertEquals(6, buf.writableBytes());
+        assertEquals(value, buf.readCharBE());
+        assertEquals(0, buf.readableBytes());
+    }
+
+    @Test
+    public void relativeReadOfCharBEMustReadWithBigEndianByteOrder() {
+        assertEquals(0, buf.readableBytes());
+        assertEquals(Long.BYTES, buf.writableBytes());
+        char value = 0x0102;
+        buf.writeCharBE(value);
+        buf.writeByte(0, (byte) 0x10);
+        assertEquals(2, buf.readableBytes());
+        assertEquals(6, buf.writableBytes());
+        assertEquals(0x1002, buf.readCharBE());
+        assertEquals(0, buf.readableBytes());
+    }
+
+    @Test
+    public void relativeReadOfCharBEMustBoundsCheckWhenReadOffsetAndSizeIsBeyondWriteOffset() {
+        assertEquals(0, buf.readableBytes());
+        assertEquals(Long.BYTES, buf.writableBytes());
+        char value = 0x0102;
+        buf.writeCharBE(value);
+        buf.readerIndex(1);
+        assertEquals(1, buf.readableBytes());
+        assertEquals(6, buf.writableBytes());
+        try {
+            buf.readCharBE();
+            fail("Expected a bounds check.");
+        } catch (IndexOutOfBoundsException ignore) {
+            // Good.
+        }
+        assertEquals(1, buf.readableBytes());
+    }
+
+    @Test
+    public void offsettedReadOfCharBEMustBoundsCheckOnNegativeOffset() {
+        try {
+            buf.readCharBE(-1);
+            fail("Expected a bounds check.");
+        } catch (IndexOutOfBoundsException ignore) {
+            // Good.
+        }
+    }
+
+    @Test
+    public void offsettedReadOfCharBEMustNotBoundsCheckWhenReadOffsetAndSizeIsEqualToWriteOffset() {
+        char value = 0x0102;
+        buf.writeCharBE(value);
+        assertEquals(value, buf.readCharBE(0));
+    }
+
+    @Test
+    public void offsettedReadOfCharBEMustReadWithBigEndianByteOrder() {
+        char value = 0x0102;
+        buf.writeCharBE(value);
+        buf.writeByte(0, (byte) 0x10);
+        assertEquals(0x1002, buf.readCharBE(0));
+    }
+
+    @Test
+    public void offsettedReadOfCharBEMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanWriteOffset() {
+        char value = 0x0102;
+        buf.writeCharBE(value);
+        try {
+            buf.readCharBE(1);
+            fail("Expected a bounds check.");
+        } catch (IndexOutOfBoundsException ignore) {
+            // Good.
+        }
+    }
+
+    @Test
+    public void offsettedReadOfCharBEMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset() {
+        try {
+            buf.readCharBE(0);
+            fail("Expected a bounds check.");
+        } catch (IndexOutOfBoundsException ignore) {
+            // Good.
+        }
+    }
+
+    @Test
     public void relativeWriteOfCharMustBoundsCheckWhenWriteOffsetAndSizeIsBeyondCapacity() {
         assertEquals(Long.BYTES, buf.capacity());
         buf.writerIndex(7);
@@ -827,7 +928,8 @@ public abstract class BBufTest {
     }
 
     @Test
-    public void relativeWriteOfCharMustHaveBigEndianByteOrder() {
+    public void relativeWriteOfCharMustHaveDefaultEndianByteOrder() {
+        buf.order(ByteOrder.BIG_ENDIAN);
         char value = 0x0102;
         buf.writeChar(value);
         buf.writerIndex(Long.BYTES);
@@ -872,7 +974,8 @@ public abstract class BBufTest {
     }
 
     @Test
-    public void offsettedWriteOfCharMustHaveBigEndianByteOrder() {
+    public void offsettedWriteOfCharMustHaveDefaultEndianByteOrder() {
+        buf.order(ByteOrder.BIG_ENDIAN);
         char value = 0x0102;
         buf.writeChar(0, value);
         buf.writerIndex(Long.BYTES);
@@ -963,6 +1066,82 @@ public abstract class BBufTest {
     }
 
     @Test
+    public void relativeWriteOfCharBEMustBoundsCheckWhenWriteOffsetAndSizeIsBeyondCapacity() {
+        assertEquals(Long.BYTES, buf.capacity());
+        buf.writerIndex(7);
+        try {
+            char value = 0x0102;
+            buf.writeCharBE(value);
+            fail("Should have bounds checked.");
+        } catch (IndexOutOfBoundsException ignore) {
+            // Good.
+        }
+        buf.writerIndex(Long.BYTES);
+        // Verify contents are unchanged.
+        assertEquals(0, buf.readLong());
+    }
+
+    @Test
+    public void relativeWriteOfCharBEMustHaveBigEndianByteOrder() {
+        char value = 0x0102;
+        buf.writeCharBE(value);
+        buf.writerIndex(Long.BYTES);
+        assertEquals((byte) 0x01, buf.readByte());
+        assertEquals((byte) 0x02, buf.readByte());
+        assertEquals((byte) 0x00, buf.readByte());
+        assertEquals((byte) 0x00, buf.readByte());
+        assertEquals((byte) 0x00, buf.readByte());
+        assertEquals((byte) 0x00, buf.readByte());
+        assertEquals((byte) 0x00, buf.readByte());
+        assertEquals((byte) 0x00, buf.readByte());
+    }
+
+    @Test
+    public void offsettedWriteOfCharBEMustBoundsCheckWhenWriteOffsetIsNegative() {
+        assertEquals(Long.BYTES, buf.capacity());
+        try {
+            char value = 0x0102;
+            buf.writeCharBE(-1, value);
+            fail("Should have bounds checked.");
+        } catch (IndexOutOfBoundsException ignore) {
+            // Good.
+        }
+        buf.writerIndex(Long.BYTES);
+        // Verify contents are unchanged.
+        assertEquals(0, buf.readLong());
+    }
+
+    @Test
+    public void offsettedWriteOfCharBEMustBoundsCheckWhenWriteOffsetAndSizeIsBeyondCapacity() {
+        assertEquals(Long.BYTES, buf.capacity());
+        try {
+            char value = 0x0102;
+            buf.writeCharBE(7, value);
+            fail("Should have bounds checked.");
+        } catch (IndexOutOfBoundsException ignore) {
+            // Good.
+        }
+        buf.writerIndex(Long.BYTES);
+        // Verify contents are unchanged.
+        assertEquals(0, buf.readLong());
+    }
+
+    @Test
+    public void offsettedWriteOfCharBEMustHaveBigEndianByteOrder() {
+        char value = 0x0102;
+        buf.writeCharBE(0, value);
+        buf.writerIndex(Long.BYTES);
+        assertEquals((byte) 0x01, buf.readByte());
+        assertEquals((byte) 0x02, buf.readByte());
+        assertEquals((byte) 0x00, buf.readByte());
+        assertEquals((byte) 0x00, buf.readByte());
+        assertEquals((byte) 0x00, buf.readByte());
+        assertEquals((byte) 0x00, buf.readByte());
+        assertEquals((byte) 0x00, buf.readByte());
+        assertEquals((byte) 0x00, buf.readByte());
+    }
+
+    @Test
     public void relativeReadOfShortMustNotBoundsCheckWhenReadOffsetAndSizeIsEqualToWriteOffset() {
         assertEquals(0, buf.readableBytes());
         assertEquals(Long.BYTES, buf.writableBytes());
@@ -975,7 +1154,8 @@ public abstract class BBufTest {
     }
 
     @Test
-    public void relativeReadOfShortMustReadWithBigEndianByteOrder() {
+    public void relativeReadOfShortMustReadWithDefaultEndianByteOrder() {
+        buf.order(ByteOrder.BIG_ENDIAN);
         assertEquals(0, buf.readableBytes());
         assertEquals(Long.BYTES, buf.writableBytes());
         short value = 0x0102;
@@ -1023,7 +1203,8 @@ public abstract class BBufTest {
     }
 
     @Test
-    public void offsettedReadOfShortMustReadWithBigEndianByteOrder() {
+    public void offsettedReadOfShortMustReadWithDefaultEndianByteOrder() {
+        buf.order(ByteOrder.BIG_ENDIAN);
         short value = 0x0102;
         buf.writeShort(value);
         buf.writeByte(0, (byte) 0x10);
@@ -1143,6 +1324,96 @@ public abstract class BBufTest {
     }
 
     @Test
+    public void relativeReadOfShortBEMustNotBoundsCheckWhenReadOffsetAndSizeIsEqualToWriteOffset() {
+        assertEquals(0, buf.readableBytes());
+        assertEquals(Long.BYTES, buf.writableBytes());
+        short value = 0x0102;
+        buf.writeShortBE(value);
+        assertEquals(2, buf.readableBytes());
+        assertEquals(6, buf.writableBytes());
+        assertEquals(value, buf.readShortBE());
+        assertEquals(0, buf.readableBytes());
+    }
+
+    @Test
+    public void relativeReadOfShortBEMustReadWithBigEndianByteOrder() {
+        assertEquals(0, buf.readableBytes());
+        assertEquals(Long.BYTES, buf.writableBytes());
+        short value = 0x0102;
+        buf.writeShortBE(value);
+        buf.writeByte(0, (byte) 0x10);
+        assertEquals(2, buf.readableBytes());
+        assertEquals(6, buf.writableBytes());
+        assertEquals(0x1002, buf.readShortBE());
+        assertEquals(0, buf.readableBytes());
+    }
+
+    @Test
+    public void relativeReadOfShortBEMustBoundsCheckWhenReadOffsetAndSizeIsBeyondWriteOffset() {
+        assertEquals(0, buf.readableBytes());
+        assertEquals(Long.BYTES, buf.writableBytes());
+        short value = 0x0102;
+        buf.writeShortBE(value);
+        buf.readerIndex(1);
+        assertEquals(1, buf.readableBytes());
+        assertEquals(6, buf.writableBytes());
+        try {
+            buf.readShortBE();
+            fail("Expected a bounds check.");
+        } catch (IndexOutOfBoundsException ignore) {
+            // Good.
+        }
+        assertEquals(1, buf.readableBytes());
+    }
+
+    @Test
+    public void offsettedReadOfShortBEMustBoundsCheckOnNegativeOffset() {
+        try {
+            buf.readShortBE(-1);
+            fail("Expected a bounds check.");
+        } catch (IndexOutOfBoundsException ignore) {
+            // Good.
+        }
+    }
+
+    @Test
+    public void offsettedReadOfShortBEMustNotBoundsCheckWhenReadOffsetAndSizeIsEqualToWriteOffset() {
+        short value = 0x0102;
+        buf.writeShortBE(value);
+        assertEquals(value, buf.readShortBE(0));
+    }
+
+    @Test
+    public void offsettedReadOfShortBEMustReadWithBigEndianByteOrder() {
+        short value = 0x0102;
+        buf.writeShortBE(value);
+        buf.writeByte(0, (byte) 0x10);
+        assertEquals(0x1002, buf.readShortBE(0));
+    }
+
+    @Test
+    public void offsettedReadOfShortBEMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanWriteOffset() {
+        short value = 0x0102;
+        buf.writeShortBE(value);
+        try {
+            buf.readShortBE(1);
+            fail("Expected a bounds check.");
+        } catch (IndexOutOfBoundsException ignore) {
+            // Good.
+        }
+    }
+
+    @Test
+    public void offsettedReadOfShortBEMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset() {
+        try {
+            buf.readShortBE(0);
+            fail("Expected a bounds check.");
+        } catch (IndexOutOfBoundsException ignore) {
+            // Good.
+        }
+    }
+
+    @Test
     public void relativeReadOfUnsignedShortMustNotBoundsCheckWhenReadOffsetAndSizeIsEqualToWriteOffset() {
         assertEquals(0, buf.readableBytes());
         assertEquals(Long.BYTES, buf.writableBytes());
@@ -1155,7 +1426,8 @@ public abstract class BBufTest {
     }
 
     @Test
-    public void relativeReadOfUnsignedShortMustReadWithBigEndianByteOrder() {
+    public void relativeReadOfUnsignedShortMustReadWithDefaultEndianByteOrder() {
+        buf.order(ByteOrder.BIG_ENDIAN);
         assertEquals(0, buf.readableBytes());
         assertEquals(Long.BYTES, buf.writableBytes());
         int value = 0x0102;
@@ -1203,7 +1475,8 @@ public abstract class BBufTest {
     }
 
     @Test
-    public void offsettedReadOfUnsignedShortMustReadWithBigEndianByteOrder() {
+    public void offsettedReadOfUnsignedShortMustReadWithDefaultEndianByteOrder() {
+        buf.order(ByteOrder.BIG_ENDIAN);
         int value = 0x0102;
         buf.writeUnsignedShort(value);
         buf.writeByte(0, (byte) 0x10);
@@ -1323,6 +1596,96 @@ public abstract class BBufTest {
     }
 
     @Test
+    public void relativeReadOfUnsignedShortBEMustNotBoundsCheckWhenReadOffsetAndSizeIsEqualToWriteOffset() {
+        assertEquals(0, buf.readableBytes());
+        assertEquals(Long.BYTES, buf.writableBytes());
+        int value = 0x0102;
+        buf.writeUnsignedShortBE(value);
+        assertEquals(2, buf.readableBytes());
+        assertEquals(6, buf.writableBytes());
+        assertEquals(value, buf.readUnsignedShortBE());
+        assertEquals(0, buf.readableBytes());
+    }
+
+    @Test
+    public void relativeReadOfUnsignedShortBEMustReadWithBigEndianByteOrder() {
+        assertEquals(0, buf.readableBytes());
+        assertEquals(Long.BYTES, buf.writableBytes());
+        int value = 0x0102;
+        buf.writeUnsignedShortBE(value);
+        buf.writeByte(0, (byte) 0x10);
+        assertEquals(2, buf.readableBytes());
+        assertEquals(6, buf.writableBytes());
+        assertEquals(0x1002, buf.readUnsignedShortBE());
+        assertEquals(0, buf.readableBytes());
+    }
+
+    @Test
+    public void relativeReadOfUnsignedShortBEMustBoundsCheckWhenReadOffsetAndSizeIsBeyondWriteOffset() {
+        assertEquals(0, buf.readableBytes());
+        assertEquals(Long.BYTES, buf.writableBytes());
+        int value = 0x0102;
+        buf.writeUnsignedShortBE(value);
+        buf.readerIndex(1);
+        assertEquals(1, buf.readableBytes());
+        assertEquals(6, buf.writableBytes());
+        try {
+            buf.readUnsignedShortBE();
+            fail("Expected a bounds check.");
+        } catch (IndexOutOfBoundsException ignore) {
+            // Good.
+        }
+        assertEquals(1, buf.readableBytes());
+    }
+
+    @Test
+    public void offsettedReadOfUnsignedShortBEMustBoundsCheckOnNegativeOffset() {
+        try {
+            buf.readUnsignedShortBE(-1);
+            fail("Expected a bounds check.");
+        } catch (IndexOutOfBoundsException ignore) {
+            // Good.
+        }
+    }
+
+    @Test
+    public void offsettedReadOfUnsignedShortBEMustNotBoundsCheckWhenReadOffsetAndSizeIsEqualToWriteOffset() {
+        int value = 0x0102;
+        buf.writeUnsignedShortBE(value);
+        assertEquals(value, buf.readUnsignedShortBE(0));
+    }
+
+    @Test
+    public void offsettedReadOfUnsignedShortBEMustReadWithBigEndianByteOrder() {
+        int value = 0x0102;
+        buf.writeUnsignedShortBE(value);
+        buf.writeByte(0, (byte) 0x10);
+        assertEquals(0x1002, buf.readUnsignedShortBE(0));
+    }
+
+    @Test
+    public void offsettedReadOfUnsignedShortBEMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanWriteOffset() {
+        int value = 0x0102;
+        buf.writeUnsignedShortBE(value);
+        try {
+            buf.readUnsignedShortBE(1);
+            fail("Expected a bounds check.");
+        } catch (IndexOutOfBoundsException ignore) {
+            // Good.
+        }
+    }
+
+    @Test
+    public void offsettedReadOfUnsignedShortBEMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset() {
+        try {
+            buf.readUnsignedShortBE(0);
+            fail("Expected a bounds check.");
+        } catch (IndexOutOfBoundsException ignore) {
+            // Good.
+        }
+    }
+
+    @Test
     public void relativeWriteOfShortMustBoundsCheckWhenWriteOffsetAndSizeIsBeyondCapacity() {
         assertEquals(Long.BYTES, buf.capacity());
         buf.writerIndex(7);
@@ -1339,7 +1702,8 @@ public abstract class BBufTest {
     }
 
     @Test
-    public void relativeWriteOfShortMustHaveBigEndianByteOrder() {
+    public void relativeWriteOfShortMustHaveDefaultEndianByteOrder() {
+        buf.order(ByteOrder.BIG_ENDIAN);
         short value = 0x0102;
         buf.writeShort(value);
         buf.writerIndex(Long.BYTES);
@@ -1384,7 +1748,8 @@ public abstract class BBufTest {
     }
 
     @Test
-    public void offsettedWriteOfShortMustHaveBigEndianByteOrder() {
+    public void offsettedWriteOfShortMustHaveDefaultEndianByteOrder() {
+        buf.order(ByteOrder.BIG_ENDIAN);
         short value = 0x0102;
         buf.writeShort(0, value);
         buf.writerIndex(Long.BYTES);
@@ -1475,6 +1840,82 @@ public abstract class BBufTest {
     }
 
     @Test
+    public void relativeWriteOfShortBEMustBoundsCheckWhenWriteOffsetAndSizeIsBeyondCapacity() {
+        assertEquals(Long.BYTES, buf.capacity());
+        buf.writerIndex(7);
+        try {
+            short value = 0x0102;
+            buf.writeShortBE(value);
+            fail("Should have bounds checked.");
+        } catch (IndexOutOfBoundsException ignore) {
+            // Good.
+        }
+        buf.writerIndex(Long.BYTES);
+        // Verify contents are unchanged.
+        assertEquals(0, buf.readLong());
+    }
+
+    @Test
+    public void relativeWriteOfShortBEMustHaveBigEndianByteOrder() {
+        short value = 0x0102;
+        buf.writeShortBE(value);
+        buf.writerIndex(Long.BYTES);
+        assertEquals((byte) 0x01, buf.readByte());
+        assertEquals((byte) 0x02, buf.readByte());
+        assertEquals((byte) 0x00, buf.readByte());
+        assertEquals((byte) 0x00, buf.readByte());
+        assertEquals((byte) 0x00, buf.readByte());
+        assertEquals((byte) 0x00, buf.readByte());
+        assertEquals((byte) 0x00, buf.readByte());
+        assertEquals((byte) 0x00, buf.readByte());
+    }
+
+    @Test
+    public void offsettedWriteOfShortBEMustBoundsCheckWhenWriteOffsetIsNegative() {
+        assertEquals(Long.BYTES, buf.capacity());
+        try {
+            short value = 0x0102;
+            buf.writeShortBE(-1, value);
+            fail("Should have bounds checked.");
+        } catch (IndexOutOfBoundsException ignore) {
+            // Good.
+        }
+        buf.writerIndex(Long.BYTES);
+        // Verify contents are unchanged.
+        assertEquals(0, buf.readLong());
+    }
+
+    @Test
+    public void offsettedWriteOfShortBEMustBoundsCheckWhenWriteOffsetAndSizeIsBeyondCapacity() {
+        assertEquals(Long.BYTES, buf.capacity());
+        try {
+            short value = 0x0102;
+            buf.writeShortBE(7, value);
+            fail("Should have bounds checked.");
+        } catch (IndexOutOfBoundsException ignore) {
+            // Good.
+        }
+        buf.writerIndex(Long.BYTES);
+        // Verify contents are unchanged.
+        assertEquals(0, buf.readLong());
+    }
+
+    @Test
+    public void offsettedWriteOfShortBEMustHaveBigEndianByteOrder() {
+        short value = 0x0102;
+        buf.writeShortBE(0, value);
+        buf.writerIndex(Long.BYTES);
+        assertEquals((byte) 0x01, buf.readByte());
+        assertEquals((byte) 0x02, buf.readByte());
+        assertEquals((byte) 0x00, buf.readByte());
+        assertEquals((byte) 0x00, buf.readByte());
+        assertEquals((byte) 0x00, buf.readByte());
+        assertEquals((byte) 0x00, buf.readByte());
+        assertEquals((byte) 0x00, buf.readByte());
+        assertEquals((byte) 0x00, buf.readByte());
+    }
+
+    @Test
     public void relativeWriteOfUnsignedShortMustBoundsCheckWhenWriteOffsetAndSizeIsBeyondCapacity() {
         assertEquals(Long.BYTES, buf.capacity());
         buf.writerIndex(7);
@@ -1491,7 +1932,8 @@ public abstract class BBufTest {
     }
 
     @Test
-    public void relativeWriteOfUnsignedShortMustHaveBigEndianByteOrder() {
+    public void relativeWriteOfUnsignedShortMustHaveDefaultEndianByteOrder() {
+        buf.order(ByteOrder.BIG_ENDIAN);
         int value = 0x0102;
         buf.writeUnsignedShort(value);
         buf.writerIndex(Long.BYTES);
@@ -1536,7 +1978,8 @@ public abstract class BBufTest {
     }
 
     @Test
-    public void offsettedWriteOfUnsignedShortMustHaveBigEndianByteOrder() {
+    public void offsettedWriteOfUnsignedShortMustHaveDefaultEndianByteOrder() {
+        buf.order(ByteOrder.BIG_ENDIAN);
         int value = 0x0102;
         buf.writeUnsignedShort(0, value);
         buf.writerIndex(Long.BYTES);
@@ -1627,6 +2070,82 @@ public abstract class BBufTest {
     }
 
     @Test
+    public void relativeWriteOfUnsignedShortBEMustBoundsCheckWhenWriteOffsetAndSizeIsBeyondCapacity() {
+        assertEquals(Long.BYTES, buf.capacity());
+        buf.writerIndex(7);
+        try {
+            int value = 0x0102;
+            buf.writeUnsignedShortBE(value);
+            fail("Should have bounds checked.");
+        } catch (IndexOutOfBoundsException ignore) {
+            // Good.
+        }
+        buf.writerIndex(Long.BYTES);
+        // Verify contents are unchanged.
+        assertEquals(0, buf.readLong());
+    }
+
+    @Test
+    public void relativeWriteOfUnsignedShortBEMustHaveBigEndianByteOrder() {
+        int value = 0x0102;
+        buf.writeUnsignedShortBE(value);
+        buf.writerIndex(Long.BYTES);
+        assertEquals((byte) 0x01, buf.readByte());
+        assertEquals((byte) 0x02, buf.readByte());
+        assertEquals((byte) 0x00, buf.readByte());
+        assertEquals((byte) 0x00, buf.readByte());
+        assertEquals((byte) 0x00, buf.readByte());
+        assertEquals((byte) 0x00, buf.readByte());
+        assertEquals((byte) 0x00, buf.readByte());
+        assertEquals((byte) 0x00, buf.readByte());
+    }
+
+    @Test
+    public void offsettedWriteOfUnsignedShortBEMustBoundsCheckWhenWriteOffsetIsNegative() {
+        assertEquals(Long.BYTES, buf.capacity());
+        try {
+            int value = 0x0102;
+            buf.writeUnsignedShortBE(-1, value);
+            fail("Should have bounds checked.");
+        } catch (IndexOutOfBoundsException ignore) {
+            // Good.
+        }
+        buf.writerIndex(Long.BYTES);
+        // Verify contents are unchanged.
+        assertEquals(0, buf.readLong());
+    }
+
+    @Test
+    public void offsettedWriteOfUnsignedShortBEMustBoundsCheckWhenWriteOffsetAndSizeIsBeyondCapacity() {
+        assertEquals(Long.BYTES, buf.capacity());
+        try {
+            int value = 0x0102;
+            buf.writeUnsignedShortBE(7, value);
+            fail("Should have bounds checked.");
+        } catch (IndexOutOfBoundsException ignore) {
+            // Good.
+        }
+        buf.writerIndex(Long.BYTES);
+        // Verify contents are unchanged.
+        assertEquals(0, buf.readLong());
+    }
+
+    @Test
+    public void offsettedWriteOfUnsignedShortBEMustHaveBigEndianByteOrder() {
+        int value = 0x0102;
+        buf.writeUnsignedShortBE(0, value);
+        buf.writerIndex(Long.BYTES);
+        assertEquals((byte) 0x01, buf.readByte());
+        assertEquals((byte) 0x02, buf.readByte());
+        assertEquals((byte) 0x00, buf.readByte());
+        assertEquals((byte) 0x00, buf.readByte());
+        assertEquals((byte) 0x00, buf.readByte());
+        assertEquals((byte) 0x00, buf.readByte());
+        assertEquals((byte) 0x00, buf.readByte());
+        assertEquals((byte) 0x00, buf.readByte());
+    }
+
+    @Test
     public void relativeReadOfMediumMustNotBoundsCheckWhenReadOffsetAndSizeIsEqualToWriteOffset() {
         assertEquals(0, buf.readableBytes());
         assertEquals(Long.BYTES, buf.writableBytes());
@@ -1639,7 +2158,8 @@ public abstract class BBufTest {
     }
 
     @Test
-    public void relativeReadOfMediumMustReadWithBigEndianByteOrder() {
+    public void relativeReadOfMediumMustReadWithDefaultEndianByteOrder() {
+        buf.order(ByteOrder.BIG_ENDIAN);
         assertEquals(0, buf.readableBytes());
         assertEquals(Long.BYTES, buf.writableBytes());
         int value = 0x010203;
@@ -1687,7 +2207,8 @@ public abstract class BBufTest {
     }
 
     @Test
-    public void offsettedReadOfMediumMustReadWithBigEndianByteOrder() {
+    public void offsettedReadOfMediumMustReadWithDefaultEndianByteOrder() {
+        buf.order(ByteOrder.BIG_ENDIAN);
         int value = 0x010203;
         buf.writeMedium(value);
         buf.writeByte(0, (byte) 0x10);
@@ -1807,6 +2328,96 @@ public abstract class BBufTest {
     }
 
     @Test
+    public void relativeReadOfMediumBEMustNotBoundsCheckWhenReadOffsetAndSizeIsEqualToWriteOffset() {
+        assertEquals(0, buf.readableBytes());
+        assertEquals(Long.BYTES, buf.writableBytes());
+        int value = 0x010203;
+        buf.writeMediumBE(value);
+        assertEquals(3, buf.readableBytes());
+        assertEquals(5, buf.writableBytes());
+        assertEquals(value, buf.readMediumBE());
+        assertEquals(0, buf.readableBytes());
+    }
+
+    @Test
+    public void relativeReadOfMediumBEMustReadWithBigEndianByteOrder() {
+        assertEquals(0, buf.readableBytes());
+        assertEquals(Long.BYTES, buf.writableBytes());
+        int value = 0x010203;
+        buf.writeMediumBE(value);
+        buf.writeByte(0, (byte) 0x10);
+        assertEquals(3, buf.readableBytes());
+        assertEquals(5, buf.writableBytes());
+        assertEquals(0x100203, buf.readMediumBE());
+        assertEquals(0, buf.readableBytes());
+    }
+
+    @Test
+    public void relativeReadOfMediumBEMustBoundsCheckWhenReadOffsetAndSizeIsBeyondWriteOffset() {
+        assertEquals(0, buf.readableBytes());
+        assertEquals(Long.BYTES, buf.writableBytes());
+        int value = 0x010203;
+        buf.writeMediumBE(value);
+        buf.readerIndex(1);
+        assertEquals(2, buf.readableBytes());
+        assertEquals(5, buf.writableBytes());
+        try {
+            buf.readMediumBE();
+            fail("Expected a bounds check.");
+        } catch (IndexOutOfBoundsException ignore) {
+            // Good.
+        }
+        assertEquals(2, buf.readableBytes());
+    }
+
+    @Test
+    public void offsettedReadOfMediumBEMustBoundsCheckOnNegativeOffset() {
+        try {
+            buf.readMediumBE(-1);
+            fail("Expected a bounds check.");
+        } catch (IndexOutOfBoundsException ignore) {
+            // Good.
+        }
+    }
+
+    @Test
+    public void offsettedReadOfMediumBEMustNotBoundsCheckWhenReadOffsetAndSizeIsEqualToWriteOffset() {
+        int value = 0x010203;
+        buf.writeMediumBE(value);
+        assertEquals(value, buf.readMediumBE(0));
+    }
+
+    @Test
+    public void offsettedReadOfMediumBEMustReadWithBigEndianByteOrder() {
+        int value = 0x010203;
+        buf.writeMediumBE(value);
+        buf.writeByte(0, (byte) 0x10);
+        assertEquals(0x100203, buf.readMediumBE(0));
+    }
+
+    @Test
+    public void offsettedReadOfMediumBEMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanWriteOffset() {
+        int value = 0x010203;
+        buf.writeMediumBE(value);
+        try {
+            buf.readMediumBE(1);
+            fail("Expected a bounds check.");
+        } catch (IndexOutOfBoundsException ignore) {
+            // Good.
+        }
+    }
+
+    @Test
+    public void offsettedReadOfMediumBEMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset() {
+        try {
+            buf.readMediumBE(0);
+            fail("Expected a bounds check.");
+        } catch (IndexOutOfBoundsException ignore) {
+            // Good.
+        }
+    }
+
+    @Test
     public void relativeReadOfUnsignedMediumMustNotBoundsCheckWhenReadOffsetAndSizeIsEqualToWriteOffset() {
         assertEquals(0, buf.readableBytes());
         assertEquals(Long.BYTES, buf.writableBytes());
@@ -1819,7 +2430,8 @@ public abstract class BBufTest {
     }
 
     @Test
-    public void relativeReadOfUnsignedMediumMustReadWithBigEndianByteOrder() {
+    public void relativeReadOfUnsignedMediumMustReadWithDefaultEndianByteOrder() {
+        buf.order(ByteOrder.BIG_ENDIAN);
         assertEquals(0, buf.readableBytes());
         assertEquals(Long.BYTES, buf.writableBytes());
         int value = 0x010203;
@@ -1867,7 +2479,8 @@ public abstract class BBufTest {
     }
 
     @Test
-    public void offsettedReadOfUnsignedMediumMustReadWithBigEndianByteOrder() {
+    public void offsettedReadOfUnsignedMediumMustReadWithDefaultEndianByteOrder() {
+        buf.order(ByteOrder.BIG_ENDIAN);
         int value = 0x010203;
         buf.writeUnsignedMedium(value);
         buf.writeByte(0, (byte) 0x10);
@@ -1987,6 +2600,96 @@ public abstract class BBufTest {
     }
 
     @Test
+    public void relativeReadOfUnsignedMediumBEMustNotBoundsCheckWhenReadOffsetAndSizeIsEqualToWriteOffset() {
+        assertEquals(0, buf.readableBytes());
+        assertEquals(Long.BYTES, buf.writableBytes());
+        int value = 0x010203;
+        buf.writeUnsignedMediumBE(value);
+        assertEquals(3, buf.readableBytes());
+        assertEquals(5, buf.writableBytes());
+        assertEquals(value, buf.readUnsignedMediumBE());
+        assertEquals(0, buf.readableBytes());
+    }
+
+    @Test
+    public void relativeReadOfUnsignedMediumBEMustReadWithBigEndianByteOrder() {
+        assertEquals(0, buf.readableBytes());
+        assertEquals(Long.BYTES, buf.writableBytes());
+        int value = 0x010203;
+        buf.writeUnsignedMediumBE(value);
+        buf.writeByte(0, (byte) 0x10);
+        assertEquals(3, buf.readableBytes());
+        assertEquals(5, buf.writableBytes());
+        assertEquals(0x100203, buf.readUnsignedMediumBE());
+        assertEquals(0, buf.readableBytes());
+    }
+
+    @Test
+    public void relativeReadOfUnsignedMediumBEMustBoundsCheckWhenReadOffsetAndSizeIsBeyondWriteOffset() {
+        assertEquals(0, buf.readableBytes());
+        assertEquals(Long.BYTES, buf.writableBytes());
+        int value = 0x010203;
+        buf.writeUnsignedMediumBE(value);
+        buf.readerIndex(1);
+        assertEquals(2, buf.readableBytes());
+        assertEquals(5, buf.writableBytes());
+        try {
+            buf.readUnsignedMediumBE();
+            fail("Expected a bounds check.");
+        } catch (IndexOutOfBoundsException ignore) {
+            // Good.
+        }
+        assertEquals(2, buf.readableBytes());
+    }
+
+    @Test
+    public void offsettedReadOfUnsignedMediumBEMustBoundsCheckOnNegativeOffset() {
+        try {
+            buf.readUnsignedMediumBE(-1);
+            fail("Expected a bounds check.");
+        } catch (IndexOutOfBoundsException ignore) {
+            // Good.
+        }
+    }
+
+    @Test
+    public void offsettedReadOfUnsignedMediumBEMustNotBoundsCheckWhenReadOffsetAndSizeIsEqualToWriteOffset() {
+        int value = 0x010203;
+        buf.writeUnsignedMediumBE(value);
+        assertEquals(value, buf.readUnsignedMediumBE(0));
+    }
+
+    @Test
+    public void offsettedReadOfUnsignedMediumBEMustReadWithBigEndianByteOrder() {
+        int value = 0x010203;
+        buf.writeUnsignedMediumBE(value);
+        buf.writeByte(0, (byte) 0x10);
+        assertEquals(0x100203, buf.readUnsignedMediumBE(0));
+    }
+
+    @Test
+    public void offsettedReadOfUnsignedMediumBEMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanWriteOffset() {
+        int value = 0x010203;
+        buf.writeUnsignedMediumBE(value);
+        try {
+            buf.readUnsignedMediumBE(1);
+            fail("Expected a bounds check.");
+        } catch (IndexOutOfBoundsException ignore) {
+            // Good.
+        }
+    }
+
+    @Test
+    public void offsettedReadOfUnsignedMediumBEMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset() {
+        try {
+            buf.readUnsignedMediumBE(0);
+            fail("Expected a bounds check.");
+        } catch (IndexOutOfBoundsException ignore) {
+            // Good.
+        }
+    }
+
+    @Test
     public void relativeWriteOfMediumMustBoundsCheckWhenWriteOffsetAndSizeIsBeyondCapacity() {
         assertEquals(Long.BYTES, buf.capacity());
         buf.writerIndex(6);
@@ -2003,7 +2706,8 @@ public abstract class BBufTest {
     }
 
     @Test
-    public void relativeWriteOfMediumMustHaveBigEndianByteOrder() {
+    public void relativeWriteOfMediumMustHaveDefaultEndianByteOrder() {
+        buf.order(ByteOrder.BIG_ENDIAN);
         int value = 0x010203;
         buf.writeMedium(value);
         buf.writerIndex(Long.BYTES);
@@ -2048,7 +2752,8 @@ public abstract class BBufTest {
     }
 
     @Test
-    public void offsettedWriteOfMediumMustHaveBigEndianByteOrder() {
+    public void offsettedWriteOfMediumMustHaveDefaultEndianByteOrder() {
+        buf.order(ByteOrder.BIG_ENDIAN);
         int value = 0x010203;
         buf.writeMedium(0, value);
         buf.writerIndex(Long.BYTES);
@@ -2139,6 +2844,82 @@ public abstract class BBufTest {
     }
 
     @Test
+    public void relativeWriteOfMediumBEMustBoundsCheckWhenWriteOffsetAndSizeIsBeyondCapacity() {
+        assertEquals(Long.BYTES, buf.capacity());
+        buf.writerIndex(6);
+        try {
+            int value = 0x010203;
+            buf.writeMediumBE(value);
+            fail("Should have bounds checked.");
+        } catch (IndexOutOfBoundsException ignore) {
+            // Good.
+        }
+        buf.writerIndex(Long.BYTES);
+        // Verify contents are unchanged.
+        assertEquals(0, buf.readLong());
+    }
+
+    @Test
+    public void relativeWriteOfMediumBEMustHaveBigEndianByteOrder() {
+        int value = 0x010203;
+        buf.writeMediumBE(value);
+        buf.writerIndex(Long.BYTES);
+        assertEquals((byte) 0x01, buf.readByte());
+        assertEquals((byte) 0x02, buf.readByte());
+        assertEquals((byte) 0x03, buf.readByte());
+        assertEquals((byte) 0x00, buf.readByte());
+        assertEquals((byte) 0x00, buf.readByte());
+        assertEquals((byte) 0x00, buf.readByte());
+        assertEquals((byte) 0x00, buf.readByte());
+        assertEquals((byte) 0x00, buf.readByte());
+    }
+
+    @Test
+    public void offsettedWriteOfMediumBEMustBoundsCheckWhenWriteOffsetIsNegative() {
+        assertEquals(Long.BYTES, buf.capacity());
+        try {
+            int value = 0x010203;
+            buf.writeMediumBE(-1, value);
+            fail("Should have bounds checked.");
+        } catch (IndexOutOfBoundsException ignore) {
+            // Good.
+        }
+        buf.writerIndex(Long.BYTES);
+        // Verify contents are unchanged.
+        assertEquals(0, buf.readLong());
+    }
+
+    @Test
+    public void offsettedWriteOfMediumBEMustBoundsCheckWhenWriteOffsetAndSizeIsBeyondCapacity() {
+        assertEquals(Long.BYTES, buf.capacity());
+        try {
+            int value = 0x010203;
+            buf.writeMediumBE(6, value);
+            fail("Should have bounds checked.");
+        } catch (IndexOutOfBoundsException ignore) {
+            // Good.
+        }
+        buf.writerIndex(Long.BYTES);
+        // Verify contents are unchanged.
+        assertEquals(0, buf.readLong());
+    }
+
+    @Test
+    public void offsettedWriteOfMediumBEMustHaveBigEndianByteOrder() {
+        int value = 0x010203;
+        buf.writeMediumBE(0, value);
+        buf.writerIndex(Long.BYTES);
+        assertEquals((byte) 0x01, buf.readByte());
+        assertEquals((byte) 0x02, buf.readByte());
+        assertEquals((byte) 0x03, buf.readByte());
+        assertEquals((byte) 0x00, buf.readByte());
+        assertEquals((byte) 0x00, buf.readByte());
+        assertEquals((byte) 0x00, buf.readByte());
+        assertEquals((byte) 0x00, buf.readByte());
+        assertEquals((byte) 0x00, buf.readByte());
+    }
+
+    @Test
     public void relativeWriteOfUnsignedMediumMustBoundsCheckWhenWriteOffsetAndSizeIsBeyondCapacity() {
         assertEquals(Long.BYTES, buf.capacity());
         buf.writerIndex(6);
@@ -2155,7 +2936,8 @@ public abstract class BBufTest {
     }
 
     @Test
-    public void relativeWriteOfUnsignedMediumMustHaveBigEndianByteOrder() {
+    public void relativeWriteOfUnsignedMediumMustHaveDefaultEndianByteOrder() {
+        buf.order(ByteOrder.BIG_ENDIAN);
         int value = 0x010203;
         buf.writeUnsignedMedium(value);
         buf.writerIndex(Long.BYTES);
@@ -2200,7 +2982,8 @@ public abstract class BBufTest {
     }
 
     @Test
-    public void offsettedWriteOfUnsignedMediumMustHaveBigEndianByteOrder() {
+    public void offsettedWriteOfUnsignedMediumMustHaveDefaultEndianByteOrder() {
+        buf.order(ByteOrder.BIG_ENDIAN);
         int value = 0x010203;
         buf.writeUnsignedMedium(0, value);
         buf.writerIndex(Long.BYTES);
@@ -2291,6 +3074,82 @@ public abstract class BBufTest {
     }
 
     @Test
+    public void relativeWriteOfUnsignedMediumBEMustBoundsCheckWhenWriteOffsetAndSizeIsBeyondCapacity() {
+        assertEquals(Long.BYTES, buf.capacity());
+        buf.writerIndex(6);
+        try {
+            int value = 0x010203;
+            buf.writeUnsignedMediumBE(value);
+            fail("Should have bounds checked.");
+        } catch (IndexOutOfBoundsException ignore) {
+            // Good.
+        }
+        buf.writerIndex(Long.BYTES);
+        // Verify contents are unchanged.
+        assertEquals(0, buf.readLong());
+    }
+
+    @Test
+    public void relativeWriteOfUnsignedMediumBEMustHaveBigEndianByteOrder() {
+        int value = 0x010203;
+        buf.writeUnsignedMediumBE(value);
+        buf.writerIndex(Long.BYTES);
+        assertEquals((byte) 0x01, buf.readByte());
+        assertEquals((byte) 0x02, buf.readByte());
+        assertEquals((byte) 0x03, buf.readByte());
+        assertEquals((byte) 0x00, buf.readByte());
+        assertEquals((byte) 0x00, buf.readByte());
+        assertEquals((byte) 0x00, buf.readByte());
+        assertEquals((byte) 0x00, buf.readByte());
+        assertEquals((byte) 0x00, buf.readByte());
+    }
+
+    @Test
+    public void offsettedWriteOfUnsignedMediumBEMustBoundsCheckWhenWriteOffsetIsNegative() {
+        assertEquals(Long.BYTES, buf.capacity());
+        try {
+            int value = 0x010203;
+            buf.writeUnsignedMediumBE(-1, value);
+            fail("Should have bounds checked.");
+        } catch (IndexOutOfBoundsException ignore) {
+            // Good.
+        }
+        buf.writerIndex(Long.BYTES);
+        // Verify contents are unchanged.
+        assertEquals(0, buf.readLong());
+    }
+
+    @Test
+    public void offsettedWriteOfUnsignedMediumBEMustBoundsCheckWhenWriteOffsetAndSizeIsBeyondCapacity() {
+        assertEquals(Long.BYTES, buf.capacity());
+        try {
+            int value = 0x010203;
+            buf.writeUnsignedMediumBE(6, value);
+            fail("Should have bounds checked.");
+        } catch (IndexOutOfBoundsException ignore) {
+            // Good.
+        }
+        buf.writerIndex(Long.BYTES);
+        // Verify contents are unchanged.
+        assertEquals(0, buf.readLong());
+    }
+
+    @Test
+    public void offsettedWriteOfUnsignedMediumBEMustHaveBigEndianByteOrder() {
+        int value = 0x010203;
+        buf.writeUnsignedMediumBE(0, value);
+        buf.writerIndex(Long.BYTES);
+        assertEquals((byte) 0x01, buf.readByte());
+        assertEquals((byte) 0x02, buf.readByte());
+        assertEquals((byte) 0x03, buf.readByte());
+        assertEquals((byte) 0x00, buf.readByte());
+        assertEquals((byte) 0x00, buf.readByte());
+        assertEquals((byte) 0x00, buf.readByte());
+        assertEquals((byte) 0x00, buf.readByte());
+        assertEquals((byte) 0x00, buf.readByte());
+    }
+
+    @Test
     public void relativeReadOfIntMustNotBoundsCheckWhenReadOffsetAndSizeIsEqualToWriteOffset() {
         assertEquals(0, buf.readableBytes());
         assertEquals(Long.BYTES, buf.writableBytes());
@@ -2303,7 +3162,8 @@ public abstract class BBufTest {
     }
 
     @Test
-    public void relativeReadOfIntMustReadWithBigEndianByteOrder() {
+    public void relativeReadOfIntMustReadWithDefaultEndianByteOrder() {
+        buf.order(ByteOrder.BIG_ENDIAN);
         assertEquals(0, buf.readableBytes());
         assertEquals(Long.BYTES, buf.writableBytes());
         int value = 0x01020304;
@@ -2351,7 +3211,8 @@ public abstract class BBufTest {
     }
 
     @Test
-    public void offsettedReadOfIntMustReadWithBigEndianByteOrder() {
+    public void offsettedReadOfIntMustReadWithDefaultEndianByteOrder() {
+        buf.order(ByteOrder.BIG_ENDIAN);
         int value = 0x01020304;
         buf.writeInt(value);
         buf.writeByte(0, (byte) 0x10);
@@ -2471,6 +3332,96 @@ public abstract class BBufTest {
     }
 
     @Test
+    public void relativeReadOfIntBEMustNotBoundsCheckWhenReadOffsetAndSizeIsEqualToWriteOffset() {
+        assertEquals(0, buf.readableBytes());
+        assertEquals(Long.BYTES, buf.writableBytes());
+        int value = 0x01020304;
+        buf.writeIntBE(value);
+        assertEquals(4, buf.readableBytes());
+        assertEquals(4, buf.writableBytes());
+        assertEquals(value, buf.readIntBE());
+        assertEquals(0, buf.readableBytes());
+    }
+
+    @Test
+    public void relativeReadOfIntBEMustReadWithBigEndianByteOrder() {
+        assertEquals(0, buf.readableBytes());
+        assertEquals(Long.BYTES, buf.writableBytes());
+        int value = 0x01020304;
+        buf.writeIntBE(value);
+        buf.writeByte(0, (byte) 0x10);
+        assertEquals(4, buf.readableBytes());
+        assertEquals(4, buf.writableBytes());
+        assertEquals(0x10020304, buf.readIntBE());
+        assertEquals(0, buf.readableBytes());
+    }
+
+    @Test
+    public void relativeReadOfIntBEMustBoundsCheckWhenReadOffsetAndSizeIsBeyondWriteOffset() {
+        assertEquals(0, buf.readableBytes());
+        assertEquals(Long.BYTES, buf.writableBytes());
+        int value = 0x01020304;
+        buf.writeIntBE(value);
+        buf.readerIndex(1);
+        assertEquals(3, buf.readableBytes());
+        assertEquals(4, buf.writableBytes());
+        try {
+            buf.readIntBE();
+            fail("Expected a bounds check.");
+        } catch (IndexOutOfBoundsException ignore) {
+            // Good.
+        }
+        assertEquals(3, buf.readableBytes());
+    }
+
+    @Test
+    public void offsettedReadOfIntBEMustBoundsCheckOnNegativeOffset() {
+        try {
+            buf.readIntBE(-1);
+            fail("Expected a bounds check.");
+        } catch (IndexOutOfBoundsException ignore) {
+            // Good.
+        }
+    }
+
+    @Test
+    public void offsettedReadOfIntBEMustNotBoundsCheckWhenReadOffsetAndSizeIsEqualToWriteOffset() {
+        int value = 0x01020304;
+        buf.writeIntBE(value);
+        assertEquals(value, buf.readIntBE(0));
+    }
+
+    @Test
+    public void offsettedReadOfIntBEMustReadWithBigEndianByteOrder() {
+        int value = 0x01020304;
+        buf.writeIntBE(value);
+        buf.writeByte(0, (byte) 0x10);
+        assertEquals(0x10020304, buf.readIntBE(0));
+    }
+
+    @Test
+    public void offsettedReadOfIntBEMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanWriteOffset() {
+        int value = 0x01020304;
+        buf.writeIntBE(value);
+        try {
+            buf.readIntBE(1);
+            fail("Expected a bounds check.");
+        } catch (IndexOutOfBoundsException ignore) {
+            // Good.
+        }
+    }
+
+    @Test
+    public void offsettedReadOfIntBEMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset() {
+        try {
+            buf.readIntBE(0);
+            fail("Expected a bounds check.");
+        } catch (IndexOutOfBoundsException ignore) {
+            // Good.
+        }
+    }
+
+    @Test
     public void relativeReadOfUnsignedIntMustNotBoundsCheckWhenReadOffsetAndSizeIsEqualToWriteOffset() {
         assertEquals(0, buf.readableBytes());
         assertEquals(Long.BYTES, buf.writableBytes());
@@ -2483,7 +3434,8 @@ public abstract class BBufTest {
     }
 
     @Test
-    public void relativeReadOfUnsignedIntMustReadWithBigEndianByteOrder() {
+    public void relativeReadOfUnsignedIntMustReadWithDefaultEndianByteOrder() {
+        buf.order(ByteOrder.BIG_ENDIAN);
         assertEquals(0, buf.readableBytes());
         assertEquals(Long.BYTES, buf.writableBytes());
         long value = 0x01020304;
@@ -2531,7 +3483,8 @@ public abstract class BBufTest {
     }
 
     @Test
-    public void offsettedReadOfUnsignedIntMustReadWithBigEndianByteOrder() {
+    public void offsettedReadOfUnsignedIntMustReadWithDefaultEndianByteOrder() {
+        buf.order(ByteOrder.BIG_ENDIAN);
         long value = 0x01020304;
         buf.writeUnsignedInt(value);
         buf.writeByte(0, (byte) 0x10);
@@ -2651,6 +3604,96 @@ public abstract class BBufTest {
     }
 
     @Test
+    public void relativeReadOfUnsignedIntBEMustNotBoundsCheckWhenReadOffsetAndSizeIsEqualToWriteOffset() {
+        assertEquals(0, buf.readableBytes());
+        assertEquals(Long.BYTES, buf.writableBytes());
+        long value = 0x01020304;
+        buf.writeUnsignedIntBE(value);
+        assertEquals(4, buf.readableBytes());
+        assertEquals(4, buf.writableBytes());
+        assertEquals(value, buf.readUnsignedIntBE());
+        assertEquals(0, buf.readableBytes());
+    }
+
+    @Test
+    public void relativeReadOfUnsignedIntBEMustReadWithBigEndianByteOrder() {
+        assertEquals(0, buf.readableBytes());
+        assertEquals(Long.BYTES, buf.writableBytes());
+        long value = 0x01020304;
+        buf.writeUnsignedIntBE(value);
+        buf.writeByte(0, (byte) 0x10);
+        assertEquals(4, buf.readableBytes());
+        assertEquals(4, buf.writableBytes());
+        assertEquals(0x10020304, buf.readUnsignedIntBE());
+        assertEquals(0, buf.readableBytes());
+    }
+
+    @Test
+    public void relativeReadOfUnsignedIntBEMustBoundsCheckWhenReadOffsetAndSizeIsBeyondWriteOffset() {
+        assertEquals(0, buf.readableBytes());
+        assertEquals(Long.BYTES, buf.writableBytes());
+        long value = 0x01020304;
+        buf.writeUnsignedIntBE(value);
+        buf.readerIndex(1);
+        assertEquals(3, buf.readableBytes());
+        assertEquals(4, buf.writableBytes());
+        try {
+            buf.readUnsignedIntBE();
+            fail("Expected a bounds check.");
+        } catch (IndexOutOfBoundsException ignore) {
+            // Good.
+        }
+        assertEquals(3, buf.readableBytes());
+    }
+
+    @Test
+    public void offsettedReadOfUnsignedIntBEMustBoundsCheckOnNegativeOffset() {
+        try {
+            buf.readUnsignedIntBE(-1);
+            fail("Expected a bounds check.");
+        } catch (IndexOutOfBoundsException ignore) {
+            // Good.
+        }
+    }
+
+    @Test
+    public void offsettedReadOfUnsignedIntBEMustNotBoundsCheckWhenReadOffsetAndSizeIsEqualToWriteOffset() {
+        long value = 0x01020304;
+        buf.writeUnsignedIntBE(value);
+        assertEquals(value, buf.readUnsignedIntBE(0));
+    }
+
+    @Test
+    public void offsettedReadOfUnsignedIntBEMustReadWithBigEndianByteOrder() {
+        long value = 0x01020304;
+        buf.writeUnsignedIntBE(value);
+        buf.writeByte(0, (byte) 0x10);
+        assertEquals(0x10020304, buf.readUnsignedIntBE(0));
+    }
+
+    @Test
+    public void offsettedReadOfUnsignedIntBEMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanWriteOffset() {
+        long value = 0x01020304;
+        buf.writeUnsignedIntBE(value);
+        try {
+            buf.readUnsignedIntBE(1);
+            fail("Expected a bounds check.");
+        } catch (IndexOutOfBoundsException ignore) {
+            // Good.
+        }
+    }
+
+    @Test
+    public void offsettedReadOfUnsignedIntBEMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset() {
+        try {
+            buf.readUnsignedIntBE(0);
+            fail("Expected a bounds check.");
+        } catch (IndexOutOfBoundsException ignore) {
+            // Good.
+        }
+    }
+
+    @Test
     public void relativeWriteOfIntMustBoundsCheckWhenWriteOffsetAndSizeIsBeyondCapacity() {
         assertEquals(Long.BYTES, buf.capacity());
         buf.writerIndex(5);
@@ -2667,7 +3710,8 @@ public abstract class BBufTest {
     }
 
     @Test
-    public void relativeWriteOfIntMustHaveBigEndianByteOrder() {
+    public void relativeWriteOfIntMustHaveDefaultEndianByteOrder() {
+        buf.order(ByteOrder.BIG_ENDIAN);
         int value = 0x01020304;
         buf.writeInt(value);
         buf.writerIndex(Long.BYTES);
@@ -2712,7 +3756,8 @@ public abstract class BBufTest {
     }
 
     @Test
-    public void offsettedWriteOfIntMustHaveBigEndianByteOrder() {
+    public void offsettedWriteOfIntMustHaveDefaultEndianByteOrder() {
+        buf.order(ByteOrder.BIG_ENDIAN);
         int value = 0x01020304;
         buf.writeInt(0, value);
         buf.writerIndex(Long.BYTES);
@@ -2803,6 +3848,82 @@ public abstract class BBufTest {
     }
 
     @Test
+    public void relativeWriteOfIntBEMustBoundsCheckWhenWriteOffsetAndSizeIsBeyondCapacity() {
+        assertEquals(Long.BYTES, buf.capacity());
+        buf.writerIndex(5);
+        try {
+            int value = 0x01020304;
+            buf.writeIntBE(value);
+            fail("Should have bounds checked.");
+        } catch (IndexOutOfBoundsException ignore) {
+            // Good.
+        }
+        buf.writerIndex(Long.BYTES);
+        // Verify contents are unchanged.
+        assertEquals(0, buf.readLong());
+    }
+
+    @Test
+    public void relativeWriteOfIntBEMustHaveBigEndianByteOrder() {
+        int value = 0x01020304;
+        buf.writeIntBE(value);
+        buf.writerIndex(Long.BYTES);
+        assertEquals((byte) 0x01, buf.readByte());
+        assertEquals((byte) 0x02, buf.readByte());
+        assertEquals((byte) 0x03, buf.readByte());
+        assertEquals((byte) 0x04, buf.readByte());
+        assertEquals((byte) 0x00, buf.readByte());
+        assertEquals((byte) 0x00, buf.readByte());
+        assertEquals((byte) 0x00, buf.readByte());
+        assertEquals((byte) 0x00, buf.readByte());
+    }
+
+    @Test
+    public void offsettedWriteOfIntBEMustBoundsCheckWhenWriteOffsetIsNegative() {
+        assertEquals(Long.BYTES, buf.capacity());
+        try {
+            int value = 0x01020304;
+            buf.writeIntBE(-1, value);
+            fail("Should have bounds checked.");
+        } catch (IndexOutOfBoundsException ignore) {
+            // Good.
+        }
+        buf.writerIndex(Long.BYTES);
+        // Verify contents are unchanged.
+        assertEquals(0, buf.readLong());
+    }
+
+    @Test
+    public void offsettedWriteOfIntBEMustBoundsCheckWhenWriteOffsetAndSizeIsBeyondCapacity() {
+        assertEquals(Long.BYTES, buf.capacity());
+        try {
+            int value = 0x01020304;
+            buf.writeIntBE(5, value);
+            fail("Should have bounds checked.");
+        } catch (IndexOutOfBoundsException ignore) {
+            // Good.
+        }
+        buf.writerIndex(Long.BYTES);
+        // Verify contents are unchanged.
+        assertEquals(0, buf.readLong());
+    }
+
+    @Test
+    public void offsettedWriteOfIntBEMustHaveBigEndianByteOrder() {
+        int value = 0x01020304;
+        buf.writeIntBE(0, value);
+        buf.writerIndex(Long.BYTES);
+        assertEquals((byte) 0x01, buf.readByte());
+        assertEquals((byte) 0x02, buf.readByte());
+        assertEquals((byte) 0x03, buf.readByte());
+        assertEquals((byte) 0x04, buf.readByte());
+        assertEquals((byte) 0x00, buf.readByte());
+        assertEquals((byte) 0x00, buf.readByte());
+        assertEquals((byte) 0x00, buf.readByte());
+        assertEquals((byte) 0x00, buf.readByte());
+    }
+
+    @Test
     public void relativeWriteOfUnsignedIntMustBoundsCheckWhenWriteOffsetAndSizeIsBeyondCapacity() {
         assertEquals(Long.BYTES, buf.capacity());
         buf.writerIndex(5);
@@ -2819,7 +3940,8 @@ public abstract class BBufTest {
     }
 
     @Test
-    public void relativeWriteOfUnsignedIntMustHaveBigEndianByteOrder() {
+    public void relativeWriteOfUnsignedIntMustHaveDefaultEndianByteOrder() {
+        buf.order(ByteOrder.BIG_ENDIAN);
         long value = 0x01020304;
         buf.writeUnsignedInt(value);
         buf.writerIndex(Long.BYTES);
@@ -2864,7 +3986,8 @@ public abstract class BBufTest {
     }
 
     @Test
-    public void offsettedWriteOfUnsignedIntMustHaveBigEndianByteOrder() {
+    public void offsettedWriteOfUnsignedIntMustHaveDefaultEndianByteOrder() {
+        buf.order(ByteOrder.BIG_ENDIAN);
         long value = 0x01020304;
         buf.writeUnsignedInt(0, value);
         buf.writerIndex(Long.BYTES);
@@ -2955,6 +4078,82 @@ public abstract class BBufTest {
     }
 
     @Test
+    public void relativeWriteOfUnsignedIntBEMustBoundsCheckWhenWriteOffsetAndSizeIsBeyondCapacity() {
+        assertEquals(Long.BYTES, buf.capacity());
+        buf.writerIndex(5);
+        try {
+            long value = 0x01020304;
+            buf.writeUnsignedIntBE(value);
+            fail("Should have bounds checked.");
+        } catch (IndexOutOfBoundsException ignore) {
+            // Good.
+        }
+        buf.writerIndex(Long.BYTES);
+        // Verify contents are unchanged.
+        assertEquals(0, buf.readLong());
+    }
+
+    @Test
+    public void relativeWriteOfUnsignedIntBEMustHaveBigEndianByteOrder() {
+        long value = 0x01020304;
+        buf.writeUnsignedIntBE(value);
+        buf.writerIndex(Long.BYTES);
+        assertEquals((byte) 0x01, buf.readByte());
+        assertEquals((byte) 0x02, buf.readByte());
+        assertEquals((byte) 0x03, buf.readByte());
+        assertEquals((byte) 0x04, buf.readByte());
+        assertEquals((byte) 0x00, buf.readByte());
+        assertEquals((byte) 0x00, buf.readByte());
+        assertEquals((byte) 0x00, buf.readByte());
+        assertEquals((byte) 0x00, buf.readByte());
+    }
+
+    @Test
+    public void offsettedWriteOfUnsignedIntBEMustBoundsCheckWhenWriteOffsetIsNegative() {
+        assertEquals(Long.BYTES, buf.capacity());
+        try {
+            long value = 0x01020304;
+            buf.writeUnsignedIntBE(-1, value);
+            fail("Should have bounds checked.");
+        } catch (IndexOutOfBoundsException ignore) {
+            // Good.
+        }
+        buf.writerIndex(Long.BYTES);
+        // Verify contents are unchanged.
+        assertEquals(0, buf.readLong());
+    }
+
+    @Test
+    public void offsettedWriteOfUnsignedIntBEMustBoundsCheckWhenWriteOffsetAndSizeIsBeyondCapacity() {
+        assertEquals(Long.BYTES, buf.capacity());
+        try {
+            long value = 0x01020304;
+            buf.writeUnsignedIntBE(5, value);
+            fail("Should have bounds checked.");
+        } catch (IndexOutOfBoundsException ignore) {
+            // Good.
+        }
+        buf.writerIndex(Long.BYTES);
+        // Verify contents are unchanged.
+        assertEquals(0, buf.readLong());
+    }
+
+    @Test
+    public void offsettedWriteOfUnsignedIntBEMustHaveBigEndianByteOrder() {
+        long value = 0x01020304;
+        buf.writeUnsignedIntBE(0, value);
+        buf.writerIndex(Long.BYTES);
+        assertEquals((byte) 0x01, buf.readByte());
+        assertEquals((byte) 0x02, buf.readByte());
+        assertEquals((byte) 0x03, buf.readByte());
+        assertEquals((byte) 0x04, buf.readByte());
+        assertEquals((byte) 0x00, buf.readByte());
+        assertEquals((byte) 0x00, buf.readByte());
+        assertEquals((byte) 0x00, buf.readByte());
+        assertEquals((byte) 0x00, buf.readByte());
+    }
+
+    @Test
     public void relativeReadOfFloatMustNotBoundsCheckWhenReadOffsetAndSizeIsEqualToWriteOffset() {
         assertEquals(0, buf.readableBytes());
         assertEquals(Long.BYTES, buf.writableBytes());
@@ -2967,7 +4166,8 @@ public abstract class BBufTest {
     }
 
     @Test
-    public void relativeReadOfFloatMustReadWithBigEndianByteOrder() {
+    public void relativeReadOfFloatMustReadWithDefaultEndianByteOrder() {
+        buf.order(ByteOrder.BIG_ENDIAN);
         assertEquals(0, buf.readableBytes());
         assertEquals(Long.BYTES, buf.writableBytes());
         float value = Float.intBitsToFloat(0x01020304);
@@ -3015,7 +4215,8 @@ public abstract class BBufTest {
     }
 
     @Test
-    public void offsettedReadOfFloatMustReadWithBigEndianByteOrder() {
+    public void offsettedReadOfFloatMustReadWithDefaultEndianByteOrder() {
+        buf.order(ByteOrder.BIG_ENDIAN);
         float value = Float.intBitsToFloat(0x01020304);
         buf.writeFloat(value);
         buf.writeByte(0, (byte) 0x10);
@@ -3135,6 +4336,96 @@ public abstract class BBufTest {
     }
 
     @Test
+    public void relativeReadOfFloatBEMustNotBoundsCheckWhenReadOffsetAndSizeIsEqualToWriteOffset() {
+        assertEquals(0, buf.readableBytes());
+        assertEquals(Long.BYTES, buf.writableBytes());
+        float value = Float.intBitsToFloat(0x01020304);
+        buf.writeFloatBE(value);
+        assertEquals(4, buf.readableBytes());
+        assertEquals(4, buf.writableBytes());
+        assertEquals(value, buf.readFloatBE());
+        assertEquals(0, buf.readableBytes());
+    }
+
+    @Test
+    public void relativeReadOfFloatBEMustReadWithBigEndianByteOrder() {
+        assertEquals(0, buf.readableBytes());
+        assertEquals(Long.BYTES, buf.writableBytes());
+        float value = Float.intBitsToFloat(0x01020304);
+        buf.writeFloatBE(value);
+        buf.writeByte(0, (byte) 0x10);
+        assertEquals(4, buf.readableBytes());
+        assertEquals(4, buf.writableBytes());
+        assertEquals(Float.intBitsToFloat(0x10020304), buf.readFloatBE());
+        assertEquals(0, buf.readableBytes());
+    }
+
+    @Test
+    public void relativeReadOfFloatBEMustBoundsCheckWhenReadOffsetAndSizeIsBeyondWriteOffset() {
+        assertEquals(0, buf.readableBytes());
+        assertEquals(Long.BYTES, buf.writableBytes());
+        float value = Float.intBitsToFloat(0x01020304);
+        buf.writeFloatBE(value);
+        buf.readerIndex(1);
+        assertEquals(3, buf.readableBytes());
+        assertEquals(4, buf.writableBytes());
+        try {
+            buf.readFloatBE();
+            fail("Expected a bounds check.");
+        } catch (IndexOutOfBoundsException ignore) {
+            // Good.
+        }
+        assertEquals(3, buf.readableBytes());
+    }
+
+    @Test
+    public void offsettedReadOfFloatBEMustBoundsCheckOnNegativeOffset() {
+        try {
+            buf.readFloatBE(-1);
+            fail("Expected a bounds check.");
+        } catch (IndexOutOfBoundsException ignore) {
+            // Good.
+        }
+    }
+
+    @Test
+    public void offsettedReadOfFloatBEMustNotBoundsCheckWhenReadOffsetAndSizeIsEqualToWriteOffset() {
+        float value = Float.intBitsToFloat(0x01020304);
+        buf.writeFloatBE(value);
+        assertEquals(value, buf.readFloatBE(0));
+    }
+
+    @Test
+    public void offsettedReadOfFloatBEMustReadWithBigEndianByteOrder() {
+        float value = Float.intBitsToFloat(0x01020304);
+        buf.writeFloatBE(value);
+        buf.writeByte(0, (byte) 0x10);
+        assertEquals(Float.intBitsToFloat(0x10020304), buf.readFloatBE(0));
+    }
+
+    @Test
+    public void offsettedReadOfFloatBEMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanWriteOffset() {
+        float value = Float.intBitsToFloat(0x01020304);
+        buf.writeFloatBE(value);
+        try {
+            buf.readFloatBE(1);
+            fail("Expected a bounds check.");
+        } catch (IndexOutOfBoundsException ignore) {
+            // Good.
+        }
+    }
+
+    @Test
+    public void offsettedReadOfFloatBEMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset() {
+        try {
+            buf.readFloatBE(0);
+            fail("Expected a bounds check.");
+        } catch (IndexOutOfBoundsException ignore) {
+            // Good.
+        }
+    }
+
+    @Test
     public void relativeWriteOfFloatMustBoundsCheckWhenWriteOffsetAndSizeIsBeyondCapacity() {
         assertEquals(Long.BYTES, buf.capacity());
         buf.writerIndex(5);
@@ -3151,7 +4442,8 @@ public abstract class BBufTest {
     }
 
     @Test
-    public void relativeWriteOfFloatMustHaveBigEndianByteOrder() {
+    public void relativeWriteOfFloatMustHaveDefaultEndianByteOrder() {
+        buf.order(ByteOrder.BIG_ENDIAN);
         float value = Float.intBitsToFloat(0x01020304);
         buf.writeFloat(value);
         buf.writerIndex(Long.BYTES);
@@ -3196,7 +4488,8 @@ public abstract class BBufTest {
     }
 
     @Test
-    public void offsettedWriteOfFloatMustHaveBigEndianByteOrder() {
+    public void offsettedWriteOfFloatMustHaveDefaultEndianByteOrder() {
+        buf.order(ByteOrder.BIG_ENDIAN);
         float value = Float.intBitsToFloat(0x01020304);
         buf.writeFloat(0, value);
         buf.writerIndex(Long.BYTES);
@@ -3287,6 +4580,82 @@ public abstract class BBufTest {
     }
 
     @Test
+    public void relativeWriteOfFloatBEMustBoundsCheckWhenWriteOffsetAndSizeIsBeyondCapacity() {
+        assertEquals(Long.BYTES, buf.capacity());
+        buf.writerIndex(5);
+        try {
+            float value = Float.intBitsToFloat(0x01020304);
+            buf.writeFloatBE(value);
+            fail("Should have bounds checked.");
+        } catch (IndexOutOfBoundsException ignore) {
+            // Good.
+        }
+        buf.writerIndex(Long.BYTES);
+        // Verify contents are unchanged.
+        assertEquals(0, buf.readLong());
+    }
+
+    @Test
+    public void relativeWriteOfFloatBEMustHaveBigEndianByteOrder() {
+        float value = Float.intBitsToFloat(0x01020304);
+        buf.writeFloatBE(value);
+        buf.writerIndex(Long.BYTES);
+        assertEquals((byte) 0x01, buf.readByte());
+        assertEquals((byte) 0x02, buf.readByte());
+        assertEquals((byte) 0x03, buf.readByte());
+        assertEquals((byte) 0x04, buf.readByte());
+        assertEquals((byte) 0x00, buf.readByte());
+        assertEquals((byte) 0x00, buf.readByte());
+        assertEquals((byte) 0x00, buf.readByte());
+        assertEquals((byte) 0x00, buf.readByte());
+    }
+
+    @Test
+    public void offsettedWriteOfFloatBEMustBoundsCheckWhenWriteOffsetIsNegative() {
+        assertEquals(Long.BYTES, buf.capacity());
+        try {
+            float value = Float.intBitsToFloat(0x01020304);
+            buf.writeFloatBE(-1, value);
+            fail("Should have bounds checked.");
+        } catch (IndexOutOfBoundsException ignore) {
+            // Good.
+        }
+        buf.writerIndex(Long.BYTES);
+        // Verify contents are unchanged.
+        assertEquals(0, buf.readLong());
+    }
+
+    @Test
+    public void offsettedWriteOfFloatBEMustBoundsCheckWhenWriteOffsetAndSizeIsBeyondCapacity() {
+        assertEquals(Long.BYTES, buf.capacity());
+        try {
+            float value = Float.intBitsToFloat(0x01020304);
+            buf.writeFloatBE(5, value);
+            fail("Should have bounds checked.");
+        } catch (IndexOutOfBoundsException ignore) {
+            // Good.
+        }
+        buf.writerIndex(Long.BYTES);
+        // Verify contents are unchanged.
+        assertEquals(0, buf.readLong());
+    }
+
+    @Test
+    public void offsettedWriteOfFloatBEMustHaveBigEndianByteOrder() {
+        float value = Float.intBitsToFloat(0x01020304);
+        buf.writeFloatBE(0, value);
+        buf.writerIndex(Long.BYTES);
+        assertEquals((byte) 0x01, buf.readByte());
+        assertEquals((byte) 0x02, buf.readByte());
+        assertEquals((byte) 0x03, buf.readByte());
+        assertEquals((byte) 0x04, buf.readByte());
+        assertEquals((byte) 0x00, buf.readByte());
+        assertEquals((byte) 0x00, buf.readByte());
+        assertEquals((byte) 0x00, buf.readByte());
+        assertEquals((byte) 0x00, buf.readByte());
+    }
+
+    @Test
     public void relativeReadOfLongMustNotBoundsCheckWhenReadOffsetAndSizeIsEqualToWriteOffset() {
         assertEquals(0, buf.readableBytes());
         assertEquals(Long.BYTES, buf.writableBytes());
@@ -3299,7 +4668,8 @@ public abstract class BBufTest {
     }
 
     @Test
-    public void relativeReadOfLongMustReadWithBigEndianByteOrder() {
+    public void relativeReadOfLongMustReadWithDefaultEndianByteOrder() {
+        buf.order(ByteOrder.BIG_ENDIAN);
         assertEquals(0, buf.readableBytes());
         assertEquals(Long.BYTES, buf.writableBytes());
         long value = 0x0102030405060708L;
@@ -3347,7 +4717,8 @@ public abstract class BBufTest {
     }
 
     @Test
-    public void offsettedReadOfLongMustReadWithBigEndianByteOrder() {
+    public void offsettedReadOfLongMustReadWithDefaultEndianByteOrder() {
+        buf.order(ByteOrder.BIG_ENDIAN);
         long value = 0x0102030405060708L;
         buf.writeLong(value);
         buf.writeByte(0, (byte) 0x10);
@@ -3467,6 +4838,96 @@ public abstract class BBufTest {
     }
 
     @Test
+    public void relativeReadOfLongBEMustNotBoundsCheckWhenReadOffsetAndSizeIsEqualToWriteOffset() {
+        assertEquals(0, buf.readableBytes());
+        assertEquals(Long.BYTES, buf.writableBytes());
+        long value = 0x0102030405060708L;
+        buf.writeLongBE(value);
+        assertEquals(8, buf.readableBytes());
+        assertEquals(0, buf.writableBytes());
+        assertEquals(value, buf.readLongBE());
+        assertEquals(0, buf.readableBytes());
+    }
+
+    @Test
+    public void relativeReadOfLongBEMustReadWithBigEndianByteOrder() {
+        assertEquals(0, buf.readableBytes());
+        assertEquals(Long.BYTES, buf.writableBytes());
+        long value = 0x0102030405060708L;
+        buf.writeLongBE(value);
+        buf.writeByte(0, (byte) 0x10);
+        assertEquals(8, buf.readableBytes());
+        assertEquals(0, buf.writableBytes());
+        assertEquals(0x1002030405060708L, buf.readLongBE());
+        assertEquals(0, buf.readableBytes());
+    }
+
+    @Test
+    public void relativeReadOfLongBEMustBoundsCheckWhenReadOffsetAndSizeIsBeyondWriteOffset() {
+        assertEquals(0, buf.readableBytes());
+        assertEquals(Long.BYTES, buf.writableBytes());
+        long value = 0x0102030405060708L;
+        buf.writeLongBE(value);
+        buf.readerIndex(1);
+        assertEquals(7, buf.readableBytes());
+        assertEquals(0, buf.writableBytes());
+        try {
+            buf.readLongBE();
+            fail("Expected a bounds check.");
+        } catch (IndexOutOfBoundsException ignore) {
+            // Good.
+        }
+        assertEquals(7, buf.readableBytes());
+    }
+
+    @Test
+    public void offsettedReadOfLongBEMustBoundsCheckOnNegativeOffset() {
+        try {
+            buf.readLongBE(-1);
+            fail("Expected a bounds check.");
+        } catch (IndexOutOfBoundsException ignore) {
+            // Good.
+        }
+    }
+
+    @Test
+    public void offsettedReadOfLongBEMustNotBoundsCheckWhenReadOffsetAndSizeIsEqualToWriteOffset() {
+        long value = 0x0102030405060708L;
+        buf.writeLongBE(value);
+        assertEquals(value, buf.readLongBE(0));
+    }
+
+    @Test
+    public void offsettedReadOfLongBEMustReadWithBigEndianByteOrder() {
+        long value = 0x0102030405060708L;
+        buf.writeLongBE(value);
+        buf.writeByte(0, (byte) 0x10);
+        assertEquals(0x1002030405060708L, buf.readLongBE(0));
+    }
+
+    @Test
+    public void offsettedReadOfLongBEMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanWriteOffset() {
+        long value = 0x0102030405060708L;
+        buf.writeLongBE(value);
+        try {
+            buf.readLongBE(1);
+            fail("Expected a bounds check.");
+        } catch (IndexOutOfBoundsException ignore) {
+            // Good.
+        }
+    }
+
+    @Test
+    public void offsettedReadOfLongBEMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset() {
+        try {
+            buf.readLongBE(0);
+            fail("Expected a bounds check.");
+        } catch (IndexOutOfBoundsException ignore) {
+            // Good.
+        }
+    }
+
+    @Test
     public void relativeWriteOfLongMustBoundsCheckWhenWriteOffsetAndSizeIsBeyondCapacity() {
         assertEquals(Long.BYTES, buf.capacity());
         buf.writerIndex(1);
@@ -3483,7 +4944,8 @@ public abstract class BBufTest {
     }
 
     @Test
-    public void relativeWriteOfLongMustHaveBigEndianByteOrder() {
+    public void relativeWriteOfLongMustHaveDefaultEndianByteOrder() {
+        buf.order(ByteOrder.BIG_ENDIAN);
         long value = 0x0102030405060708L;
         buf.writeLong(value);
         buf.writerIndex(Long.BYTES);
@@ -3528,7 +4990,8 @@ public abstract class BBufTest {
     }
 
     @Test
-    public void offsettedWriteOfLongMustHaveBigEndianByteOrder() {
+    public void offsettedWriteOfLongMustHaveDefaultEndianByteOrder() {
+        buf.order(ByteOrder.BIG_ENDIAN);
         long value = 0x0102030405060708L;
         buf.writeLong(0, value);
         buf.writerIndex(Long.BYTES);
@@ -3619,6 +5082,82 @@ public abstract class BBufTest {
     }
 
     @Test
+    public void relativeWriteOfLongBEMustBoundsCheckWhenWriteOffsetAndSizeIsBeyondCapacity() {
+        assertEquals(Long.BYTES, buf.capacity());
+        buf.writerIndex(1);
+        try {
+            long value = 0x0102030405060708L;
+            buf.writeLongBE(value);
+            fail("Should have bounds checked.");
+        } catch (IndexOutOfBoundsException ignore) {
+            // Good.
+        }
+        buf.writerIndex(Long.BYTES);
+        // Verify contents are unchanged.
+        assertEquals(0, buf.readLong());
+    }
+
+    @Test
+    public void relativeWriteOfLongBEMustHaveBigEndianByteOrder() {
+        long value = 0x0102030405060708L;
+        buf.writeLongBE(value);
+        buf.writerIndex(Long.BYTES);
+        assertEquals((byte) 0x01, buf.readByte());
+        assertEquals((byte) 0x02, buf.readByte());
+        assertEquals((byte) 0x03, buf.readByte());
+        assertEquals((byte) 0x04, buf.readByte());
+        assertEquals((byte) 0x05, buf.readByte());
+        assertEquals((byte) 0x06, buf.readByte());
+        assertEquals((byte) 0x07, buf.readByte());
+        assertEquals((byte) 0x08, buf.readByte());
+    }
+
+    @Test
+    public void offsettedWriteOfLongBEMustBoundsCheckWhenWriteOffsetIsNegative() {
+        assertEquals(Long.BYTES, buf.capacity());
+        try {
+            long value = 0x0102030405060708L;
+            buf.writeLongBE(-1, value);
+            fail("Should have bounds checked.");
+        } catch (IndexOutOfBoundsException ignore) {
+            // Good.
+        }
+        buf.writerIndex(Long.BYTES);
+        // Verify contents are unchanged.
+        assertEquals(0, buf.readLong());
+    }
+
+    @Test
+    public void offsettedWriteOfLongBEMustBoundsCheckWhenWriteOffsetAndSizeIsBeyondCapacity() {
+        assertEquals(Long.BYTES, buf.capacity());
+        try {
+            long value = 0x0102030405060708L;
+            buf.writeLongBE(1, value);
+            fail("Should have bounds checked.");
+        } catch (IndexOutOfBoundsException ignore) {
+            // Good.
+        }
+        buf.writerIndex(Long.BYTES);
+        // Verify contents are unchanged.
+        assertEquals(0, buf.readLong());
+    }
+
+    @Test
+    public void offsettedWriteOfLongBEMustHaveBigEndianByteOrder() {
+        long value = 0x0102030405060708L;
+        buf.writeLongBE(0, value);
+        buf.writerIndex(Long.BYTES);
+        assertEquals((byte) 0x01, buf.readByte());
+        assertEquals((byte) 0x02, buf.readByte());
+        assertEquals((byte) 0x03, buf.readByte());
+        assertEquals((byte) 0x04, buf.readByte());
+        assertEquals((byte) 0x05, buf.readByte());
+        assertEquals((byte) 0x06, buf.readByte());
+        assertEquals((byte) 0x07, buf.readByte());
+        assertEquals((byte) 0x08, buf.readByte());
+    }
+
+    @Test
     public void relativeReadOfDoubleMustNotBoundsCheckWhenReadOffsetAndSizeIsEqualToWriteOffset() {
         assertEquals(0, buf.readableBytes());
         assertEquals(Long.BYTES, buf.writableBytes());
@@ -3631,7 +5170,8 @@ public abstract class BBufTest {
     }
 
     @Test
-    public void relativeReadOfDoubleMustReadWithBigEndianByteOrder() {
+    public void relativeReadOfDoubleMustReadWithDefaultEndianByteOrder() {
+        buf.order(ByteOrder.BIG_ENDIAN);
         assertEquals(0, buf.readableBytes());
         assertEquals(Long.BYTES, buf.writableBytes());
         double value = Double.longBitsToDouble(0x0102030405060708L);
@@ -3679,7 +5219,8 @@ public abstract class BBufTest {
     }
 
     @Test
-    public void offsettedReadOfDoubleMustReadWithBigEndianByteOrder() {
+    public void offsettedReadOfDoubleMustReadWithDefaultEndianByteOrder() {
+        buf.order(ByteOrder.BIG_ENDIAN);
         double value = Double.longBitsToDouble(0x0102030405060708L);
         buf.writeDouble(value);
         buf.writeByte(0, (byte) 0x10);
@@ -3799,6 +5340,96 @@ public abstract class BBufTest {
     }
 
     @Test
+    public void relativeReadOfDoubleBEMustNotBoundsCheckWhenReadOffsetAndSizeIsEqualToWriteOffset() {
+        assertEquals(0, buf.readableBytes());
+        assertEquals(Long.BYTES, buf.writableBytes());
+        double value = Double.longBitsToDouble(0x0102030405060708L);
+        buf.writeDoubleBE(value);
+        assertEquals(8, buf.readableBytes());
+        assertEquals(0, buf.writableBytes());
+        assertEquals(value, buf.readDoubleBE());
+        assertEquals(0, buf.readableBytes());
+    }
+
+    @Test
+    public void relativeReadOfDoubleBEMustReadWithBigEndianByteOrder() {
+        assertEquals(0, buf.readableBytes());
+        assertEquals(Long.BYTES, buf.writableBytes());
+        double value = Double.longBitsToDouble(0x0102030405060708L);
+        buf.writeDoubleBE(value);
+        buf.writeByte(0, (byte) 0x10);
+        assertEquals(8, buf.readableBytes());
+        assertEquals(0, buf.writableBytes());
+        assertEquals(Double.longBitsToDouble(0x1002030405060708L), buf.readDoubleBE());
+        assertEquals(0, buf.readableBytes());
+    }
+
+    @Test
+    public void relativeReadOfDoubleBEMustBoundsCheckWhenReadOffsetAndSizeIsBeyondWriteOffset() {
+        assertEquals(0, buf.readableBytes());
+        assertEquals(Long.BYTES, buf.writableBytes());
+        double value = Double.longBitsToDouble(0x0102030405060708L);
+        buf.writeDoubleBE(value);
+        buf.readerIndex(1);
+        assertEquals(7, buf.readableBytes());
+        assertEquals(0, buf.writableBytes());
+        try {
+            buf.readDoubleBE();
+            fail("Expected a bounds check.");
+        } catch (IndexOutOfBoundsException ignore) {
+            // Good.
+        }
+        assertEquals(7, buf.readableBytes());
+    }
+
+    @Test
+    public void offsettedReadOfDoubleBEMustBoundsCheckOnNegativeOffset() {
+        try {
+            buf.readDoubleBE(-1);
+            fail("Expected a bounds check.");
+        } catch (IndexOutOfBoundsException ignore) {
+            // Good.
+        }
+    }
+
+    @Test
+    public void offsettedReadOfDoubleBEMustNotBoundsCheckWhenReadOffsetAndSizeIsEqualToWriteOffset() {
+        double value = Double.longBitsToDouble(0x0102030405060708L);
+        buf.writeDoubleBE(value);
+        assertEquals(value, buf.readDoubleBE(0));
+    }
+
+    @Test
+    public void offsettedReadOfDoubleBEMustReadWithBigEndianByteOrder() {
+        double value = Double.longBitsToDouble(0x0102030405060708L);
+        buf.writeDoubleBE(value);
+        buf.writeByte(0, (byte) 0x10);
+        assertEquals(Double.longBitsToDouble(0x1002030405060708L), buf.readDoubleBE(0));
+    }
+
+    @Test
+    public void offsettedReadOfDoubleBEMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanWriteOffset() {
+        double value = Double.longBitsToDouble(0x0102030405060708L);
+        buf.writeDoubleBE(value);
+        try {
+            buf.readDoubleBE(1);
+            fail("Expected a bounds check.");
+        } catch (IndexOutOfBoundsException ignore) {
+            // Good.
+        }
+    }
+
+    @Test
+    public void offsettedReadOfDoubleBEMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset() {
+        try {
+            buf.readDoubleBE(0);
+            fail("Expected a bounds check.");
+        } catch (IndexOutOfBoundsException ignore) {
+            // Good.
+        }
+    }
+
+    @Test
     public void relativeWriteOfDoubleMustBoundsCheckWhenWriteOffsetAndSizeIsBeyondCapacity() {
         assertEquals(Long.BYTES, buf.capacity());
         buf.writerIndex(1);
@@ -3815,7 +5446,8 @@ public abstract class BBufTest {
     }
 
     @Test
-    public void relativeWriteOfDoubleMustHaveBigEndianByteOrder() {
+    public void relativeWriteOfDoubleMustHaveDefaultEndianByteOrder() {
+        buf.order(ByteOrder.BIG_ENDIAN);
         double value = Double.longBitsToDouble(0x0102030405060708L);
         buf.writeDouble(value);
         buf.writerIndex(Long.BYTES);
@@ -3860,7 +5492,8 @@ public abstract class BBufTest {
     }
 
     @Test
-    public void offsettedWriteOfDoubleMustHaveBigEndianByteOrder() {
+    public void offsettedWriteOfDoubleMustHaveDefaultEndianByteOrder() {
+        buf.order(ByteOrder.BIG_ENDIAN);
         double value = Double.longBitsToDouble(0x0102030405060708L);
         buf.writeDouble(0, value);
         buf.writerIndex(Long.BYTES);
@@ -3948,6 +5581,82 @@ public abstract class BBufTest {
         assertEquals((byte) 0x03, buf.readByte());
         assertEquals((byte) 0x02, buf.readByte());
         assertEquals((byte) 0x01, buf.readByte());
+    }
+
+    @Test
+    public void relativeWriteOfDoubleBEMustBoundsCheckWhenWriteOffsetAndSizeIsBeyondCapacity() {
+        assertEquals(Long.BYTES, buf.capacity());
+        buf.writerIndex(1);
+        try {
+            double value = Double.longBitsToDouble(0x0102030405060708L);
+            buf.writeDoubleBE(value);
+            fail("Should have bounds checked.");
+        } catch (IndexOutOfBoundsException ignore) {
+            // Good.
+        }
+        buf.writerIndex(Long.BYTES);
+        // Verify contents are unchanged.
+        assertEquals(0, buf.readLong());
+    }
+
+    @Test
+    public void relativeWriteOfDoubleBEMustHaveBigEndianByteOrder() {
+        double value = Double.longBitsToDouble(0x0102030405060708L);
+        buf.writeDoubleBE(value);
+        buf.writerIndex(Long.BYTES);
+        assertEquals((byte) 0x01, buf.readByte());
+        assertEquals((byte) 0x02, buf.readByte());
+        assertEquals((byte) 0x03, buf.readByte());
+        assertEquals((byte) 0x04, buf.readByte());
+        assertEquals((byte) 0x05, buf.readByte());
+        assertEquals((byte) 0x06, buf.readByte());
+        assertEquals((byte) 0x07, buf.readByte());
+        assertEquals((byte) 0x08, buf.readByte());
+    }
+
+    @Test
+    public void offsettedWriteOfDoubleBEMustBoundsCheckWhenWriteOffsetIsNegative() {
+        assertEquals(Long.BYTES, buf.capacity());
+        try {
+            double value = Double.longBitsToDouble(0x0102030405060708L);
+            buf.writeDoubleBE(-1, value);
+            fail("Should have bounds checked.");
+        } catch (IndexOutOfBoundsException ignore) {
+            // Good.
+        }
+        buf.writerIndex(Long.BYTES);
+        // Verify contents are unchanged.
+        assertEquals(0, buf.readLong());
+    }
+
+    @Test
+    public void offsettedWriteOfDoubleBEMustBoundsCheckWhenWriteOffsetAndSizeIsBeyondCapacity() {
+        assertEquals(Long.BYTES, buf.capacity());
+        try {
+            double value = Double.longBitsToDouble(0x0102030405060708L);
+            buf.writeDoubleBE(1, value);
+            fail("Should have bounds checked.");
+        } catch (IndexOutOfBoundsException ignore) {
+            // Good.
+        }
+        buf.writerIndex(Long.BYTES);
+        // Verify contents are unchanged.
+        assertEquals(0, buf.readLong());
+    }
+
+    @Test
+    public void offsettedWriteOfDoubleBEMustHaveBigEndianByteOrder() {
+        double value = Double.longBitsToDouble(0x0102030405060708L);
+        buf.writeDoubleBE(0, value);
+        buf.writerIndex(Long.BYTES);
+        assertEquals((byte) 0x01, buf.readByte());
+        assertEquals((byte) 0x02, buf.readByte());
+        assertEquals((byte) 0x03, buf.readByte());
+        assertEquals((byte) 0x04, buf.readByte());
+        assertEquals((byte) 0x05, buf.readByte());
+        assertEquals((byte) 0x06, buf.readByte());
+        assertEquals((byte) 0x07, buf.readByte());
+        assertEquals((byte) 0x08, buf.readByte());
     }
     // </editor-fold>
     // ### CODEGEN END primitive accessors tests

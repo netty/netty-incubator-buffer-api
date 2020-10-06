@@ -117,7 +117,8 @@ public interface Buf extends Rc<Buf> {
     /**
      * Get the byte value at the current {@link Buf#readerIndex()},
      * and increases the reader offset by {@link Byte#BYTES}.
-     * The value is read using a two's complement 8-bit encoding, with big-endian byte order.
+     * The value is read using a two's complement 8-bit encoding,
+     * with the {@link #order() configured} default byte order.
      *
      * @return The byte value at the current reader offset.
      * @throws IndexOutOfBoundsException If {@link Buf#readableBytes} is less than {@link Byte#BYTES}.
@@ -127,7 +128,8 @@ public interface Buf extends Rc<Buf> {
     /**
      * Get the byte value at the given reader offset.
      * The {@link Buf#readerIndex()} is not modified.
-     * The value is read using a two's complement 8-bit encoding, with big-endian byte order.
+     * The value is read using a two's complement 8-bit encoding,
+     * with the {@link #order() configured} default byte order.
      *
      * @param roff The read offset, an absolute index into this buffer, to read from.
      * @return The byte value at the given offset.
@@ -139,7 +141,8 @@ public interface Buf extends Rc<Buf> {
     /**
      * Get the unsigned byte value at the current {@link Buf#readerIndex()},
      * and increases the reader offset by {@link Byte#BYTES}.
-     * The value is read using an unsigned two's complement 8-bit encoding, with big-endian byte order.
+     * The value is read using an unsigned two's complement 8-bit encoding,
+     * with the {@link #order() configured} default byte order.
      *
      * @return The unsigned byte value at the current reader offset.
      * @throws IndexOutOfBoundsException If {@link Buf#readableBytes} is less than {@link Byte#BYTES}.
@@ -149,7 +152,8 @@ public interface Buf extends Rc<Buf> {
     /**
      * Get the unsigned byte value at the given reader offset.
      * The {@link Buf#readerIndex()} is not modified.
-     * The value is read using an unsigned two's complement 8-bit encoding, with big-endian byte order.
+     * The value is read using an unsigned two's complement 8-bit encoding,
+     * with the {@link #order() configured} default byte order.
      *
      * @param roff The read offset, an absolute index into this buffer, to read from.
      * @return The unsigned byte value at the given offset.
@@ -161,7 +165,8 @@ public interface Buf extends Rc<Buf> {
     /**
      * Set the given byte value at the current {@link Buf#writerIndex()},
      * and increase the writer offset by {@link Byte#BYTES}.
-     * The value is written using a two's complement 8-bit encoding, with big-endian byte order.
+     * The value is written using a two's complement 8-bit encoding,
+     * with the {@link #order() configured} default byte order.
      *
      * @param value The byte value to write.
      * @return This Buf.
@@ -171,7 +176,8 @@ public interface Buf extends Rc<Buf> {
 
     /**
      * Set the given byte value at the given write offset. The {@link Buf#writerIndex()} is not modified.
-     * The value is written using a two's complement 8-bit encoding, with big-endian byte order.
+     * The value is written using a two's complement 8-bit encoding,
+     * with the {@link #order() configured} default byte order.
      *
      * @param woff The write offset, an absolute index into this buffer to write to.
      * @param value The byte value to write.
@@ -184,7 +190,8 @@ public interface Buf extends Rc<Buf> {
     /**
      * Set the given unsigned byte value at the current {@link Buf#writerIndex()},
      * and increase the writer offset by {@link Byte#BYTES}.
-     * The value is written using an unsigned two's complement 8-bit encoding, with big-endian byte order.
+     * The value is written using an unsigned two's complement 8-bit encoding,
+     * with the {@link #order() configured} default byte order.
      *
      * @param value The int value to write.
      * @return This Buf.
@@ -194,7 +201,8 @@ public interface Buf extends Rc<Buf> {
 
     /**
      * Set the given unsigned byte value at the given write offset. The {@link Buf#writerIndex()} is not modified.
-     * The value is written using an unsigned two's complement 8-bit encoding, with big-endian byte order.
+     * The value is written using an unsigned two's complement 8-bit encoding,
+     * with the {@link #order() configured} default byte order.
      *
      * @param woff The write offset, an absolute index into this buffer to write to.
      * @param value The int value to write.
@@ -207,7 +215,8 @@ public interface Buf extends Rc<Buf> {
     /**
      * Get the char value at the current {@link Buf#readerIndex()},
      * and increases the reader offset by 2.
-     * The value is read using a 2-byte UTF-16 encoding, with big-endian byte order.
+     * The value is read using a 2-byte UTF-16 encoding,
+     * with the {@link #order() configured} default byte order.
      *
      * @return The char value at the current reader offset.
      * @throws IndexOutOfBoundsException If {@link Buf#readableBytes} is less than 2.
@@ -217,7 +226,8 @@ public interface Buf extends Rc<Buf> {
     /**
      * Get the char value at the given reader offset.
      * The {@link Buf#readerIndex()} is not modified.
-     * The value is read using a 2-byte UTF-16 encoding, with big-endian byte order.
+     * The value is read using a 2-byte UTF-16 encoding,
+     * with the {@link #order() configured} default byte order.
      *
      * @param roff The read offset, an absolute index into this buffer, to read from.
      * @return The char value at the given offset.
@@ -229,7 +239,8 @@ public interface Buf extends Rc<Buf> {
     /**
      * Get the char value at the current {@link Buf#readerIndex()},
      * and increases the reader offset by 2.
-     * The value is read using a 2-byte UTF-16 encoding, with little-endian byte order.
+     * The value is read using a 2-byte UTF-16 encoding,
+     * with little-endian byte order.
      *
      * @return The char value at the current reader offset.
      * @throws IndexOutOfBoundsException If {@link Buf#readableBytes} is less than 2.
@@ -239,7 +250,8 @@ public interface Buf extends Rc<Buf> {
     /**
      * Get the char value at the given reader offset.
      * The {@link Buf#readerIndex()} is not modified.
-     * The value is read using a 2-byte UTF-16 encoding, with little-endian byte order.
+     * The value is read using a 2-byte UTF-16 encoding,
+     * with little-endian byte order.
      *
      * @param roff The read offset, an absolute index into this buffer, to read from.
      * @return The char value at the given offset.
@@ -249,9 +261,34 @@ public interface Buf extends Rc<Buf> {
     char readCharLE(int roff);
 
     /**
+     * Get the char value at the current {@link Buf#readerIndex()},
+     * and increases the reader offset by 2.
+     * The value is read using a 2-byte UTF-16 encoding,
+     * with big-endian byte order.
+     *
+     * @return The char value at the current reader offset.
+     * @throws IndexOutOfBoundsException If {@link Buf#readableBytes} is less than 2.
+     */
+    char readCharBE();
+
+    /**
+     * Get the char value at the given reader offset.
+     * The {@link Buf#readerIndex()} is not modified.
+     * The value is read using a 2-byte UTF-16 encoding,
+     * with big-endian byte order.
+     *
+     * @param roff The read offset, an absolute index into this buffer, to read from.
+     * @return The char value at the given offset.
+     * @throws IndexOutOfBoundsException if the given index is out of bounds of the buffer, that is, less than 0 or
+     *                                   greater than or equal to {@link Buf#capacity()} minus 2.
+     */
+    char readCharBE(int roff);
+
+    /**
      * Set the given char value at the current {@link Buf#writerIndex()},
      * and increase the writer offset by 2.
-     * The value is written using a 2-byte UTF-16 encoding, with big-endian byte order.
+     * The value is written using a 2-byte UTF-16 encoding,
+     * with the {@link #order() configured} default byte order.
      *
      * @param value The char value to write.
      * @return This Buf.
@@ -261,7 +298,8 @@ public interface Buf extends Rc<Buf> {
 
     /**
      * Set the given char value at the given write offset. The {@link Buf#writerIndex()} is not modified.
-     * The value is written using a 2-byte UTF-16 encoding, with big-endian byte order.
+     * The value is written using a 2-byte UTF-16 encoding,
+     * with the {@link #order() configured} default byte order.
      *
      * @param woff The write offset, an absolute index into this buffer to write to.
      * @param value The char value to write.
@@ -274,7 +312,8 @@ public interface Buf extends Rc<Buf> {
     /**
      * Set the given char value at the current {@link Buf#writerIndex()},
      * and increase the writer offset by 2.
-     * The value is written using a 2-byte UTF-16 encoding, with little-endian byte order.
+     * The value is written using a 2-byte UTF-16 encoding,
+     * with little-endian byte order.
      *
      * @param value The char value to write.
      * @return This Buf.
@@ -284,7 +323,8 @@ public interface Buf extends Rc<Buf> {
 
     /**
      * Set the given char value at the given write offset. The {@link Buf#writerIndex()} is not modified.
-     * The value is written using a 2-byte UTF-16 encoding, with little-endian byte order.
+     * The value is written using a 2-byte UTF-16 encoding,
+     * with little-endian byte order.
      *
      * @param woff The write offset, an absolute index into this buffer to write to.
      * @param value The char value to write.
@@ -295,9 +335,35 @@ public interface Buf extends Rc<Buf> {
     Buf writeCharLE(int woff, char value);
 
     /**
+     * Set the given char value at the current {@link Buf#writerIndex()},
+     * and increase the writer offset by 2.
+     * The value is written using a 2-byte UTF-16 encoding,
+     * with big-endian byte order.
+     *
+     * @param value The char value to write.
+     * @return This Buf.
+     * @throws IndexOutOfBoundsException If {@link Buf#writableBytes} is less than 2.
+     */
+    Buf writeCharBE(char value);
+
+    /**
+     * Set the given char value at the given write offset. The {@link Buf#writerIndex()} is not modified.
+     * The value is written using a 2-byte UTF-16 encoding,
+     * with big-endian byte order.
+     *
+     * @param woff The write offset, an absolute index into this buffer to write to.
+     * @param value The char value to write.
+     * @return This Buf.
+     * @throws IndexOutOfBoundsException if the given offset is out of bounds of the buffer, that is, less than 0 or
+     *                                   greater than or equal to {@link Buf#capacity()} minus 2.
+     */
+    Buf writeCharBE(int woff, char value);
+
+    /**
      * Get the short value at the current {@link Buf#readerIndex()},
      * and increases the reader offset by {@link Short#BYTES}.
-     * The value is read using a two's complement 16-bit encoding, with big-endian byte order.
+     * The value is read using a two's complement 16-bit encoding,
+     * with the {@link #order() configured} default byte order.
      *
      * @return The short value at the current reader offset.
      * @throws IndexOutOfBoundsException If {@link Buf#readableBytes} is less than {@link Short#BYTES}.
@@ -307,7 +373,8 @@ public interface Buf extends Rc<Buf> {
     /**
      * Get the short value at the given reader offset.
      * The {@link Buf#readerIndex()} is not modified.
-     * The value is read using a two's complement 16-bit encoding, with big-endian byte order.
+     * The value is read using a two's complement 16-bit encoding,
+     * with the {@link #order() configured} default byte order.
      *
      * @param roff The read offset, an absolute index into this buffer, to read from.
      * @return The short value at the given offset.
@@ -319,7 +386,8 @@ public interface Buf extends Rc<Buf> {
     /**
      * Get the short value at the current {@link Buf#readerIndex()},
      * and increases the reader offset by {@link Short#BYTES}.
-     * The value is read using a two's complement 16-bit encoding, with little-endian byte order.
+     * The value is read using a two's complement 16-bit encoding,
+     * with little-endian byte order.
      *
      * @return The short value at the current reader offset.
      * @throws IndexOutOfBoundsException If {@link Buf#readableBytes} is less than {@link Short#BYTES}.
@@ -329,7 +397,8 @@ public interface Buf extends Rc<Buf> {
     /**
      * Get the short value at the given reader offset.
      * The {@link Buf#readerIndex()} is not modified.
-     * The value is read using a two's complement 16-bit encoding, with little-endian byte order.
+     * The value is read using a two's complement 16-bit encoding,
+     * with little-endian byte order.
      *
      * @param roff The read offset, an absolute index into this buffer, to read from.
      * @return The short value at the given offset.
@@ -339,9 +408,34 @@ public interface Buf extends Rc<Buf> {
     short readShortLE(int roff);
 
     /**
+     * Get the short value at the current {@link Buf#readerIndex()},
+     * and increases the reader offset by {@link Short#BYTES}.
+     * The value is read using a two's complement 16-bit encoding,
+     * with big-endian byte order.
+     *
+     * @return The short value at the current reader offset.
+     * @throws IndexOutOfBoundsException If {@link Buf#readableBytes} is less than {@link Short#BYTES}.
+     */
+    short readShortBE();
+
+    /**
+     * Get the short value at the given reader offset.
+     * The {@link Buf#readerIndex()} is not modified.
+     * The value is read using a two's complement 16-bit encoding,
+     * with big-endian byte order.
+     *
+     * @param roff The read offset, an absolute index into this buffer, to read from.
+     * @return The short value at the given offset.
+     * @throws IndexOutOfBoundsException if the given index is out of bounds of the buffer, that is, less than 0 or
+     *                                   greater than or equal to {@link Buf#capacity()} minus {@link Short#BYTES}.
+     */
+    short readShortBE(int roff);
+
+    /**
      * Get the unsigned short value at the current {@link Buf#readerIndex()},
      * and increases the reader offset by {@link Short#BYTES}.
-     * The value is read using an unsigned two's complement 16-bit encoding, with big-endian byte order.
+     * The value is read using an unsigned two's complement 16-bit encoding,
+     * with the {@link #order() configured} default byte order.
      *
      * @return The unsigned short value at the current reader offset.
      * @throws IndexOutOfBoundsException If {@link Buf#readableBytes} is less than {@link Short#BYTES}.
@@ -351,7 +445,8 @@ public interface Buf extends Rc<Buf> {
     /**
      * Get the unsigned short value at the given reader offset.
      * The {@link Buf#readerIndex()} is not modified.
-     * The value is read using an unsigned two's complement 16-bit encoding, with big-endian byte order.
+     * The value is read using an unsigned two's complement 16-bit encoding,
+     * with the {@link #order() configured} default byte order.
      *
      * @param roff The read offset, an absolute index into this buffer, to read from.
      * @return The unsigned short value at the given offset.
@@ -363,7 +458,8 @@ public interface Buf extends Rc<Buf> {
     /**
      * Get the unsigned short value at the current {@link Buf#readerIndex()},
      * and increases the reader offset by {@link Short#BYTES}.
-     * The value is read using an unsigned two's complement 16-bit encoding, with little-endian byte order.
+     * The value is read using an unsigned two's complement 16-bit encoding,
+     * with little-endian byte order.
      *
      * @return The unsigned short value at the current reader offset.
      * @throws IndexOutOfBoundsException If {@link Buf#readableBytes} is less than {@link Short#BYTES}.
@@ -373,7 +469,8 @@ public interface Buf extends Rc<Buf> {
     /**
      * Get the unsigned short value at the given reader offset.
      * The {@link Buf#readerIndex()} is not modified.
-     * The value is read using an unsigned two's complement 16-bit encoding, with little-endian byte order.
+     * The value is read using an unsigned two's complement 16-bit encoding,
+     * with little-endian byte order.
      *
      * @param roff The read offset, an absolute index into this buffer, to read from.
      * @return The unsigned short value at the given offset.
@@ -383,9 +480,34 @@ public interface Buf extends Rc<Buf> {
     int readUnsignedShortLE(int roff);
 
     /**
+     * Get the unsigned short value at the current {@link Buf#readerIndex()},
+     * and increases the reader offset by {@link Short#BYTES}.
+     * The value is read using an unsigned two's complement 16-bit encoding,
+     * with big-endian byte order.
+     *
+     * @return The unsigned short value at the current reader offset.
+     * @throws IndexOutOfBoundsException If {@link Buf#readableBytes} is less than {@link Short#BYTES}.
+     */
+    int readUnsignedShortBE();
+
+    /**
+     * Get the unsigned short value at the given reader offset.
+     * The {@link Buf#readerIndex()} is not modified.
+     * The value is read using an unsigned two's complement 16-bit encoding,
+     * with big-endian byte order.
+     *
+     * @param roff The read offset, an absolute index into this buffer, to read from.
+     * @return The unsigned short value at the given offset.
+     * @throws IndexOutOfBoundsException if the given index is out of bounds of the buffer, that is, less than 0 or
+     *                                   greater than or equal to {@link Buf#capacity()} minus {@link Short#BYTES}.
+     */
+    int readUnsignedShortBE(int roff);
+
+    /**
      * Set the given short value at the current {@link Buf#writerIndex()},
      * and increase the writer offset by {@link Short#BYTES}.
-     * The value is written using a two's complement 16-bit encoding, with big-endian byte order.
+     * The value is written using a two's complement 16-bit encoding,
+     * with the {@link #order() configured} default byte order.
      *
      * @param value The short value to write.
      * @return This Buf.
@@ -395,7 +517,8 @@ public interface Buf extends Rc<Buf> {
 
     /**
      * Set the given short value at the given write offset. The {@link Buf#writerIndex()} is not modified.
-     * The value is written using a two's complement 16-bit encoding, with big-endian byte order.
+     * The value is written using a two's complement 16-bit encoding,
+     * with the {@link #order() configured} default byte order.
      *
      * @param woff The write offset, an absolute index into this buffer to write to.
      * @param value The short value to write.
@@ -408,7 +531,8 @@ public interface Buf extends Rc<Buf> {
     /**
      * Set the given short value at the current {@link Buf#writerIndex()},
      * and increase the writer offset by {@link Short#BYTES}.
-     * The value is written using a two's complement 16-bit encoding, with little-endian byte order.
+     * The value is written using a two's complement 16-bit encoding,
+     * with little-endian byte order.
      *
      * @param value The short value to write.
      * @return This Buf.
@@ -418,7 +542,8 @@ public interface Buf extends Rc<Buf> {
 
     /**
      * Set the given short value at the given write offset. The {@link Buf#writerIndex()} is not modified.
-     * The value is written using a two's complement 16-bit encoding, with little-endian byte order.
+     * The value is written using a two's complement 16-bit encoding,
+     * with little-endian byte order.
      *
      * @param woff The write offset, an absolute index into this buffer to write to.
      * @param value The short value to write.
@@ -429,9 +554,35 @@ public interface Buf extends Rc<Buf> {
     Buf writeShortLE(int woff, short value);
 
     /**
+     * Set the given short value at the current {@link Buf#writerIndex()},
+     * and increase the writer offset by {@link Short#BYTES}.
+     * The value is written using a two's complement 16-bit encoding,
+     * with big-endian byte order.
+     *
+     * @param value The short value to write.
+     * @return This Buf.
+     * @throws IndexOutOfBoundsException If {@link Buf#writableBytes} is less than {@link Short#BYTES}.
+     */
+    Buf writeShortBE(short value);
+
+    /**
+     * Set the given short value at the given write offset. The {@link Buf#writerIndex()} is not modified.
+     * The value is written using a two's complement 16-bit encoding,
+     * with big-endian byte order.
+     *
+     * @param woff The write offset, an absolute index into this buffer to write to.
+     * @param value The short value to write.
+     * @return This Buf.
+     * @throws IndexOutOfBoundsException if the given offset is out of bounds of the buffer, that is, less than 0 or
+     *                                   greater than or equal to {@link Buf#capacity()} minus {@link Short#BYTES}.
+     */
+    Buf writeShortBE(int woff, short value);
+
+    /**
      * Set the given unsigned short value at the current {@link Buf#writerIndex()},
      * and increase the writer offset by {@link Short#BYTES}.
-     * The value is written using an unsigned two's complement 16-bit encoding, with big-endian byte order.
+     * The value is written using an unsigned two's complement 16-bit encoding,
+     * with the {@link #order() configured} default byte order.
      *
      * @param value The int value to write.
      * @return This Buf.
@@ -441,7 +592,8 @@ public interface Buf extends Rc<Buf> {
 
     /**
      * Set the given unsigned short value at the given write offset. The {@link Buf#writerIndex()} is not modified.
-     * The value is written using an unsigned two's complement 16-bit encoding, with big-endian byte order.
+     * The value is written using an unsigned two's complement 16-bit encoding,
+     * with the {@link #order() configured} default byte order.
      *
      * @param woff The write offset, an absolute index into this buffer to write to.
      * @param value The int value to write.
@@ -454,7 +606,8 @@ public interface Buf extends Rc<Buf> {
     /**
      * Set the given unsigned short value at the current {@link Buf#writerIndex()},
      * and increase the writer offset by {@link Short#BYTES}.
-     * The value is written using an unsigned two's complement 16-bit encoding, with little-endian byte order.
+     * The value is written using an unsigned two's complement 16-bit encoding,
+     * with little-endian byte order.
      *
      * @param value The int value to write.
      * @return This Buf.
@@ -464,7 +617,8 @@ public interface Buf extends Rc<Buf> {
 
     /**
      * Set the given unsigned short value at the given write offset. The {@link Buf#writerIndex()} is not modified.
-     * The value is written using an unsigned two's complement 16-bit encoding, with little-endian byte order.
+     * The value is written using an unsigned two's complement 16-bit encoding,
+     * with little-endian byte order.
      *
      * @param woff The write offset, an absolute index into this buffer to write to.
      * @param value The int value to write.
@@ -475,9 +629,35 @@ public interface Buf extends Rc<Buf> {
     Buf writeUnsignedShortLE(int woff, int value);
 
     /**
+     * Set the given unsigned short value at the current {@link Buf#writerIndex()},
+     * and increase the writer offset by {@link Short#BYTES}.
+     * The value is written using an unsigned two's complement 16-bit encoding,
+     * with big-endian byte order.
+     *
+     * @param value The int value to write.
+     * @return This Buf.
+     * @throws IndexOutOfBoundsException If {@link Buf#writableBytes} is less than {@link Short#BYTES}.
+     */
+    Buf writeUnsignedShortBE(int value);
+
+    /**
+     * Set the given unsigned short value at the given write offset. The {@link Buf#writerIndex()} is not modified.
+     * The value is written using an unsigned two's complement 16-bit encoding,
+     * with big-endian byte order.
+     *
+     * @param woff The write offset, an absolute index into this buffer to write to.
+     * @param value The int value to write.
+     * @return This Buf.
+     * @throws IndexOutOfBoundsException if the given offset is out of bounds of the buffer, that is, less than 0 or
+     *                                   greater than or equal to {@link Buf#capacity()} minus {@link Short#BYTES}.
+     */
+    Buf writeUnsignedShortBE(int woff, int value);
+
+    /**
      * Get the int value at the current {@link Buf#readerIndex()},
      * and increases the reader offset by 3.
-     * The value is read using a two's complement 24-bit encoding, with big-endian byte order.
+     * The value is read using a two's complement 24-bit encoding,
+     * with the {@link #order() configured} default byte order.
      *
      * @return The int value at the current reader offset.
      * @throws IndexOutOfBoundsException If {@link Buf#readableBytes} is less than 3.
@@ -487,7 +667,8 @@ public interface Buf extends Rc<Buf> {
     /**
      * Get the int value at the given reader offset.
      * The {@link Buf#readerIndex()} is not modified.
-     * The value is read using a two's complement 24-bit encoding, with big-endian byte order.
+     * The value is read using a two's complement 24-bit encoding,
+     * with the {@link #order() configured} default byte order.
      *
      * @param roff The read offset, an absolute index into this buffer, to read from.
      * @return The int value at the given offset.
@@ -499,7 +680,8 @@ public interface Buf extends Rc<Buf> {
     /**
      * Get the int value at the current {@link Buf#readerIndex()},
      * and increases the reader offset by 3.
-     * The value is read using a two's complement 24-bit encoding, with little-endian byte order.
+     * The value is read using a two's complement 24-bit encoding,
+     * with little-endian byte order.
      *
      * @return The int value at the current reader offset.
      * @throws IndexOutOfBoundsException If {@link Buf#readableBytes} is less than 3.
@@ -509,7 +691,8 @@ public interface Buf extends Rc<Buf> {
     /**
      * Get the int value at the given reader offset.
      * The {@link Buf#readerIndex()} is not modified.
-     * The value is read using a two's complement 24-bit encoding, with little-endian byte order.
+     * The value is read using a two's complement 24-bit encoding,
+     * with little-endian byte order.
      *
      * @param roff The read offset, an absolute index into this buffer, to read from.
      * @return The int value at the given offset.
@@ -519,9 +702,34 @@ public interface Buf extends Rc<Buf> {
     int readMediumLE(int roff);
 
     /**
+     * Get the int value at the current {@link Buf#readerIndex()},
+     * and increases the reader offset by 3.
+     * The value is read using a two's complement 24-bit encoding,
+     * with big-endian byte order.
+     *
+     * @return The int value at the current reader offset.
+     * @throws IndexOutOfBoundsException If {@link Buf#readableBytes} is less than 3.
+     */
+    int readMediumBE();
+
+    /**
+     * Get the int value at the given reader offset.
+     * The {@link Buf#readerIndex()} is not modified.
+     * The value is read using a two's complement 24-bit encoding,
+     * with big-endian byte order.
+     *
+     * @param roff The read offset, an absolute index into this buffer, to read from.
+     * @return The int value at the given offset.
+     * @throws IndexOutOfBoundsException if the given index is out of bounds of the buffer, that is, less than 0 or
+     *                                   greater than or equal to {@link Buf#capacity()} minus 3.
+     */
+    int readMediumBE(int roff);
+
+    /**
      * Get the unsigned int value at the current {@link Buf#readerIndex()},
      * and increases the reader offset by 3.
-     * The value is read using an unsigned two's complement 24-bit encoding, with big-endian byte order.
+     * The value is read using an unsigned two's complement 24-bit encoding,
+     * with the {@link #order() configured} default byte order.
      *
      * @return The unsigned int value at the current reader offset.
      * @throws IndexOutOfBoundsException If {@link Buf#readableBytes} is less than 3.
@@ -531,7 +739,8 @@ public interface Buf extends Rc<Buf> {
     /**
      * Get the unsigned int value at the given reader offset.
      * The {@link Buf#readerIndex()} is not modified.
-     * The value is read using an unsigned two's complement 24-bit encoding, with big-endian byte order.
+     * The value is read using an unsigned two's complement 24-bit encoding,
+     * with the {@link #order() configured} default byte order.
      *
      * @param roff The read offset, an absolute index into this buffer, to read from.
      * @return The unsigned int value at the given offset.
@@ -543,7 +752,8 @@ public interface Buf extends Rc<Buf> {
     /**
      * Get the unsigned int value at the current {@link Buf#readerIndex()},
      * and increases the reader offset by 3.
-     * The value is read using an unsigned two's complement 24-bit encoding, with little-endian byte order.
+     * The value is read using an unsigned two's complement 24-bit encoding,
+     * with little-endian byte order.
      *
      * @return The unsigned int value at the current reader offset.
      * @throws IndexOutOfBoundsException If {@link Buf#readableBytes} is less than 3.
@@ -553,7 +763,8 @@ public interface Buf extends Rc<Buf> {
     /**
      * Get the unsigned int value at the given reader offset.
      * The {@link Buf#readerIndex()} is not modified.
-     * The value is read using an unsigned two's complement 24-bit encoding, with little-endian byte order.
+     * The value is read using an unsigned two's complement 24-bit encoding,
+     * with little-endian byte order.
      *
      * @param roff The read offset, an absolute index into this buffer, to read from.
      * @return The unsigned int value at the given offset.
@@ -563,9 +774,34 @@ public interface Buf extends Rc<Buf> {
     int readUnsignedMediumLE(int roff);
 
     /**
+     * Get the unsigned int value at the current {@link Buf#readerIndex()},
+     * and increases the reader offset by 3.
+     * The value is read using an unsigned two's complement 24-bit encoding,
+     * with big-endian byte order.
+     *
+     * @return The unsigned int value at the current reader offset.
+     * @throws IndexOutOfBoundsException If {@link Buf#readableBytes} is less than 3.
+     */
+    int readUnsignedMediumBE();
+
+    /**
+     * Get the unsigned int value at the given reader offset.
+     * The {@link Buf#readerIndex()} is not modified.
+     * The value is read using an unsigned two's complement 24-bit encoding,
+     * with big-endian byte order.
+     *
+     * @param roff The read offset, an absolute index into this buffer, to read from.
+     * @return The unsigned int value at the given offset.
+     * @throws IndexOutOfBoundsException if the given index is out of bounds of the buffer, that is, less than 0 or
+     *                                   greater than or equal to {@link Buf#capacity()} minus 3.
+     */
+    int readUnsignedMediumBE(int roff);
+
+    /**
      * Set the given int value at the current {@link Buf#writerIndex()},
      * and increase the writer offset by 3.
-     * The value is written using a two's complement 24-bit encoding, with big-endian byte order.
+     * The value is written using a two's complement 24-bit encoding,
+     * with the {@link #order() configured} default byte order.
      *
      * @param value The int value to write.
      * @return This Buf.
@@ -575,7 +811,8 @@ public interface Buf extends Rc<Buf> {
 
     /**
      * Set the given int value at the given write offset. The {@link Buf#writerIndex()} is not modified.
-     * The value is written using a two's complement 24-bit encoding, with big-endian byte order.
+     * The value is written using a two's complement 24-bit encoding,
+     * with the {@link #order() configured} default byte order.
      *
      * @param woff The write offset, an absolute index into this buffer to write to.
      * @param value The int value to write.
@@ -588,7 +825,8 @@ public interface Buf extends Rc<Buf> {
     /**
      * Set the given int value at the current {@link Buf#writerIndex()},
      * and increase the writer offset by 3.
-     * The value is written using a two's complement 24-bit encoding, with little-endian byte order.
+     * The value is written using a two's complement 24-bit encoding,
+     * with little-endian byte order.
      *
      * @param value The int value to write.
      * @return This Buf.
@@ -598,7 +836,8 @@ public interface Buf extends Rc<Buf> {
 
     /**
      * Set the given int value at the given write offset. The {@link Buf#writerIndex()} is not modified.
-     * The value is written using a two's complement 24-bit encoding, with little-endian byte order.
+     * The value is written using a two's complement 24-bit encoding,
+     * with little-endian byte order.
      *
      * @param woff The write offset, an absolute index into this buffer to write to.
      * @param value The int value to write.
@@ -609,9 +848,35 @@ public interface Buf extends Rc<Buf> {
     Buf writeMediumLE(int woff, int value);
 
     /**
+     * Set the given int value at the current {@link Buf#writerIndex()},
+     * and increase the writer offset by 3.
+     * The value is written using a two's complement 24-bit encoding,
+     * with big-endian byte order.
+     *
+     * @param value The int value to write.
+     * @return This Buf.
+     * @throws IndexOutOfBoundsException If {@link Buf#writableBytes} is less than 3.
+     */
+    Buf writeMediumBE(int value);
+
+    /**
+     * Set the given int value at the given write offset. The {@link Buf#writerIndex()} is not modified.
+     * The value is written using a two's complement 24-bit encoding,
+     * with big-endian byte order.
+     *
+     * @param woff The write offset, an absolute index into this buffer to write to.
+     * @param value The int value to write.
+     * @return This Buf.
+     * @throws IndexOutOfBoundsException if the given offset is out of bounds of the buffer, that is, less than 0 or
+     *                                   greater than or equal to {@link Buf#capacity()} minus 3.
+     */
+    Buf writeMediumBE(int woff, int value);
+
+    /**
      * Set the given unsigned int value at the current {@link Buf#writerIndex()},
      * and increase the writer offset by 3.
-     * The value is written using an unsigned two's complement 24-bit encoding, with big-endian byte order.
+     * The value is written using an unsigned two's complement 24-bit encoding,
+     * with the {@link #order() configured} default byte order.
      *
      * @param value The int value to write.
      * @return This Buf.
@@ -621,7 +886,8 @@ public interface Buf extends Rc<Buf> {
 
     /**
      * Set the given unsigned int value at the given write offset. The {@link Buf#writerIndex()} is not modified.
-     * The value is written using an unsigned two's complement 24-bit encoding, with big-endian byte order.
+     * The value is written using an unsigned two's complement 24-bit encoding,
+     * with the {@link #order() configured} default byte order.
      *
      * @param woff The write offset, an absolute index into this buffer to write to.
      * @param value The int value to write.
@@ -634,7 +900,8 @@ public interface Buf extends Rc<Buf> {
     /**
      * Set the given unsigned int value at the current {@link Buf#writerIndex()},
      * and increase the writer offset by 3.
-     * The value is written using an unsigned two's complement 24-bit encoding, with little-endian byte order.
+     * The value is written using an unsigned two's complement 24-bit encoding,
+     * with little-endian byte order.
      *
      * @param value The int value to write.
      * @return This Buf.
@@ -644,7 +911,8 @@ public interface Buf extends Rc<Buf> {
 
     /**
      * Set the given unsigned int value at the given write offset. The {@link Buf#writerIndex()} is not modified.
-     * The value is written using an unsigned two's complement 24-bit encoding, with little-endian byte order.
+     * The value is written using an unsigned two's complement 24-bit encoding,
+     * with little-endian byte order.
      *
      * @param woff The write offset, an absolute index into this buffer to write to.
      * @param value The int value to write.
@@ -655,9 +923,35 @@ public interface Buf extends Rc<Buf> {
     Buf writeUnsignedMediumLE(int woff, int value);
 
     /**
+     * Set the given unsigned int value at the current {@link Buf#writerIndex()},
+     * and increase the writer offset by 3.
+     * The value is written using an unsigned two's complement 24-bit encoding,
+     * with big-endian byte order.
+     *
+     * @param value The int value to write.
+     * @return This Buf.
+     * @throws IndexOutOfBoundsException If {@link Buf#writableBytes} is less than 3.
+     */
+    Buf writeUnsignedMediumBE(int value);
+
+    /**
+     * Set the given unsigned int value at the given write offset. The {@link Buf#writerIndex()} is not modified.
+     * The value is written using an unsigned two's complement 24-bit encoding,
+     * with big-endian byte order.
+     *
+     * @param woff The write offset, an absolute index into this buffer to write to.
+     * @param value The int value to write.
+     * @return This Buf.
+     * @throws IndexOutOfBoundsException if the given offset is out of bounds of the buffer, that is, less than 0 or
+     *                                   greater than or equal to {@link Buf#capacity()} minus 3.
+     */
+    Buf writeUnsignedMediumBE(int woff, int value);
+
+    /**
      * Get the int value at the current {@link Buf#readerIndex()},
      * and increases the reader offset by {@link Integer#BYTES}.
-     * The value is read using a two's complement 32-bit encoding, with big-endian byte order.
+     * The value is read using a two's complement 32-bit encoding,
+     * with the {@link #order() configured} default byte order.
      *
      * @return The int value at the current reader offset.
      * @throws IndexOutOfBoundsException If {@link Buf#readableBytes} is less than {@link Integer#BYTES}.
@@ -667,7 +961,8 @@ public interface Buf extends Rc<Buf> {
     /**
      * Get the int value at the given reader offset.
      * The {@link Buf#readerIndex()} is not modified.
-     * The value is read using a two's complement 32-bit encoding, with big-endian byte order.
+     * The value is read using a two's complement 32-bit encoding,
+     * with the {@link #order() configured} default byte order.
      *
      * @param roff The read offset, an absolute index into this buffer, to read from.
      * @return The int value at the given offset.
@@ -679,7 +974,8 @@ public interface Buf extends Rc<Buf> {
     /**
      * Get the int value at the current {@link Buf#readerIndex()},
      * and increases the reader offset by {@link Integer#BYTES}.
-     * The value is read using a two's complement 32-bit encoding, with little-endian byte order.
+     * The value is read using a two's complement 32-bit encoding,
+     * with little-endian byte order.
      *
      * @return The int value at the current reader offset.
      * @throws IndexOutOfBoundsException If {@link Buf#readableBytes} is less than {@link Integer#BYTES}.
@@ -689,7 +985,8 @@ public interface Buf extends Rc<Buf> {
     /**
      * Get the int value at the given reader offset.
      * The {@link Buf#readerIndex()} is not modified.
-     * The value is read using a two's complement 32-bit encoding, with little-endian byte order.
+     * The value is read using a two's complement 32-bit encoding,
+     * with little-endian byte order.
      *
      * @param roff The read offset, an absolute index into this buffer, to read from.
      * @return The int value at the given offset.
@@ -699,9 +996,34 @@ public interface Buf extends Rc<Buf> {
     int readIntLE(int roff);
 
     /**
+     * Get the int value at the current {@link Buf#readerIndex()},
+     * and increases the reader offset by {@link Integer#BYTES}.
+     * The value is read using a two's complement 32-bit encoding,
+     * with big-endian byte order.
+     *
+     * @return The int value at the current reader offset.
+     * @throws IndexOutOfBoundsException If {@link Buf#readableBytes} is less than {@link Integer#BYTES}.
+     */
+    int readIntBE();
+
+    /**
+     * Get the int value at the given reader offset.
+     * The {@link Buf#readerIndex()} is not modified.
+     * The value is read using a two's complement 32-bit encoding,
+     * with big-endian byte order.
+     *
+     * @param roff The read offset, an absolute index into this buffer, to read from.
+     * @return The int value at the given offset.
+     * @throws IndexOutOfBoundsException if the given index is out of bounds of the buffer, that is, less than 0 or
+     *                                   greater than or equal to {@link Buf#capacity()} minus {@link Integer#BYTES}.
+     */
+    int readIntBE(int roff);
+
+    /**
      * Get the unsigned int value at the current {@link Buf#readerIndex()},
      * and increases the reader offset by {@link Integer#BYTES}.
-     * The value is read using an unsigned two's complement 32-bit encoding, with big-endian byte order.
+     * The value is read using an unsigned two's complement 32-bit encoding,
+     * with the {@link #order() configured} default byte order.
      *
      * @return The unsigned int value at the current reader offset.
      * @throws IndexOutOfBoundsException If {@link Buf#readableBytes} is less than {@link Integer#BYTES}.
@@ -711,7 +1033,8 @@ public interface Buf extends Rc<Buf> {
     /**
      * Get the unsigned int value at the given reader offset.
      * The {@link Buf#readerIndex()} is not modified.
-     * The value is read using an unsigned two's complement 32-bit encoding, with big-endian byte order.
+     * The value is read using an unsigned two's complement 32-bit encoding,
+     * with the {@link #order() configured} default byte order.
      *
      * @param roff The read offset, an absolute index into this buffer, to read from.
      * @return The unsigned int value at the given offset.
@@ -723,7 +1046,8 @@ public interface Buf extends Rc<Buf> {
     /**
      * Get the unsigned int value at the current {@link Buf#readerIndex()},
      * and increases the reader offset by {@link Integer#BYTES}.
-     * The value is read using an unsigned two's complement 32-bit encoding, with little-endian byte order.
+     * The value is read using an unsigned two's complement 32-bit encoding,
+     * with little-endian byte order.
      *
      * @return The unsigned int value at the current reader offset.
      * @throws IndexOutOfBoundsException If {@link Buf#readableBytes} is less than {@link Integer#BYTES}.
@@ -733,7 +1057,8 @@ public interface Buf extends Rc<Buf> {
     /**
      * Get the unsigned int value at the given reader offset.
      * The {@link Buf#readerIndex()} is not modified.
-     * The value is read using an unsigned two's complement 32-bit encoding, with little-endian byte order.
+     * The value is read using an unsigned two's complement 32-bit encoding,
+     * with little-endian byte order.
      *
      * @param roff The read offset, an absolute index into this buffer, to read from.
      * @return The unsigned int value at the given offset.
@@ -743,9 +1068,34 @@ public interface Buf extends Rc<Buf> {
     long readUnsignedIntLE(int roff);
 
     /**
+     * Get the unsigned int value at the current {@link Buf#readerIndex()},
+     * and increases the reader offset by {@link Integer#BYTES}.
+     * The value is read using an unsigned two's complement 32-bit encoding,
+     * with big-endian byte order.
+     *
+     * @return The unsigned int value at the current reader offset.
+     * @throws IndexOutOfBoundsException If {@link Buf#readableBytes} is less than {@link Integer#BYTES}.
+     */
+    long readUnsignedIntBE();
+
+    /**
+     * Get the unsigned int value at the given reader offset.
+     * The {@link Buf#readerIndex()} is not modified.
+     * The value is read using an unsigned two's complement 32-bit encoding,
+     * with big-endian byte order.
+     *
+     * @param roff The read offset, an absolute index into this buffer, to read from.
+     * @return The unsigned int value at the given offset.
+     * @throws IndexOutOfBoundsException if the given index is out of bounds of the buffer, that is, less than 0 or
+     *                                   greater than or equal to {@link Buf#capacity()} minus {@link Integer#BYTES}.
+     */
+    long readUnsignedIntBE(int roff);
+
+    /**
      * Set the given int value at the current {@link Buf#writerIndex()},
      * and increase the writer offset by {@link Integer#BYTES}.
-     * The value is written using a two's complement 32-bit encoding, with big-endian byte order.
+     * The value is written using a two's complement 32-bit encoding,
+     * with the {@link #order() configured} default byte order.
      *
      * @param value The int value to write.
      * @return This Buf.
@@ -755,7 +1105,8 @@ public interface Buf extends Rc<Buf> {
 
     /**
      * Set the given int value at the given write offset. The {@link Buf#writerIndex()} is not modified.
-     * The value is written using a two's complement 32-bit encoding, with big-endian byte order.
+     * The value is written using a two's complement 32-bit encoding,
+     * with the {@link #order() configured} default byte order.
      *
      * @param woff The write offset, an absolute index into this buffer to write to.
      * @param value The int value to write.
@@ -768,7 +1119,8 @@ public interface Buf extends Rc<Buf> {
     /**
      * Set the given int value at the current {@link Buf#writerIndex()},
      * and increase the writer offset by {@link Integer#BYTES}.
-     * The value is written using a two's complement 32-bit encoding, with little-endian byte order.
+     * The value is written using a two's complement 32-bit encoding,
+     * with little-endian byte order.
      *
      * @param value The int value to write.
      * @return This Buf.
@@ -778,7 +1130,8 @@ public interface Buf extends Rc<Buf> {
 
     /**
      * Set the given int value at the given write offset. The {@link Buf#writerIndex()} is not modified.
-     * The value is written using a two's complement 32-bit encoding, with little-endian byte order.
+     * The value is written using a two's complement 32-bit encoding,
+     * with little-endian byte order.
      *
      * @param woff The write offset, an absolute index into this buffer to write to.
      * @param value The int value to write.
@@ -789,9 +1142,35 @@ public interface Buf extends Rc<Buf> {
     Buf writeIntLE(int woff, int value);
 
     /**
+     * Set the given int value at the current {@link Buf#writerIndex()},
+     * and increase the writer offset by {@link Integer#BYTES}.
+     * The value is written using a two's complement 32-bit encoding,
+     * with big-endian byte order.
+     *
+     * @param value The int value to write.
+     * @return This Buf.
+     * @throws IndexOutOfBoundsException If {@link Buf#writableBytes} is less than {@link Integer#BYTES}.
+     */
+    Buf writeIntBE(int value);
+
+    /**
+     * Set the given int value at the given write offset. The {@link Buf#writerIndex()} is not modified.
+     * The value is written using a two's complement 32-bit encoding,
+     * with big-endian byte order.
+     *
+     * @param woff The write offset, an absolute index into this buffer to write to.
+     * @param value The int value to write.
+     * @return This Buf.
+     * @throws IndexOutOfBoundsException if the given offset is out of bounds of the buffer, that is, less than 0 or
+     *                                   greater than or equal to {@link Buf#capacity()} minus {@link Integer#BYTES}.
+     */
+    Buf writeIntBE(int woff, int value);
+
+    /**
      * Set the given unsigned int value at the current {@link Buf#writerIndex()},
      * and increase the writer offset by {@link Integer#BYTES}.
-     * The value is written using an unsigned two's complement 32-bit encoding, with big-endian byte order.
+     * The value is written using an unsigned two's complement 32-bit encoding,
+     * with the {@link #order() configured} default byte order.
      *
      * @param value The long value to write.
      * @return This Buf.
@@ -801,7 +1180,8 @@ public interface Buf extends Rc<Buf> {
 
     /**
      * Set the given unsigned int value at the given write offset. The {@link Buf#writerIndex()} is not modified.
-     * The value is written using an unsigned two's complement 32-bit encoding, with big-endian byte order.
+     * The value is written using an unsigned two's complement 32-bit encoding,
+     * with the {@link #order() configured} default byte order.
      *
      * @param woff The write offset, an absolute index into this buffer to write to.
      * @param value The long value to write.
@@ -814,7 +1194,8 @@ public interface Buf extends Rc<Buf> {
     /**
      * Set the given unsigned int value at the current {@link Buf#writerIndex()},
      * and increase the writer offset by {@link Integer#BYTES}.
-     * The value is written using an unsigned two's complement 32-bit encoding, with little-endian byte order.
+     * The value is written using an unsigned two's complement 32-bit encoding,
+     * with little-endian byte order.
      *
      * @param value The long value to write.
      * @return This Buf.
@@ -824,7 +1205,8 @@ public interface Buf extends Rc<Buf> {
 
     /**
      * Set the given unsigned int value at the given write offset. The {@link Buf#writerIndex()} is not modified.
-     * The value is written using an unsigned two's complement 32-bit encoding, with little-endian byte order.
+     * The value is written using an unsigned two's complement 32-bit encoding,
+     * with little-endian byte order.
      *
      * @param woff The write offset, an absolute index into this buffer to write to.
      * @param value The long value to write.
@@ -835,9 +1217,35 @@ public interface Buf extends Rc<Buf> {
     Buf writeUnsignedIntLE(int woff, long value);
 
     /**
+     * Set the given unsigned int value at the current {@link Buf#writerIndex()},
+     * and increase the writer offset by {@link Integer#BYTES}.
+     * The value is written using an unsigned two's complement 32-bit encoding,
+     * with big-endian byte order.
+     *
+     * @param value The long value to write.
+     * @return This Buf.
+     * @throws IndexOutOfBoundsException If {@link Buf#writableBytes} is less than {@link Integer#BYTES}.
+     */
+    Buf writeUnsignedIntBE(long value);
+
+    /**
+     * Set the given unsigned int value at the given write offset. The {@link Buf#writerIndex()} is not modified.
+     * The value is written using an unsigned two's complement 32-bit encoding,
+     * with big-endian byte order.
+     *
+     * @param woff The write offset, an absolute index into this buffer to write to.
+     * @param value The long value to write.
+     * @return This Buf.
+     * @throws IndexOutOfBoundsException if the given offset is out of bounds of the buffer, that is, less than 0 or
+     *                                   greater than or equal to {@link Buf#capacity()} minus {@link Integer#BYTES}.
+     */
+    Buf writeUnsignedIntBE(int woff, long value);
+
+    /**
      * Get the float value at the current {@link Buf#readerIndex()},
      * and increases the reader offset by {@link Float#BYTES}.
-     * The value is read using a 32-bit IEEE floating point encoding, with big-endian byte order.
+     * The value is read using a 32-bit IEEE floating point encoding,
+     * with the {@link #order() configured} default byte order.
      *
      * @return The float value at the current reader offset.
      * @throws IndexOutOfBoundsException If {@link Buf#readableBytes} is less than {@link Float#BYTES}.
@@ -847,7 +1255,8 @@ public interface Buf extends Rc<Buf> {
     /**
      * Get the float value at the given reader offset.
      * The {@link Buf#readerIndex()} is not modified.
-     * The value is read using a 32-bit IEEE floating point encoding, with big-endian byte order.
+     * The value is read using a 32-bit IEEE floating point encoding,
+     * with the {@link #order() configured} default byte order.
      *
      * @param roff The read offset, an absolute index into this buffer, to read from.
      * @return The float value at the given offset.
@@ -859,7 +1268,8 @@ public interface Buf extends Rc<Buf> {
     /**
      * Get the float value at the current {@link Buf#readerIndex()},
      * and increases the reader offset by {@link Float#BYTES}.
-     * The value is read using a 32-bit IEEE floating point encoding, with little-endian byte order.
+     * The value is read using a 32-bit IEEE floating point encoding,
+     * with little-endian byte order.
      *
      * @return The float value at the current reader offset.
      * @throws IndexOutOfBoundsException If {@link Buf#readableBytes} is less than {@link Float#BYTES}.
@@ -869,7 +1279,8 @@ public interface Buf extends Rc<Buf> {
     /**
      * Get the float value at the given reader offset.
      * The {@link Buf#readerIndex()} is not modified.
-     * The value is read using a 32-bit IEEE floating point encoding, with little-endian byte order.
+     * The value is read using a 32-bit IEEE floating point encoding,
+     * with little-endian byte order.
      *
      * @param roff The read offset, an absolute index into this buffer, to read from.
      * @return The float value at the given offset.
@@ -879,9 +1290,34 @@ public interface Buf extends Rc<Buf> {
     float readFloatLE(int roff);
 
     /**
+     * Get the float value at the current {@link Buf#readerIndex()},
+     * and increases the reader offset by {@link Float#BYTES}.
+     * The value is read using a 32-bit IEEE floating point encoding,
+     * with big-endian byte order.
+     *
+     * @return The float value at the current reader offset.
+     * @throws IndexOutOfBoundsException If {@link Buf#readableBytes} is less than {@link Float#BYTES}.
+     */
+    float readFloatBE();
+
+    /**
+     * Get the float value at the given reader offset.
+     * The {@link Buf#readerIndex()} is not modified.
+     * The value is read using a 32-bit IEEE floating point encoding,
+     * with big-endian byte order.
+     *
+     * @param roff The read offset, an absolute index into this buffer, to read from.
+     * @return The float value at the given offset.
+     * @throws IndexOutOfBoundsException if the given index is out of bounds of the buffer, that is, less than 0 or
+     *                                   greater than or equal to {@link Buf#capacity()} minus {@link Float#BYTES}.
+     */
+    float readFloatBE(int roff);
+
+    /**
      * Set the given float value at the current {@link Buf#writerIndex()},
      * and increase the writer offset by {@link Float#BYTES}.
-     * The value is written using a 32-bit IEEE floating point encoding, with big-endian byte order.
+     * The value is written using a 32-bit IEEE floating point encoding,
+     * with the {@link #order() configured} default byte order.
      *
      * @param value The float value to write.
      * @return This Buf.
@@ -891,7 +1327,8 @@ public interface Buf extends Rc<Buf> {
 
     /**
      * Set the given float value at the given write offset. The {@link Buf#writerIndex()} is not modified.
-     * The value is written using a 32-bit IEEE floating point encoding, with big-endian byte order.
+     * The value is written using a 32-bit IEEE floating point encoding,
+     * with the {@link #order() configured} default byte order.
      *
      * @param woff The write offset, an absolute index into this buffer to write to.
      * @param value The float value to write.
@@ -904,7 +1341,8 @@ public interface Buf extends Rc<Buf> {
     /**
      * Set the given float value at the current {@link Buf#writerIndex()},
      * and increase the writer offset by {@link Float#BYTES}.
-     * The value is written using a 32-bit IEEE floating point encoding, with little-endian byte order.
+     * The value is written using a 32-bit IEEE floating point encoding,
+     * with little-endian byte order.
      *
      * @param value The float value to write.
      * @return This Buf.
@@ -914,7 +1352,8 @@ public interface Buf extends Rc<Buf> {
 
     /**
      * Set the given float value at the given write offset. The {@link Buf#writerIndex()} is not modified.
-     * The value is written using a 32-bit IEEE floating point encoding, with little-endian byte order.
+     * The value is written using a 32-bit IEEE floating point encoding,
+     * with little-endian byte order.
      *
      * @param woff The write offset, an absolute index into this buffer to write to.
      * @param value The float value to write.
@@ -925,9 +1364,35 @@ public interface Buf extends Rc<Buf> {
     Buf writeFloatLE(int woff, float value);
 
     /**
+     * Set the given float value at the current {@link Buf#writerIndex()},
+     * and increase the writer offset by {@link Float#BYTES}.
+     * The value is written using a 32-bit IEEE floating point encoding,
+     * with big-endian byte order.
+     *
+     * @param value The float value to write.
+     * @return This Buf.
+     * @throws IndexOutOfBoundsException If {@link Buf#writableBytes} is less than {@link Float#BYTES}.
+     */
+    Buf writeFloatBE(float value);
+
+    /**
+     * Set the given float value at the given write offset. The {@link Buf#writerIndex()} is not modified.
+     * The value is written using a 32-bit IEEE floating point encoding,
+     * with big-endian byte order.
+     *
+     * @param woff The write offset, an absolute index into this buffer to write to.
+     * @param value The float value to write.
+     * @return This Buf.
+     * @throws IndexOutOfBoundsException if the given offset is out of bounds of the buffer, that is, less than 0 or
+     *                                   greater than or equal to {@link Buf#capacity()} minus {@link Float#BYTES}.
+     */
+    Buf writeFloatBE(int woff, float value);
+
+    /**
      * Get the long value at the current {@link Buf#readerIndex()},
      * and increases the reader offset by {@link Long#BYTES}.
-     * The value is read using a two's complement 64-bit encoding, with big-endian byte order.
+     * The value is read using a two's complement 64-bit encoding,
+     * with the {@link #order() configured} default byte order.
      *
      * @return The long value at the current reader offset.
      * @throws IndexOutOfBoundsException If {@link Buf#readableBytes} is less than {@link Long#BYTES}.
@@ -937,7 +1402,8 @@ public interface Buf extends Rc<Buf> {
     /**
      * Get the long value at the given reader offset.
      * The {@link Buf#readerIndex()} is not modified.
-     * The value is read using a two's complement 64-bit encoding, with big-endian byte order.
+     * The value is read using a two's complement 64-bit encoding,
+     * with the {@link #order() configured} default byte order.
      *
      * @param roff The read offset, an absolute index into this buffer, to read from.
      * @return The long value at the given offset.
@@ -949,7 +1415,8 @@ public interface Buf extends Rc<Buf> {
     /**
      * Get the long value at the current {@link Buf#readerIndex()},
      * and increases the reader offset by {@link Long#BYTES}.
-     * The value is read using a two's complement 64-bit encoding, with little-endian byte order.
+     * The value is read using a two's complement 64-bit encoding,
+     * with little-endian byte order.
      *
      * @return The long value at the current reader offset.
      * @throws IndexOutOfBoundsException If {@link Buf#readableBytes} is less than {@link Long#BYTES}.
@@ -959,7 +1426,8 @@ public interface Buf extends Rc<Buf> {
     /**
      * Get the long value at the given reader offset.
      * The {@link Buf#readerIndex()} is not modified.
-     * The value is read using a two's complement 64-bit encoding, with little-endian byte order.
+     * The value is read using a two's complement 64-bit encoding,
+     * with little-endian byte order.
      *
      * @param roff The read offset, an absolute index into this buffer, to read from.
      * @return The long value at the given offset.
@@ -969,9 +1437,34 @@ public interface Buf extends Rc<Buf> {
     long readLongLE(int roff);
 
     /**
+     * Get the long value at the current {@link Buf#readerIndex()},
+     * and increases the reader offset by {@link Long#BYTES}.
+     * The value is read using a two's complement 64-bit encoding,
+     * with big-endian byte order.
+     *
+     * @return The long value at the current reader offset.
+     * @throws IndexOutOfBoundsException If {@link Buf#readableBytes} is less than {@link Long#BYTES}.
+     */
+    long readLongBE();
+
+    /**
+     * Get the long value at the given reader offset.
+     * The {@link Buf#readerIndex()} is not modified.
+     * The value is read using a two's complement 64-bit encoding,
+     * with big-endian byte order.
+     *
+     * @param roff The read offset, an absolute index into this buffer, to read from.
+     * @return The long value at the given offset.
+     * @throws IndexOutOfBoundsException if the given index is out of bounds of the buffer, that is, less than 0 or
+     *                                   greater than or equal to {@link Buf#capacity()} minus {@link Long#BYTES}.
+     */
+    long readLongBE(int roff);
+
+    /**
      * Set the given long value at the current {@link Buf#writerIndex()},
      * and increase the writer offset by {@link Long#BYTES}.
-     * The value is written using a two's complement 64-bit encoding, with big-endian byte order.
+     * The value is written using a two's complement 64-bit encoding,
+     * with the {@link #order() configured} default byte order.
      *
      * @param value The long value to write.
      * @return This Buf.
@@ -981,7 +1474,8 @@ public interface Buf extends Rc<Buf> {
 
     /**
      * Set the given long value at the given write offset. The {@link Buf#writerIndex()} is not modified.
-     * The value is written using a two's complement 64-bit encoding, with big-endian byte order.
+     * The value is written using a two's complement 64-bit encoding,
+     * with the {@link #order() configured} default byte order.
      *
      * @param woff The write offset, an absolute index into this buffer to write to.
      * @param value The long value to write.
@@ -994,7 +1488,8 @@ public interface Buf extends Rc<Buf> {
     /**
      * Set the given long value at the current {@link Buf#writerIndex()},
      * and increase the writer offset by {@link Long#BYTES}.
-     * The value is written using a two's complement 64-bit encoding, with little-endian byte order.
+     * The value is written using a two's complement 64-bit encoding,
+     * with little-endian byte order.
      *
      * @param value The long value to write.
      * @return This Buf.
@@ -1004,7 +1499,8 @@ public interface Buf extends Rc<Buf> {
 
     /**
      * Set the given long value at the given write offset. The {@link Buf#writerIndex()} is not modified.
-     * The value is written using a two's complement 64-bit encoding, with little-endian byte order.
+     * The value is written using a two's complement 64-bit encoding,
+     * with little-endian byte order.
      *
      * @param woff The write offset, an absolute index into this buffer to write to.
      * @param value The long value to write.
@@ -1015,9 +1511,35 @@ public interface Buf extends Rc<Buf> {
     Buf writeLongLE(int woff, long value);
 
     /**
+     * Set the given long value at the current {@link Buf#writerIndex()},
+     * and increase the writer offset by {@link Long#BYTES}.
+     * The value is written using a two's complement 64-bit encoding,
+     * with big-endian byte order.
+     *
+     * @param value The long value to write.
+     * @return This Buf.
+     * @throws IndexOutOfBoundsException If {@link Buf#writableBytes} is less than {@link Long#BYTES}.
+     */
+    Buf writeLongBE(long value);
+
+    /**
+     * Set the given long value at the given write offset. The {@link Buf#writerIndex()} is not modified.
+     * The value is written using a two's complement 64-bit encoding,
+     * with big-endian byte order.
+     *
+     * @param woff The write offset, an absolute index into this buffer to write to.
+     * @param value The long value to write.
+     * @return This Buf.
+     * @throws IndexOutOfBoundsException if the given offset is out of bounds of the buffer, that is, less than 0 or
+     *                                   greater than or equal to {@link Buf#capacity()} minus {@link Long#BYTES}.
+     */
+    Buf writeLongBE(int woff, long value);
+
+    /**
      * Get the double value at the current {@link Buf#readerIndex()},
      * and increases the reader offset by {@link Double#BYTES}.
-     * The value is read using a 64-bit IEEE floating point encoding, with big-endian byte order.
+     * The value is read using a 64-bit IEEE floating point encoding,
+     * with the {@link #order() configured} default byte order.
      *
      * @return The double value at the current reader offset.
      * @throws IndexOutOfBoundsException If {@link Buf#readableBytes} is less than {@link Double#BYTES}.
@@ -1027,7 +1549,8 @@ public interface Buf extends Rc<Buf> {
     /**
      * Get the double value at the given reader offset.
      * The {@link Buf#readerIndex()} is not modified.
-     * The value is read using a 64-bit IEEE floating point encoding, with big-endian byte order.
+     * The value is read using a 64-bit IEEE floating point encoding,
+     * with the {@link #order() configured} default byte order.
      *
      * @param roff The read offset, an absolute index into this buffer, to read from.
      * @return The double value at the given offset.
@@ -1039,7 +1562,8 @@ public interface Buf extends Rc<Buf> {
     /**
      * Get the double value at the current {@link Buf#readerIndex()},
      * and increases the reader offset by {@link Double#BYTES}.
-     * The value is read using a 64-bit IEEE floating point encoding, with little-endian byte order.
+     * The value is read using a 64-bit IEEE floating point encoding,
+     * with little-endian byte order.
      *
      * @return The double value at the current reader offset.
      * @throws IndexOutOfBoundsException If {@link Buf#readableBytes} is less than {@link Double#BYTES}.
@@ -1049,7 +1573,8 @@ public interface Buf extends Rc<Buf> {
     /**
      * Get the double value at the given reader offset.
      * The {@link Buf#readerIndex()} is not modified.
-     * The value is read using a 64-bit IEEE floating point encoding, with little-endian byte order.
+     * The value is read using a 64-bit IEEE floating point encoding,
+     * with little-endian byte order.
      *
      * @param roff The read offset, an absolute index into this buffer, to read from.
      * @return The double value at the given offset.
@@ -1059,9 +1584,34 @@ public interface Buf extends Rc<Buf> {
     double readDoubleLE(int roff);
 
     /**
+     * Get the double value at the current {@link Buf#readerIndex()},
+     * and increases the reader offset by {@link Double#BYTES}.
+     * The value is read using a 64-bit IEEE floating point encoding,
+     * with big-endian byte order.
+     *
+     * @return The double value at the current reader offset.
+     * @throws IndexOutOfBoundsException If {@link Buf#readableBytes} is less than {@link Double#BYTES}.
+     */
+    double readDoubleBE();
+
+    /**
+     * Get the double value at the given reader offset.
+     * The {@link Buf#readerIndex()} is not modified.
+     * The value is read using a 64-bit IEEE floating point encoding,
+     * with big-endian byte order.
+     *
+     * @param roff The read offset, an absolute index into this buffer, to read from.
+     * @return The double value at the given offset.
+     * @throws IndexOutOfBoundsException if the given index is out of bounds of the buffer, that is, less than 0 or
+     *                                   greater than or equal to {@link Buf#capacity()} minus {@link Double#BYTES}.
+     */
+    double readDoubleBE(int roff);
+
+    /**
      * Set the given double value at the current {@link Buf#writerIndex()},
      * and increase the writer offset by {@link Double#BYTES}.
-     * The value is written using a 64-bit IEEE floating point encoding, with big-endian byte order.
+     * The value is written using a 64-bit IEEE floating point encoding,
+     * with the {@link #order() configured} default byte order.
      *
      * @param value The double value to write.
      * @return This Buf.
@@ -1071,7 +1621,8 @@ public interface Buf extends Rc<Buf> {
 
     /**
      * Set the given double value at the given write offset. The {@link Buf#writerIndex()} is not modified.
-     * The value is written using a 64-bit IEEE floating point encoding, with big-endian byte order.
+     * The value is written using a 64-bit IEEE floating point encoding,
+     * with the {@link #order() configured} default byte order.
      *
      * @param woff The write offset, an absolute index into this buffer to write to.
      * @param value The double value to write.
@@ -1084,7 +1635,8 @@ public interface Buf extends Rc<Buf> {
     /**
      * Set the given double value at the current {@link Buf#writerIndex()},
      * and increase the writer offset by {@link Double#BYTES}.
-     * The value is written using a 64-bit IEEE floating point encoding, with little-endian byte order.
+     * The value is written using a 64-bit IEEE floating point encoding,
+     * with little-endian byte order.
      *
      * @param value The double value to write.
      * @return This Buf.
@@ -1094,7 +1646,8 @@ public interface Buf extends Rc<Buf> {
 
     /**
      * Set the given double value at the given write offset. The {@link Buf#writerIndex()} is not modified.
-     * The value is written using a 64-bit IEEE floating point encoding, with little-endian byte order.
+     * The value is written using a 64-bit IEEE floating point encoding,
+     * with little-endian byte order.
      *
      * @param woff The write offset, an absolute index into this buffer to write to.
      * @param value The double value to write.
@@ -1103,6 +1656,31 @@ public interface Buf extends Rc<Buf> {
      *                                   greater than or equal to {@link Buf#capacity()} minus {@link Double#BYTES}.
      */
     Buf writeDoubleLE(int woff, double value);
+
+    /**
+     * Set the given double value at the current {@link Buf#writerIndex()},
+     * and increase the writer offset by {@link Double#BYTES}.
+     * The value is written using a 64-bit IEEE floating point encoding,
+     * with big-endian byte order.
+     *
+     * @param value The double value to write.
+     * @return This Buf.
+     * @throws IndexOutOfBoundsException If {@link Buf#writableBytes} is less than {@link Double#BYTES}.
+     */
+    Buf writeDoubleBE(double value);
+
+    /**
+     * Set the given double value at the given write offset. The {@link Buf#writerIndex()} is not modified.
+     * The value is written using a 64-bit IEEE floating point encoding,
+     * with big-endian byte order.
+     *
+     * @param woff The write offset, an absolute index into this buffer to write to.
+     * @param value The double value to write.
+     * @return This Buf.
+     * @throws IndexOutOfBoundsException if the given offset is out of bounds of the buffer, that is, less than 0 or
+     *                                   greater than or equal to {@link Buf#capacity()} minus {@link Double#BYTES}.
+     */
+    Buf writeDoubleBE(int woff, double value);
     // </editor-fold>
     // ### CODEGEN END primitive accessors interface
 }
