@@ -30,7 +30,7 @@ import java.util.concurrent.SynchronousQueue;
 import static org.hamcrest.Matchers.*;
 import static org.junit.Assert.*;
 
-public abstract class BBufTest {
+public abstract class BufTest {
     protected abstract Allocator createAllocator();
 
     private Allocator allocator;

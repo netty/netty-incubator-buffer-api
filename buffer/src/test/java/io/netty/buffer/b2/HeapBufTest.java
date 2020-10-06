@@ -17,29 +17,19 @@ package io.netty.buffer.b2;
 
 import org.junit.Test;
 
-import static org.hamcrest.Matchers.*;
 import static org.junit.Assert.*;
 
-public class PooledDirectBBufWithCleanerTest extends DirectBBufWithCleanerTest {
+public class HeapBufTest extends BufTest {
     @Override
     protected Allocator createAllocator() {
-        return Allocator.pooledDirectWithCleaner();
+        return Allocator.heap();
     }
 
     @Test
-    public void buffersMustBeReusedByPoolingAllocatorEvenWhenDroppedByCleanerInsteadOfExplicitly()
-            throws InterruptedException {
-        try (var allocator = createAllocator()) {
-            int iterations = 100;
-            int allocationSize = 1024;
-            for (int i = 0; i < iterations; i++) {
-                allocateAndForget(allocator, allocationSize);
-                System.gc();
-                System.runFinalization();
-            }
-            var sum = Statics.MEM_USAGE_NATIVE.sum();
-            var totalAllocated = (long) allocationSize * iterations;
-            assertThat(sum, lessThan(totalAllocated));
+    public void heapBufferMustHaveZeroAddress() {
+        try (Allocator allocator = createAllocator();
+             Buf buf = allocator.allocate(8)) {
+            assertEquals(0, buf.getNativeAddress());
         }
     }
 }

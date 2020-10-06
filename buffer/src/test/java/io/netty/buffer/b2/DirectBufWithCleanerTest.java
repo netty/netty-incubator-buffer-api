@@ -5,7 +5,7 @@ import org.junit.Test;
 import static org.hamcrest.Matchers.*;
 import static org.junit.Assert.*;
 
-public class DirectBBufWithCleanerTest extends DirectBBufTest {
+public class DirectBufWithCleanerTest extends DirectBufTest {
     @Override
     protected Allocator createAllocator() {
         return Allocator.directWithCleaner();

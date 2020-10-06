@@ -571,7 +571,7 @@ public final class Codegen {
     public static void main(String[] args) throws Exception {
         generateCodeInline(Path.of("buffer/src/main/java/io/netty/buffer/b2/Buf.java"));
         generateCodeInline(Path.of("buffer/src/main/java/io/netty/buffer/b2/BBuf.java"));
-        generateCodeInline(Path.of("buffer/src/test/java/io/netty/buffer/b2/BBufTest.java"));
+        generateCodeInline(Path.of("buffer/src/test/java/io/netty/buffer/b2/BufTest.java"));
     }
 
     private static void generateCodeInline(Path path) throws IOException {
