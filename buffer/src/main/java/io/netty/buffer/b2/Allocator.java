@@ -17,7 +17,9 @@ package io.netty.buffer.b2;
 
 import jdk.incubator.foreign.MemorySegment;
 
-import static io.netty.buffer.b2.BBuf.*;
+import java.nio.ByteOrder;
+
+import static io.netty.buffer.b2.BBuf.SEGMENT_CLOSE;
 
 /**
  * Interface for {@link Buf} allocators.
@@ -38,11 +40,28 @@ public interface Allocator extends AutoCloseable {
     /**
      * Allocate a {@link Buf} of the given size in bytes. This method may throw an {@link OutOfMemoryError} if there is
      * not enough free memory available to allocate a {@link Buf} of the requested size.
+     * <p>
+     * The buffer will use the current platform native byte order by default, for accessor methods that don't have an
+     * explicit byte order.
      *
      * @param size The size of {@link Buf} to allocate.
      * @return The newly allocated {@link Buf}.
      */
     Buf allocate(long size);
+
+    /**
+     * Allocate a {@link Buf} of the given size in bytes. This method may throw an {@link OutOfMemoryError} if there is
+     * not enough free memory available to allocate a {@link Buf} of the requested size.
+     * <p>
+     * The buffer will use the given byte order by default.
+     *
+     * @param size The size of {@link Buf} to allocate.
+     * @param order The default byte order used by the accessor methods that don't have an explicit byte order.
+     * @return The newly allocated {@link Buf}.
+     */
+    default Buf allocate(long size, ByteOrder order) {
+        return allocate(size).order(order);
+    }
 
     /**
      * Close this allocator, freeing all of its internal resources. It is not specified if the allocator can still be

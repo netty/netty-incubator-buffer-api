@@ -22,7 +22,7 @@ import java.util.ArrayList;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
-import static java.lang.invoke.MethodHandles.*;
+import static java.lang.invoke.MethodHandles.lookup;
 
 abstract class SizeClassedMemoryPool implements Allocator, Drop<BBuf> {
     private static final VarHandle CLOSE = Statics.findVarHandle(

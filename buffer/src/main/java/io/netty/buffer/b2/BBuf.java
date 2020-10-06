@@ -17,17 +17,58 @@ package io.netty.buffer.b2;
 
 import jdk.incubator.foreign.MemorySegment;
 
-import static jdk.incubator.foreign.MemoryAccess.*;
+import java.nio.ByteOrder;
+
+import static jdk.incubator.foreign.MemoryAccess.getByteAtOffset_BE;
+import static jdk.incubator.foreign.MemoryAccess.getCharAtOffset_BE;
+import static jdk.incubator.foreign.MemoryAccess.getCharAtOffset_LE;
+import static jdk.incubator.foreign.MemoryAccess.getDoubleAtOffset_BE;
+import static jdk.incubator.foreign.MemoryAccess.getDoubleAtOffset_LE;
+import static jdk.incubator.foreign.MemoryAccess.getFloatAtOffset_BE;
+import static jdk.incubator.foreign.MemoryAccess.getFloatAtOffset_LE;
+import static jdk.incubator.foreign.MemoryAccess.getIntAtOffset_BE;
+import static jdk.incubator.foreign.MemoryAccess.getIntAtOffset_LE;
+import static jdk.incubator.foreign.MemoryAccess.getLongAtOffset_BE;
+import static jdk.incubator.foreign.MemoryAccess.getLongAtOffset_LE;
+import static jdk.incubator.foreign.MemoryAccess.getShortAtOffset_BE;
+import static jdk.incubator.foreign.MemoryAccess.getShortAtOffset_LE;
+import static jdk.incubator.foreign.MemoryAccess.setByteAtOffset_BE;
+import static jdk.incubator.foreign.MemoryAccess.setByteAtOffset_LE;
+import static jdk.incubator.foreign.MemoryAccess.setCharAtOffset_BE;
+import static jdk.incubator.foreign.MemoryAccess.setCharAtOffset_LE;
+import static jdk.incubator.foreign.MemoryAccess.setDoubleAtOffset_BE;
+import static jdk.incubator.foreign.MemoryAccess.setDoubleAtOffset_LE;
+import static jdk.incubator.foreign.MemoryAccess.setFloatAtOffset_BE;
+import static jdk.incubator.foreign.MemoryAccess.setFloatAtOffset_LE;
+import static jdk.incubator.foreign.MemoryAccess.setIntAtOffset_BE;
+import static jdk.incubator.foreign.MemoryAccess.setIntAtOffset_LE;
+import static jdk.incubator.foreign.MemoryAccess.setLongAtOffset_BE;
+import static jdk.incubator.foreign.MemoryAccess.setLongAtOffset_LE;
+import static jdk.incubator.foreign.MemoryAccess.setShortAtOffset_BE;
+import static jdk.incubator.foreign.MemoryAccess.setShortAtOffset_LE;
 
 class BBuf extends RcSupport<Buf, BBuf> implements Buf {
     static final Drop<BBuf> SEGMENT_CLOSE = buf -> buf.seg.close();
     final MemorySegment seg;
+    private boolean isBigEndian;
     private int roff;
     private int woff;
 
     BBuf(MemorySegment segment, Drop<BBuf> drop) {
         super(drop);
         seg = segment;
+        isBigEndian = ByteOrder.nativeOrder() == ByteOrder.BIG_ENDIAN;
+    }
+
+    @Override
+    public Buf order(ByteOrder order) {
+        isBigEndian = order == ByteOrder.BIG_ENDIAN;
+        return this;
+    }
+
+    @Override
+    public ByteOrder order() {
+        return isBigEndian? ByteOrder.BIG_ENDIAN : ByteOrder.LITTLE_ENDIAN;
     }
 
     @Override
@@ -311,9 +352,13 @@ class BBuf extends RcSupport<Buf, BBuf> implements Buf {
     @Override
     public int readMedium() {
         checkRead(roff, 3);
-        int value = getByteAtOffset_BE(seg, roff) << 16 |
-                    (getByteAtOffset_BE(seg, roff + 1) & 0xFF) << 8 |
-                    getByteAtOffset_BE(seg, roff + 2) & 0xFF;
+        int value = isBigEndian?
+                getByteAtOffset_BE(seg, roff) << 16 |
+                (getByteAtOffset_BE(seg, roff + 1) & 0xFF) << 8 |
+                getByteAtOffset_BE(seg, roff + 2) & 0xFF :
+                getByteAtOffset_BE(seg, roff) & 0xFF |
+                (getByteAtOffset_BE(seg, roff + 1) & 0xFF) << 8 |
+                getByteAtOffset_BE(seg, roff + 2) << 16;
         roff += 3;
         return value;
     }
@@ -322,8 +367,8 @@ class BBuf extends RcSupport<Buf, BBuf> implements Buf {
     public int readMedium(int roff) {
         checkRead(roff, 3);
         return getByteAtOffset_BE(seg, roff) << 16 |
-                    (getByteAtOffset_BE(seg, roff + 1) & 0xFF) << 8 |
-                    getByteAtOffset_BE(seg, roff + 2) & 0xFF;
+               (getByteAtOffset_BE(seg, roff + 1) & 0xFF) << 8 |
+               getByteAtOffset_BE(seg, roff + 2) & 0xFF;
     }
 
     @Override
@@ -738,6 +783,7 @@ class BBuf extends RcSupport<Buf, BBuf> implements Buf {
             public BBuf transferOwnership(Thread recipient, Drop<BBuf> drop) {
                 var newSegment = isConfined? transferSegment.withOwnerThread(recipient) : transferSegment;
                 BBuf copy = new BBuf(newSegment, drop);
+                copy.isBigEndian = outer.isBigEndian;
                 copy.roff = outer.roff;
                 copy.woff = outer.woff;
                 return copy;

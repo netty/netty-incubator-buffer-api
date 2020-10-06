@@ -15,10 +15,26 @@
  */
 package io.netty.buffer.b2;
 
+import java.nio.ByteOrder;
+
 /**
  * A reference counted buffer API with separate reader and writer indexes.
  */
 public interface Buf extends Rc<Buf> {
+    /**
+     * Change the default byte order of this buffer, and return this buffer.
+     *
+     * @param order The new default byte order, used by accessor methods that don't use an explicit byte order.
+     * @return This buffer instance.
+     */
+    Buf order(ByteOrder order);
+
+    /**
+     * The default byte order of this buffer.
+     * @return The default byte order of this buffer.
+     */
+    ByteOrder order();
+
     /**
      * The capacity of this buffer, that is, the maximum number of bytes it can contain.
      *
