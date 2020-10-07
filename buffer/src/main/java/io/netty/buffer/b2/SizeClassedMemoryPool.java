@@ -15,8 +15,6 @@
  */
 package io.netty.buffer.b2;
 
-import jdk.incubator.foreign.MemorySegment;
-
 import java.lang.invoke.VarHandle;
 import java.util.ArrayList;
 import java.util.concurrent.ConcurrentHashMap;
@@ -24,37 +22,43 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 
 import static java.lang.invoke.MethodHandles.lookup;
 
-abstract class SizeClassedMemoryPool implements Allocator, Drop<BBuf> {
+class SizeClassedMemoryPool implements Allocator, Drop<Buf> {
     private static final VarHandle CLOSE = Statics.findVarHandle(
             lookup(), SizeClassedMemoryPool.class, "closed", boolean.class);
+    private final MemoryManager manager;
     private final ConcurrentHashMap<Long, ConcurrentLinkedQueue<Send<Buf>>> pool;
     @SuppressWarnings("unused")
     private volatile boolean closed;
 
-    protected SizeClassedMemoryPool() {
+    protected SizeClassedMemoryPool(MemoryManager manager) {
+        this.manager = manager;
         pool = new ConcurrentHashMap<>();
     }
 
     @Override
     public Buf allocate(long size) {
+        Allocator.checkSize(size);
         var sizeClassPool = getSizeClassPool(size);
         Send<Buf> send = sizeClassPool.poll();
         if (send != null) {
             return send.receive();
         }
-        var segment = createMemorySegment(size);
-        return createBBuf(segment);
+        return createBuf(size, getDrop());
     }
 
-    protected BBuf createBBuf(MemorySegment segment) {
-        return new BBuf(segment, getDrop());
+    protected MemoryManager getMemoryManager() {
+        return manager;
     }
 
-    protected SizeClassedMemoryPool getDrop() {
+    protected Buf createBuf(long size, Drop<Buf> drop) {
+        var buf = manager.allocateShared(size, drop);
+        drop.accept(buf);
+        return buf;
+    }
+
+    protected Drop<Buf> getDrop() {
         return this;
     }
-
-    protected abstract MemorySegment createMemorySegment(long size);
 
     @Override
     public void close() {
@@ -79,7 +83,7 @@ abstract class SizeClassedMemoryPool implements Allocator, Drop<BBuf> {
     }
 
     @Override
-    public void drop(BBuf buf) {
+    public void drop(Buf buf) {
         var sizeClassPool = getSizeClassPool(buf.capacity());
         sizeClassPool.offer(buf.send());
         if (closed) {
@@ -90,8 +94,11 @@ abstract class SizeClassedMemoryPool implements Allocator, Drop<BBuf> {
         }
     }
 
-    void recoverLostSegment(MemorySegment segment) {
-        createBBuf(segment).close();
+    void recoverLostMemory(Object memory) {
+        var drop = getDrop();
+        var buf = manager.recoverMemory(memory, drop);
+        drop.accept(buf);
+        buf.close();
     }
 
     private ConcurrentLinkedQueue<Send<Buf>> getSizeClassPool(long size) {
@@ -99,6 +106,6 @@ abstract class SizeClassedMemoryPool implements Allocator, Drop<BBuf> {
     }
 
     private static void dispose(Buf buf) {
-        BBuf.SEGMENT_CLOSE.drop((BBuf) buf);
+        MemSegBuf.SEGMENT_CLOSE.drop((MemSegBuf) buf);
     }
 }

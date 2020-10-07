@@ -48,14 +48,14 @@ import static jdk.incubator.foreign.MemoryAccess.setLongAtOffset_LE;
 import static jdk.incubator.foreign.MemoryAccess.setShortAtOffset_BE;
 import static jdk.incubator.foreign.MemoryAccess.setShortAtOffset_LE;
 
-class BBuf extends RcSupport<Buf, BBuf> implements Buf {
-    static final Drop<BBuf> SEGMENT_CLOSE = buf -> buf.seg.close();
+class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
+    static final Drop<MemSegBuf> SEGMENT_CLOSE = buf -> buf.seg.close();
     final MemorySegment seg;
     private boolean isBigEndian;
     private int roff;
     private int woff;
 
-    BBuf(MemorySegment segment, Drop<BBuf> drop) {
+    MemSegBuf(MemorySegment segment, Drop<MemSegBuf> drop) {
         super(drop);
         seg = segment;
         isBigEndian = ByteOrder.nativeOrder() == ByteOrder.BIG_ENDIAN;
@@ -83,7 +83,7 @@ class BBuf extends RcSupport<Buf, BBuf> implements Buf {
     }
 
     @Override
-    public BBuf readerIndex(int index) {
+    public MemSegBuf readerIndex(int index) {
         checkRead(index, 0);
         roff = index;
         return this;
@@ -95,7 +95,7 @@ class BBuf extends RcSupport<Buf, BBuf> implements Buf {
     }
 
     @Override
-    public BBuf writerIndex(int index) {
+    public MemSegBuf writerIndex(int index) {
         checkWrite(index, 0);
         woff = index;
         return this;
@@ -1181,15 +1181,15 @@ getByteAtOffset_BE(seg, roff) & 0xFF |
     // ### CODEGEN END primitive accessors implementation
 
     @Override
-    protected Owned<BBuf> prepareSend() {
-        BBuf outer = this;
+    protected Owned<MemSegBuf> prepareSend() {
+        MemSegBuf outer = this;
         boolean isConfined = seg.ownerThread() == null;
         MemorySegment transferSegment = isConfined? seg : seg.withOwnerThread(null);
-        return new Owned<BBuf>() {
+        return new Owned<MemSegBuf>() {
             @Override
-            public BBuf transferOwnership(Thread recipient, Drop<BBuf> drop) {
+            public MemSegBuf transferOwnership(Thread recipient, Drop<MemSegBuf> drop) {
                 var newSegment = isConfined? transferSegment.withOwnerThread(recipient) : transferSegment;
-                BBuf copy = new BBuf(newSegment, drop);
+                MemSegBuf copy = new MemSegBuf(newSegment, drop);
                 copy.isBigEndian = outer.isBigEndian;
                 copy.roff = outer.roff;
                 copy.woff = outer.woff;

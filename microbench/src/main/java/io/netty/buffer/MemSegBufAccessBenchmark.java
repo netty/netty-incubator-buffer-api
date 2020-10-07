@@ -36,7 +36,7 @@ import java.util.concurrent.TimeUnit;
 @Fork(1)
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
-public class BBufAccessBenchmark extends AbstractMicrobenchmark {
+public class MemSegBufAccessBenchmark extends AbstractMicrobenchmark {
     public enum BBufType {
         UNSAFE {
             @Override

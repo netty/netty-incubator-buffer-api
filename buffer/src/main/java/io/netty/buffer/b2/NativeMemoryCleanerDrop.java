@@ -20,24 +20,28 @@ import java.lang.ref.Cleaner.Cleanable;
 import java.lang.ref.WeakReference;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import static io.netty.buffer.b2.Statics.*;
-import static java.lang.invoke.MethodHandles.*;
+import static io.netty.buffer.b2.Statics.CLEANER;
+import static io.netty.buffer.b2.Statics.findVarHandle;
+import static java.lang.invoke.MethodHandles.lookup;
 
-class NativeMemoryCleanerDrop implements Drop<BBuf> {
+class NativeMemoryCleanerDrop implements Drop<Buf> {
     private static final VarHandle CLEANABLE =
             findVarHandle(lookup(), NativeMemoryCleanerDrop.class, "cleanable", GatedCleanable.class);
     private final SizeClassedMemoryPool pool;
-    private final Drop<BBuf> delegate;
+    private final MemoryManager manager;
+    private final Drop<Buf> delegate;
     @SuppressWarnings("unused")
     private volatile GatedCleanable cleanable;
 
-    NativeMemoryCleanerDrop(SizeClassedMemoryPool pool, Drop<BBuf> delegate) {
+    NativeMemoryCleanerDrop(SizeClassedMemoryPool pool, MemoryManager manager,
+                            Drop<Buf> delegate) {
         this.pool = pool;
+        this.manager = manager;
         this.delegate = delegate;
     }
 
     @Override
-    public void drop(BBuf buf) {
+    public void drop(Buf buf) {
         GatedCleanable c = (GatedCleanable) CLEANABLE.getAndSet(this, null);
         if (c != null) {
             c.clean();
@@ -45,7 +49,7 @@ class NativeMemoryCleanerDrop implements Drop<BBuf> {
     }
 
     @Override
-    public void accept(BBuf buf) {
+    public void accept(Buf buf) {
         // Unregister old cleanable, if any, to avoid uncontrolled build-up.
         GatedCleanable c = (GatedCleanable) CLEANABLE.getAndSet(this, null);
         if (c != null) {
@@ -54,15 +58,15 @@ class NativeMemoryCleanerDrop implements Drop<BBuf> {
         }
 
         var pool = this.pool;
-        var seg = buf.seg;
+        var mem = manager.unwrapRecoverableMemory(buf);
         var delegate = this.delegate;
-        WeakReference<BBuf> ref = new WeakReference<>(buf);
+        WeakReference<Buf> ref = new WeakReference<>(buf);
         AtomicBoolean gate = new AtomicBoolean();
         cleanable = new GatedCleanable(gate, CLEANER.register(this, () -> {
             if (gate.compareAndSet(false, true)) {
-                BBuf b = ref.get();
+                Buf b = ref.get();
                 if (b == null) {
-                    pool.recoverLostSegment(seg);
+                    pool.recoverLostMemory(mem);
                 } else {
                     delegate.drop(b);
                 }

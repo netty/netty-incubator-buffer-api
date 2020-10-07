@@ -15,11 +15,7 @@
  */
 package io.netty.buffer.b2;
 
-import jdk.incubator.foreign.MemorySegment;
-
 import java.nio.ByteOrder;
-
-import static io.netty.buffer.b2.BBuf.SEGMENT_CLOSE;
 
 /**
  * Interface for {@link Buf} allocators.
@@ -72,85 +68,54 @@ public interface Allocator extends AutoCloseable {
     }
 
     static Allocator heap() {
+        var man = MemoryManager.getHeapMemoryManager();
         return new Allocator() {
             @Override
-            public BBuf allocate(long size) {
+            public Buf allocate(long size) {
                 checkSize(size);
-                var segment = allocateHeap(size);
-                return new BBuf(segment, SEGMENT_CLOSE);
+                return man.allocateConfined(size, man.drop());
             }
         };
     }
 
     static Allocator direct() {
+        var man = MemoryManager.getNativeMemoryManager();
         return new Allocator() {
             @Override
             public Buf allocate(long size) {
                 checkSize(size);
-                var segment = allocateNative(size);
-                return new BBuf(segment, SEGMENT_CLOSE);
+                return man.allocateConfined(size, man.drop());
             }
         };
     }
 
     static Allocator directWithCleaner() {
+        var man = MemoryManager.getNativeMemoryManager();
         return new Allocator() {
             @Override
             public Buf allocate(long size) {
                 checkSize(size);
-                var segment = allocateNative(size);
-                segment.registerCleaner(Statics.CLEANER);
-                return new BBuf(segment, SEGMENT_CLOSE);
-            }
-        };
-    }
-
-    static Allocator pooledHeap() {
-        return new SizeClassedMemoryPool() {
-            @Override
-            protected MemorySegment createMemorySegment(long size) {
-                checkSize(size);
-                return allocateHeap(size).withOwnerThread(null);
-            }
-        };
-    }
-
-    static Allocator pooledDirect() {
-        return new SizeClassedMemoryPool() {
-            @Override
-            protected MemorySegment createMemorySegment(long size) {
-                checkSize(size);
-                return allocateNative(size).withOwnerThread(null);
-            }
-        };
-    }
-
-    static Allocator pooledDirectWithCleaner() {
-        return new SizeClassedMemoryPool() {
-            @Override
-            protected MemorySegment createMemorySegment(long size) {
-                checkSize(size);
-                return allocateNative(size).withOwnerThread(null);
-            }
-
-            @Override
-            protected BBuf createBBuf(MemorySegment segment) {
-                var drop = new NativeMemoryCleanerDrop(this, getDrop());
-                var buf = new BBuf(segment, drop);
-                drop.accept(buf);
+                var buf = man.allocateConfined(size, man.drop());
+                man.registerCleaner(buf, Statics.CLEANER);
                 return buf;
             }
         };
     }
 
-    private static MemorySegment allocateHeap(long size) {
-        return MemorySegment.ofArray(new byte[Math.toIntExact(size)]);
+    static Allocator pooledHeap() {
+        return new SizeClassedMemoryPool(MemoryManager.getHeapMemoryManager());
     }
 
-    private static MemorySegment allocateNative(long size) {
-        var segment = MemorySegment.allocateNative(size)
-                                   .withCleanupAction(Statics.getCleanupAction(size));
-        Statics.MEM_USAGE_NATIVE.add(size);
-        return segment;
+    static Allocator pooledDirect() {
+        return new SizeClassedMemoryPool(MemoryManager.getNativeMemoryManager());
+    }
+
+    static Allocator pooledDirectWithCleaner() {
+        return new SizeClassedMemoryPool(MemoryManager.getNativeMemoryManager()) {
+            @Override
+            protected Drop<Buf> getDrop() {
+                return new NativeMemoryCleanerDrop(this, getMemoryManager(), super.getDrop());
+            }
+        };
     }
 }
