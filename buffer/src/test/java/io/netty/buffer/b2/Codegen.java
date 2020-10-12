@@ -635,40 +635,40 @@ public final class Codegen {
 
         builder.add(template.relativeRead(type, Order.DF, false, true));
         builder.add(template.offsetRead(type, Order.DF, false, true));
-        if (type.includeLEBE) {
-            builder.add(template.relativeRead(type, Order.LE, false, true));
-            builder.add(template.offsetRead(type, Order.LE, false, true));
-            builder.add(template.relativeRead(type, Order.BE, false, true));
-            builder.add(template.offsetRead(type, Order.BE, false, true));
-        }
+//        if (type.includeLEBE) {
+//            builder.add(template.relativeRead(type, Order.LE, false, true));
+//            builder.add(template.offsetRead(type, Order.LE, false, true));
+//            builder.add(template.relativeRead(type, Order.BE, false, true));
+//            builder.add(template.offsetRead(type, Order.BE, false, true));
+//        }
         if (type.unsignedCarrier != null) {
             builder.add(template.relativeRead(type, Order.DF, true, true));
             builder.add(template.offsetRead(type, Order.DF, true, true));
-            if (type.includeLEBE) {
-                builder.add(template.relativeRead(type, Order.LE, true, true));
-                builder.add(template.offsetRead(type, Order.LE, true, true));
-                builder.add(template.relativeRead(type, Order.BE, true, true));
-                builder.add(template.offsetRead(type, Order.BE, true, true));
-            }
+//            if (type.includeLEBE) {
+//                builder.add(template.relativeRead(type, Order.LE, true, true));
+//                builder.add(template.offsetRead(type, Order.LE, true, true));
+//                builder.add(template.relativeRead(type, Order.BE, true, true));
+//                builder.add(template.offsetRead(type, Order.BE, true, true));
+//            }
         }
 
         builder.add(template.relativeWrite(type, Order.DF, false, false));
         builder.add(template.offsetWrite(type, Order.DF, false, false));
-        if (type.includeLEBE) {
-            builder.add(template.relativeWrite(type, Order.LE, false, false));
-            builder.add(template.offsetWrite(type, Order.LE, false, false));
-            builder.add(template.relativeWrite(type, Order.BE, false, false));
-            builder.add(template.offsetWrite(type, Order.BE, false, false));
-        }
+//        if (type.includeLEBE) {
+//            builder.add(template.relativeWrite(type, Order.LE, false, false));
+//            builder.add(template.offsetWrite(type, Order.LE, false, false));
+//            builder.add(template.relativeWrite(type, Order.BE, false, false));
+//            builder.add(template.offsetWrite(type, Order.BE, false, false));
+//        }
         if (type.unsignedCarrier != null) {
             builder.add(template.relativeWrite(type, Order.DF, true, false));
             builder.add(template.offsetWrite(type, Order.DF, true, false));
-            if (type.includeLEBE) {
-                builder.add(template.relativeWrite(type, Order.LE, true, false));
-                builder.add(template.offsetWrite(type, Order.LE, true, false));
-                builder.add(template.relativeWrite(type, Order.BE, true, false));
-                builder.add(template.offsetWrite(type, Order.BE, true, false));
-            }
+//            if (type.includeLEBE) {
+//                builder.add(template.relativeWrite(type, Order.LE, true, false));
+//                builder.add(template.offsetWrite(type, Order.LE, true, false));
+//                builder.add(template.relativeWrite(type, Order.BE, true, false));
+//                builder.add(template.offsetWrite(type, Order.BE, true, false));
+//            }
         }
 
         return builder.build();

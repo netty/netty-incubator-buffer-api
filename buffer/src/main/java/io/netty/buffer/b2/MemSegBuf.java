@@ -219,34 +219,6 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
     }
 
     @Override
-    public char readCharLE() {
-        checkRead(roff, 2);
-        char value = getCharAtOffset_LE(seg, roff);
-        roff += 2;
-        return value;
-    }
-
-    @Override
-    public char readCharLE(int roff) {
-        checkRead(roff, 2);
-        return getCharAtOffset_LE(seg, roff);
-    }
-
-    @Override
-    public char readCharBE() {
-        checkRead(roff, 2);
-        char value = getCharAtOffset_BE(seg, roff);
-        roff += 2;
-        return value;
-    }
-
-    @Override
-    public char readCharBE(int roff) {
-        checkRead(roff, 2);
-        return getCharAtOffset_BE(seg, roff);
-    }
-
-    @Override
     public Buf writeChar(char value) {
         if (isBigEndian) {
             setCharAtOffset_BE(seg, woff, value);
@@ -268,32 +240,6 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
     }
 
     @Override
-    public Buf writeCharLE(char value) {
-        setCharAtOffset_LE(seg, woff, value);
-        woff += 2;
-        return this;
-    }
-
-    @Override
-    public Buf writeCharLE(int woff, char value) {
-        setCharAtOffset_LE(seg, woff, value);
-        return this;
-    }
-
-    @Override
-    public Buf writeCharBE(char value) {
-        setCharAtOffset_BE(seg, woff, value);
-        woff += 2;
-        return this;
-    }
-
-    @Override
-    public Buf writeCharBE(int woff, char value) {
-        setCharAtOffset_BE(seg, woff, value);
-        return this;
-    }
-
-    @Override
     public short readShort() {
         checkRead(roff, Short.BYTES);
         short value = (isBigEndian? getShortAtOffset_BE(seg, roff) : getShortAtOffset_LE(seg, roff));
@@ -308,34 +254,6 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
     }
 
     @Override
-    public short readShortLE() {
-        checkRead(roff, Short.BYTES);
-        short value = getShortAtOffset_LE(seg, roff);
-        roff += Short.BYTES;
-        return value;
-    }
-
-    @Override
-    public short readShortLE(int roff) {
-        checkRead(roff, Short.BYTES);
-        return getShortAtOffset_LE(seg, roff);
-    }
-
-    @Override
-    public short readShortBE() {
-        checkRead(roff, Short.BYTES);
-        short value = getShortAtOffset_BE(seg, roff);
-        roff += Short.BYTES;
-        return value;
-    }
-
-    @Override
-    public short readShortBE(int roff) {
-        checkRead(roff, Short.BYTES);
-        return getShortAtOffset_BE(seg, roff);
-    }
-
-    @Override
     public int readUnsignedShort() {
         checkRead(roff, Short.BYTES);
         int value = (isBigEndian? getShortAtOffset_BE(seg, roff) : getShortAtOffset_LE(seg, roff)) & 0xFFFF;
@@ -347,34 +265,6 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
     public int readUnsignedShort(int roff) {
         checkRead(roff, Short.BYTES);
         return (isBigEndian? getShortAtOffset_BE(seg, roff) : getShortAtOffset_LE(seg, roff)) & 0xFFFF;
-    }
-
-    @Override
-    public int readUnsignedShortLE() {
-        checkRead(roff, Short.BYTES);
-        int value = getShortAtOffset_LE(seg, roff) & 0xFFFF;
-        roff += Short.BYTES;
-        return value;
-    }
-
-    @Override
-    public int readUnsignedShortLE(int roff) {
-        checkRead(roff, Short.BYTES);
-        return getShortAtOffset_LE(seg, roff) & 0xFFFF;
-    }
-
-    @Override
-    public int readUnsignedShortBE() {
-        checkRead(roff, Short.BYTES);
-        int value = getShortAtOffset_BE(seg, roff) & 0xFFFF;
-        roff += Short.BYTES;
-        return value;
-    }
-
-    @Override
-    public int readUnsignedShortBE(int roff) {
-        checkRead(roff, Short.BYTES);
-        return getShortAtOffset_BE(seg, roff) & 0xFFFF;
     }
 
     @Override
@@ -399,32 +289,6 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
     }
 
     @Override
-    public Buf writeShortLE(short value) {
-        setShortAtOffset_LE(seg, woff, value);
-        woff += Short.BYTES;
-        return this;
-    }
-
-    @Override
-    public Buf writeShortLE(int woff, short value) {
-        setShortAtOffset_LE(seg, woff, value);
-        return this;
-    }
-
-    @Override
-    public Buf writeShortBE(short value) {
-        setShortAtOffset_BE(seg, woff, value);
-        woff += Short.BYTES;
-        return this;
-    }
-
-    @Override
-    public Buf writeShortBE(int woff, short value) {
-        setShortAtOffset_BE(seg, woff, value);
-        return this;
-    }
-
-    @Override
     public Buf writeUnsignedShort(int value) {
         if (isBigEndian) {
             setShortAtOffset_BE(seg, woff, (short) (value & 0xFFFF));
@@ -442,32 +306,6 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
         } else {
             setShortAtOffset_LE(seg, woff, (short) (value & 0xFFFF));
         }
-        return this;
-    }
-
-    @Override
-    public Buf writeUnsignedShortLE(int value) {
-        setShortAtOffset_LE(seg, woff, (short) (value & 0xFFFF));
-        woff += Short.BYTES;
-        return this;
-    }
-
-    @Override
-    public Buf writeUnsignedShortLE(int woff, int value) {
-        setShortAtOffset_LE(seg, woff, (short) (value & 0xFFFF));
-        return this;
-    }
-
-    @Override
-    public Buf writeUnsignedShortBE(int value) {
-        setShortAtOffset_BE(seg, woff, (short) (value & 0xFFFF));
-        woff += Short.BYTES;
-        return this;
-    }
-
-    @Override
-    public Buf writeUnsignedShortBE(int woff, int value) {
-        setShortAtOffset_BE(seg, woff, (short) (value & 0xFFFF));
         return this;
     }
 
@@ -498,42 +336,6 @@ getByteAtOffset_BE(seg, roff) & 0xFF |
     }
 
     @Override
-    public int readMediumLE() {
-        checkRead(roff, 3);
-        int value = getByteAtOffset_BE(seg, roff) & 0xFF |
-                    (getByteAtOffset_BE(seg, roff + 1) & 0xFF) << 8 |
-                    getByteAtOffset_BE(seg, roff + 2) << 16;
-        roff += 3;
-        return value;
-    }
-
-    @Override
-    public int readMediumLE(int roff) {
-        checkRead(roff, 3);
-        return getByteAtOffset_BE(seg, roff) & 0xFF |
-                    (getByteAtOffset_BE(seg, roff + 1) & 0xFF) << 8 |
-                    getByteAtOffset_BE(seg, roff + 2) << 16;
-    }
-
-    @Override
-    public int readMediumBE() {
-        checkRead(roff, 3);
-        int value = getByteAtOffset_BE(seg, roff) << 16 |
-                    (getByteAtOffset_BE(seg, roff + 1) & 0xFF) << 8 |
-                    getByteAtOffset_BE(seg, roff + 2) & 0xFF;
-        roff += 3;
-        return value;
-    }
-
-    @Override
-    public int readMediumBE(int roff) {
-        checkRead(roff, 3);
-        return getByteAtOffset_BE(seg, roff) << 16 |
-                    (getByteAtOffset_BE(seg, roff + 1) & 0xFF) << 8 |
-                    getByteAtOffset_BE(seg, roff + 2) & 0xFF;
-    }
-
-    @Override
     public int readUnsignedMedium() {
         checkRead(roff, 3);
         int value = isBigEndian?
@@ -557,42 +359,6 @@ getByteAtOffset_BE(seg, roff) & 0xFF |
 (getByteAtOffset_BE(seg, roff) & 0xFF |
                 (getByteAtOffset_BE(seg, roff + 1) & 0xFF) << 8 |
                 getByteAtOffset_BE(seg, roff + 2) << 16) & 0xFFFFFF;
-    }
-
-    @Override
-    public int readUnsignedMediumLE() {
-        checkRead(roff, 3);
-        int value = (getByteAtOffset_BE(seg, roff) & 0xFF |
-                    (getByteAtOffset_BE(seg, roff + 1) & 0xFF) << 8 |
-                    getByteAtOffset_BE(seg, roff + 2) << 16) & 0xFFFFFF;
-        roff += 3;
-        return value;
-    }
-
-    @Override
-    public int readUnsignedMediumLE(int roff) {
-        checkRead(roff, 3);
-        return (getByteAtOffset_BE(seg, roff) & 0xFF |
-                    (getByteAtOffset_BE(seg, roff + 1) & 0xFF) << 8 |
-                    getByteAtOffset_BE(seg, roff + 2) << 16) & 0xFFFFFF;
-    }
-
-    @Override
-    public int readUnsignedMediumBE() {
-        checkRead(roff, 3);
-        int value = (getByteAtOffset_BE(seg, roff) << 16 |
-                    (getByteAtOffset_BE(seg, roff + 1) & 0xFF) << 8 |
-                    getByteAtOffset_BE(seg, roff + 2) & 0xFF) & 0xFFFFFF;
-        roff += 3;
-        return value;
-    }
-
-    @Override
-    public int readUnsignedMediumBE(int roff) {
-        checkRead(roff, 3);
-        return (getByteAtOffset_BE(seg, roff) << 16 |
-                    (getByteAtOffset_BE(seg, roff + 1) & 0xFF) << 8 |
-                    getByteAtOffset_BE(seg, roff + 2) & 0xFF) & 0xFFFFFF;
     }
 
     @Override
@@ -623,44 +389,6 @@ getByteAtOffset_BE(seg, roff) & 0xFF |
             setByteAtOffset_BE(seg, woff + 1, (byte) (value >> 8 & 0xFF));
             setByteAtOffset_BE(seg, woff + 2, (byte) (value >> 16 & 0xFF));
         }
-        return this;
-    }
-
-    @Override
-    public Buf writeMediumLE(int value) {
-        checkWrite(woff, 3);
-        setByteAtOffset_BE(seg, woff, (byte) (value & 0xFF));
-        setByteAtOffset_BE(seg, woff + 1, (byte) (value >> 8 & 0xFF));
-        setByteAtOffset_BE(seg, woff + 2, (byte) (value >> 16 & 0xFF));
-        woff += 3;
-        return this;
-    }
-
-    @Override
-    public Buf writeMediumLE(int woff, int value) {
-        checkWrite(woff, 3);
-        setByteAtOffset_BE(seg, woff, (byte) (value & 0xFF));
-        setByteAtOffset_BE(seg, woff + 1, (byte) (value >> 8 & 0xFF));
-        setByteAtOffset_BE(seg, woff + 2, (byte) (value >> 16 & 0xFF));
-        return this;
-    }
-
-    @Override
-    public Buf writeMediumBE(int value) {
-        checkWrite(woff, 3);
-        setByteAtOffset_BE(seg, woff, (byte) (value >> 16));
-        setByteAtOffset_BE(seg, woff + 1, (byte) (value >> 8 & 0xFF));
-        setByteAtOffset_BE(seg, woff + 2, (byte) (value & 0xFF));
-        woff += 3;
-        return this;
-    }
-
-    @Override
-    public Buf writeMediumBE(int woff, int value) {
-        checkWrite(woff, 3);
-        setByteAtOffset_BE(seg, woff, (byte) (value >> 16));
-        setByteAtOffset_BE(seg, woff + 1, (byte) (value >> 8 & 0xFF));
-        setByteAtOffset_BE(seg, woff + 2, (byte) (value & 0xFF));
         return this;
     }
 
@@ -696,44 +424,6 @@ getByteAtOffset_BE(seg, roff) & 0xFF |
     }
 
     @Override
-    public Buf writeUnsignedMediumLE(int value) {
-        checkWrite(woff, 3);
-        setByteAtOffset_BE(seg, woff, (byte) (value & 0xFF));
-        setByteAtOffset_BE(seg, woff + 1, (byte) (value >> 8 & 0xFF));
-        setByteAtOffset_BE(seg, woff + 2, (byte) (value >> 16 & 0xFF));
-        woff += 3;
-        return this;
-    }
-
-    @Override
-    public Buf writeUnsignedMediumLE(int woff, int value) {
-        checkWrite(woff, 3);
-        setByteAtOffset_BE(seg, woff, (byte) (value & 0xFF));
-        setByteAtOffset_BE(seg, woff + 1, (byte) (value >> 8 & 0xFF));
-        setByteAtOffset_BE(seg, woff + 2, (byte) (value >> 16 & 0xFF));
-        return this;
-    }
-
-    @Override
-    public Buf writeUnsignedMediumBE(int value) {
-        checkWrite(woff, 3);
-        setByteAtOffset_BE(seg, woff, (byte) (value >> 16));
-        setByteAtOffset_BE(seg, woff + 1, (byte) (value >> 8 & 0xFF));
-        setByteAtOffset_BE(seg, woff + 2, (byte) (value & 0xFF));
-        woff += 3;
-        return this;
-    }
-
-    @Override
-    public Buf writeUnsignedMediumBE(int woff, int value) {
-        checkWrite(woff, 3);
-        setByteAtOffset_BE(seg, woff, (byte) (value >> 16));
-        setByteAtOffset_BE(seg, woff + 1, (byte) (value >> 8 & 0xFF));
-        setByteAtOffset_BE(seg, woff + 2, (byte) (value & 0xFF));
-        return this;
-    }
-
-    @Override
     public int readInt() {
         checkRead(roff, Integer.BYTES);
         int value = (isBigEndian? getIntAtOffset_BE(seg, roff) : getIntAtOffset_LE(seg, roff));
@@ -748,34 +438,6 @@ getByteAtOffset_BE(seg, roff) & 0xFF |
     }
 
     @Override
-    public int readIntLE() {
-        checkRead(roff, Integer.BYTES);
-        int value = getIntAtOffset_LE(seg, roff);
-        roff += Integer.BYTES;
-        return value;
-    }
-
-    @Override
-    public int readIntLE(int roff) {
-        checkRead(roff, Integer.BYTES);
-        return getIntAtOffset_LE(seg, roff);
-    }
-
-    @Override
-    public int readIntBE() {
-        checkRead(roff, Integer.BYTES);
-        int value = getIntAtOffset_BE(seg, roff);
-        roff += Integer.BYTES;
-        return value;
-    }
-
-    @Override
-    public int readIntBE(int roff) {
-        checkRead(roff, Integer.BYTES);
-        return getIntAtOffset_BE(seg, roff);
-    }
-
-    @Override
     public long readUnsignedInt() {
         checkRead(roff, Integer.BYTES);
         long value = (isBigEndian? getIntAtOffset_BE(seg, roff) : getIntAtOffset_LE(seg, roff)) & 0xFFFFFFFFL;
@@ -787,34 +449,6 @@ getByteAtOffset_BE(seg, roff) & 0xFF |
     public long readUnsignedInt(int roff) {
         checkRead(roff, Integer.BYTES);
         return (isBigEndian? getIntAtOffset_BE(seg, roff) : getIntAtOffset_LE(seg, roff)) & 0xFFFFFFFFL;
-    }
-
-    @Override
-    public long readUnsignedIntLE() {
-        checkRead(roff, Integer.BYTES);
-        long value = getIntAtOffset_LE(seg, roff) & 0xFFFFFFFFL;
-        roff += Integer.BYTES;
-        return value;
-    }
-
-    @Override
-    public long readUnsignedIntLE(int roff) {
-        checkRead(roff, Integer.BYTES);
-        return getIntAtOffset_LE(seg, roff) & 0xFFFFFFFFL;
-    }
-
-    @Override
-    public long readUnsignedIntBE() {
-        checkRead(roff, Integer.BYTES);
-        long value = getIntAtOffset_BE(seg, roff) & 0xFFFFFFFFL;
-        roff += Integer.BYTES;
-        return value;
-    }
-
-    @Override
-    public long readUnsignedIntBE(int roff) {
-        checkRead(roff, Integer.BYTES);
-        return getIntAtOffset_BE(seg, roff) & 0xFFFFFFFFL;
     }
 
     @Override
@@ -835,32 +469,6 @@ getByteAtOffset_BE(seg, roff) & 0xFF |
         } else {
             setIntAtOffset_LE(seg, woff, value);
         }
-        return this;
-    }
-
-    @Override
-    public Buf writeIntLE(int value) {
-        setIntAtOffset_LE(seg, woff, value);
-        woff += Integer.BYTES;
-        return this;
-    }
-
-    @Override
-    public Buf writeIntLE(int woff, int value) {
-        setIntAtOffset_LE(seg, woff, value);
-        return this;
-    }
-
-    @Override
-    public Buf writeIntBE(int value) {
-        setIntAtOffset_BE(seg, woff, value);
-        woff += Integer.BYTES;
-        return this;
-    }
-
-    @Override
-    public Buf writeIntBE(int woff, int value) {
-        setIntAtOffset_BE(seg, woff, value);
         return this;
     }
 
@@ -886,32 +494,6 @@ getByteAtOffset_BE(seg, roff) & 0xFF |
     }
 
     @Override
-    public Buf writeUnsignedIntLE(long value) {
-        setIntAtOffset_LE(seg, woff, (int) (value & 0xFFFFFFFFL));
-        woff += Integer.BYTES;
-        return this;
-    }
-
-    @Override
-    public Buf writeUnsignedIntLE(int woff, long value) {
-        setIntAtOffset_LE(seg, woff, (int) (value & 0xFFFFFFFFL));
-        return this;
-    }
-
-    @Override
-    public Buf writeUnsignedIntBE(long value) {
-        setIntAtOffset_BE(seg, woff, (int) (value & 0xFFFFFFFFL));
-        woff += Integer.BYTES;
-        return this;
-    }
-
-    @Override
-    public Buf writeUnsignedIntBE(int woff, long value) {
-        setIntAtOffset_BE(seg, woff, (int) (value & 0xFFFFFFFFL));
-        return this;
-    }
-
-    @Override
     public float readFloat() {
         checkRead(roff, Float.BYTES);
         float value = (isBigEndian? getFloatAtOffset_BE(seg, roff) : getFloatAtOffset_LE(seg, roff));
@@ -923,34 +505,6 @@ getByteAtOffset_BE(seg, roff) & 0xFF |
     public float readFloat(int roff) {
         checkRead(roff, Float.BYTES);
         return (isBigEndian? getFloatAtOffset_BE(seg, roff) : getFloatAtOffset_LE(seg, roff));
-    }
-
-    @Override
-    public float readFloatLE() {
-        checkRead(roff, Float.BYTES);
-        float value = getFloatAtOffset_LE(seg, roff);
-        roff += Float.BYTES;
-        return value;
-    }
-
-    @Override
-    public float readFloatLE(int roff) {
-        checkRead(roff, Float.BYTES);
-        return getFloatAtOffset_LE(seg, roff);
-    }
-
-    @Override
-    public float readFloatBE() {
-        checkRead(roff, Float.BYTES);
-        float value = getFloatAtOffset_BE(seg, roff);
-        roff += Float.BYTES;
-        return value;
-    }
-
-    @Override
-    public float readFloatBE(int roff) {
-        checkRead(roff, Float.BYTES);
-        return getFloatAtOffset_BE(seg, roff);
     }
 
     @Override
@@ -975,32 +529,6 @@ getByteAtOffset_BE(seg, roff) & 0xFF |
     }
 
     @Override
-    public Buf writeFloatLE(float value) {
-        setFloatAtOffset_LE(seg, woff, value);
-        woff += Float.BYTES;
-        return this;
-    }
-
-    @Override
-    public Buf writeFloatLE(int woff, float value) {
-        setFloatAtOffset_LE(seg, woff, value);
-        return this;
-    }
-
-    @Override
-    public Buf writeFloatBE(float value) {
-        setFloatAtOffset_BE(seg, woff, value);
-        woff += Float.BYTES;
-        return this;
-    }
-
-    @Override
-    public Buf writeFloatBE(int woff, float value) {
-        setFloatAtOffset_BE(seg, woff, value);
-        return this;
-    }
-
-    @Override
     public long readLong() {
         checkRead(roff, Long.BYTES);
         long value = (isBigEndian? getLongAtOffset_BE(seg, roff) : getLongAtOffset_LE(seg, roff));
@@ -1012,34 +540,6 @@ getByteAtOffset_BE(seg, roff) & 0xFF |
     public long readLong(int roff) {
         checkRead(roff, Long.BYTES);
         return (isBigEndian? getLongAtOffset_BE(seg, roff) : getLongAtOffset_LE(seg, roff));
-    }
-
-    @Override
-    public long readLongLE() {
-        checkRead(roff, Long.BYTES);
-        long value = getLongAtOffset_LE(seg, roff);
-        roff += Long.BYTES;
-        return value;
-    }
-
-    @Override
-    public long readLongLE(int roff) {
-        checkRead(roff, Long.BYTES);
-        return getLongAtOffset_LE(seg, roff);
-    }
-
-    @Override
-    public long readLongBE() {
-        checkRead(roff, Long.BYTES);
-        long value = getLongAtOffset_BE(seg, roff);
-        roff += Long.BYTES;
-        return value;
-    }
-
-    @Override
-    public long readLongBE(int roff) {
-        checkRead(roff, Long.BYTES);
-        return getLongAtOffset_BE(seg, roff);
     }
 
     @Override
@@ -1064,32 +564,6 @@ getByteAtOffset_BE(seg, roff) & 0xFF |
     }
 
     @Override
-    public Buf writeLongLE(long value) {
-        setLongAtOffset_LE(seg, woff, value);
-        woff += Long.BYTES;
-        return this;
-    }
-
-    @Override
-    public Buf writeLongLE(int woff, long value) {
-        setLongAtOffset_LE(seg, woff, value);
-        return this;
-    }
-
-    @Override
-    public Buf writeLongBE(long value) {
-        setLongAtOffset_BE(seg, woff, value);
-        woff += Long.BYTES;
-        return this;
-    }
-
-    @Override
-    public Buf writeLongBE(int woff, long value) {
-        setLongAtOffset_BE(seg, woff, value);
-        return this;
-    }
-
-    @Override
     public double readDouble() {
         checkRead(roff, Double.BYTES);
         double value = (isBigEndian? getDoubleAtOffset_BE(seg, roff) : getDoubleAtOffset_LE(seg, roff));
@@ -1101,34 +575,6 @@ getByteAtOffset_BE(seg, roff) & 0xFF |
     public double readDouble(int roff) {
         checkRead(roff, Double.BYTES);
         return (isBigEndian? getDoubleAtOffset_BE(seg, roff) : getDoubleAtOffset_LE(seg, roff));
-    }
-
-    @Override
-    public double readDoubleLE() {
-        checkRead(roff, Double.BYTES);
-        double value = getDoubleAtOffset_LE(seg, roff);
-        roff += Double.BYTES;
-        return value;
-    }
-
-    @Override
-    public double readDoubleLE(int roff) {
-        checkRead(roff, Double.BYTES);
-        return getDoubleAtOffset_LE(seg, roff);
-    }
-
-    @Override
-    public double readDoubleBE() {
-        checkRead(roff, Double.BYTES);
-        double value = getDoubleAtOffset_BE(seg, roff);
-        roff += Double.BYTES;
-        return value;
-    }
-
-    @Override
-    public double readDoubleBE(int roff) {
-        checkRead(roff, Double.BYTES);
-        return getDoubleAtOffset_BE(seg, roff);
     }
 
     @Override
@@ -1149,32 +595,6 @@ getByteAtOffset_BE(seg, roff) & 0xFF |
         } else {
             setDoubleAtOffset_LE(seg, woff, value);
         }
-        return this;
-    }
-
-    @Override
-    public Buf writeDoubleLE(double value) {
-        setDoubleAtOffset_LE(seg, woff, value);
-        woff += Double.BYTES;
-        return this;
-    }
-
-    @Override
-    public Buf writeDoubleLE(int woff, double value) {
-        setDoubleAtOffset_LE(seg, woff, value);
-        return this;
-    }
-
-    @Override
-    public Buf writeDoubleBE(double value) {
-        setDoubleAtOffset_BE(seg, woff, value);
-        woff += Double.BYTES;
-        return this;
-    }
-
-    @Override
-    public Buf writeDoubleBE(int woff, double value) {
-        setDoubleAtOffset_BE(seg, woff, value);
         return this;
     }
     // </editor-fold>
