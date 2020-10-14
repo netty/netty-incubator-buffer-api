@@ -27,8 +27,12 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.SynchronousQueue;
 
-import static org.hamcrest.Matchers.*;
-import static org.junit.Assert.*;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.containsString;
+import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 public abstract class BufTest {
     protected abstract Allocator createAllocator();
@@ -39,7 +43,11 @@ public abstract class BufTest {
     @Before
     public void setUp() {
         allocator = createAllocator();
-        buf = allocator.allocate(8);
+        buf = allocate(8);
+    }
+
+    protected Buf allocate(int size) {
+        return allocator.allocate(size);
     }
 
     @After
@@ -91,7 +99,7 @@ public abstract class BufTest {
 
     @Test
     public void acquireOnClosedBufferMustThrow() {
-        var buf = allocator.allocate(8);
+        var buf = allocate(8);
         buf.close();
         try {
             buf.acquire();
@@ -112,7 +120,7 @@ public abstract class BufTest {
         });
         executor.shutdown();
 
-        try (Buf buf = allocator.allocate(8)) {
+        try (Buf buf = allocate(8)) {
             buf.writeByte((byte) 42);
             assertTrue(queue.offer(buf.send()));
         }
@@ -131,7 +139,7 @@ public abstract class BufTest {
         });
         executor.shutdown();
 
-        try (Buf buf = allocator.allocate(8)) {
+        try (Buf buf = allocate(8)) {
             assertSame(buf, buf.writeByte((byte) 42));
             queue.put(buf.send());
         }
@@ -142,7 +150,7 @@ public abstract class BufTest {
     @Test
     public void mustThrowWhenAllocatingZeroSizedBuffer() {
         try {
-            allocator.allocate(0);
+            allocate(0);
             fail("Expected to throw an IllegalArgumentException.");
         } catch (IllegalArgumentException ignore) {
         }
@@ -151,7 +159,7 @@ public abstract class BufTest {
     @Test
     public void mustThrowWhenAllocatingNegativeSizedBuffer() {
         try {
-            allocator.allocate(-1);
+            allocate(-1);
             fail("Expected to throw an IllegalArgumentException.");
         } catch (IllegalArgumentException ignore) {
         }
@@ -160,7 +168,7 @@ public abstract class BufTest {
     @Test
     public void mustThrowWhenAllocatingOverSizedBuffer() {
         try {
-            allocator.allocate(Integer.MAX_VALUE);
+            allocate(Integer.MAX_VALUE);
             fail("Expected to throw an IllegalArgumentException.");
         } catch (IllegalArgumentException ignore) {
         }
@@ -169,7 +177,7 @@ public abstract class BufTest {
     @Test
     public void mustAllowAllocatingMaxArraySizedBuffer() {
         try {
-            allocator.allocate(Integer.MAX_VALUE - 8).close();
+            allocate(Integer.MAX_VALUE - 8).close();
         } catch (OutOfMemoryError oome) {
             // Mark test as ignored if this happens.
             throw new AssumptionViolatedException("JVM does not have enough memory for this test.", oome);
@@ -222,14 +230,14 @@ public abstract class BufTest {
     @Test
     public void capacityMustBeAllocatedSize() {
         assertEquals(8, buf.capacity());
-        try (Buf b = allocator.allocate(13)) {
+        try (Buf b = allocate(13)) {
             assertEquals(13, b.capacity());
         }
     }
 
     @Test
     public void fill() {
-        try (Buf buf = allocator.allocate(16)) {
+        try (Buf buf = allocate(16)) {
             assertSame(buf, buf.fill((byte) 0xA5));
             buf.writerIndex(16);
             assertEquals(0xA5A5A5A5_A5A5A5A5L, buf.readLong());
@@ -239,7 +247,7 @@ public abstract class BufTest {
 
     @Test
     public void readerWriterIndexUpdates() {
-        try (Buf buf = allocator.allocate(22)) {
+        try (Buf buf = allocate(22)) {
             assertEquals(0, buf.writerIndex());
             assertSame(buf, buf.writerIndex(1));
             assertEquals(1, buf.writerIndex());
@@ -271,7 +279,7 @@ public abstract class BufTest {
 
     @Test
     public void readAndWriteBoundsChecksWithIndexUpdates() {
-        try (Buf buf = allocator.allocate(8)) {
+        try (Buf buf = allocate(8)) {
             buf.writeLong(0);
 
             buf.readLong(); // Fine.
