@@ -52,12 +52,18 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
     static final Drop<MemSegBuf> SEGMENT_CLOSE = buf -> buf.seg.close();
     final MemorySegment seg;
     private boolean isBigEndian;
+    private boolean isSendable;
     private int roff;
     private int woff;
 
-    MemSegBuf(MemorySegment segment, Drop<MemSegBuf> drop) {
+    MemSegBuf(MemorySegment segmet, Drop<MemSegBuf> drop) {
+        this(segmet, drop, true);
+    }
+
+    private MemSegBuf(MemorySegment segment, Drop<MemSegBuf> drop, boolean isSendable) {
         super(drop);
         seg = segment;
+        this.isSendable = isSendable;
         isBigEndian = ByteOrder.nativeOrder() == ByteOrder.BIG_ENDIAN;
     }
 
@@ -129,6 +135,15 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
         } catch (UnsupportedOperationException e) {
             return 0; // This is a heap segment.
         }
+    }
+
+    @Override
+    public Buf slice(int offset, int length) {
+        var slice = seg.asSlice(offset, length);
+        acquire();
+        Drop<MemSegBuf> drop = b -> close();
+        var sendable = false; // Sending implies ownership change, which we can't do for slices.
+        return new MemSegBuf(slice, drop, sendable).writerIndex(length).order(order());
     }
 
     // ### CODEGEN START primitive accessors implementation
@@ -602,6 +617,10 @@ getByteAtOffset_BE(seg, roff) & 0xFF |
 
     @Override
     protected Owned<MemSegBuf> prepareSend() {
+        if (!isSendable) {
+            throw new IllegalStateException(
+                    "Cannot send() this buffer. This buffer might be a slice of another buffer.");
+        }
         MemSegBuf outer = this;
         boolean isConfined = seg.ownerThread() == null;
         MemorySegment transferSegment = isConfined? seg : seg.withOwnerThread(null);

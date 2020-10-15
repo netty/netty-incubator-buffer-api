@@ -111,6 +111,37 @@ public interface Buf extends Rc<Buf> {
      */
     long getNativeAddress();
 
+    /**
+     * Returns a slice of this buffer's readable bytes.
+     * Modifying the content of the returned buffer or this buffer affects each other's content,
+     * while they maintain separate indexes. This method is identical to
+     * {@code buf.slice(buf.readerIndex(), buf.readableBytes())}.
+     * This method does not modify {@link #readerIndex()} or {@link #writerIndex()} of this buffer.
+     * <p>
+     * This method increments the reference count of this buffer.
+     * The reference count is decremented again when the slice is deallocated.
+     *
+     * @return A new buffer instance, with independent {@link #readerIndex()} and {@link #writerIndex()},
+     * that is a view of the readable region of this buffer.
+     */
+    default Buf slice() {
+        return slice(readerIndex(), readableBytes());
+    }
+
+    /**
+     * Returns a slice of the given region of this buffer.
+     * Modifying the content of the returned buffer or this buffer affects each other's content,
+     * while they maintain separate indexes.
+     * This method does not modify {@link #readerIndex()} or {@link #writerIndex()} of this buffer.
+     * <p>
+     * This method increments the reference count of this buffer.
+     * The reference count is decremented again when the slice is deallocated.
+     *
+     * @return A new buffer instance, with independent {@link #readerIndex()} and {@link #writerIndex()},
+     * that is a view of the given region of this buffer.
+     */
+    Buf slice(int offset, int length);
+
     // ### CODEGEN START primitive accessors interface
     // <editor-fold defaultstate="collapsed" desc="Generated primitive accessors interface.">
 

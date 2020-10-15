@@ -35,6 +35,9 @@ public abstract class RcSupport<I extends Rc<I>, T extends RcSupport<I, T>> impl
         if (acquires < 0) {
             throw new IllegalStateException("Resource is closed.");
         }
+        if (acquires == Integer.MAX_VALUE) {
+            throw new IllegalStateException("Cannot acquire more references; counter would overflow.");
+        }
         acquires++;
         return self();
     }
@@ -49,7 +52,7 @@ public abstract class RcSupport<I extends Rc<I>, T extends RcSupport<I, T>> impl
     @Override
     public final void close() {
         if (acquires == -1) {
-            throw new IllegalStateException("Double-free: Already closed and dropped.");
+            throw new IllegalStateException("Double-free: Resource already closed and dropped.");
         }
         if (acquires == 0) {
             drop.drop(impl());
@@ -64,13 +67,18 @@ public abstract class RcSupport<I extends Rc<I>, T extends RcSupport<I, T>> impl
      * This instance immediately becomes inaccessible, and all attempts at accessing this Rc will throw. Calling {@link
      * #close()} will have no effect, so this method is safe to call within a try-with-resources statement.
      *
-     * @implNote Not possible without hacks because we need the receiving thread in order to set the new owner in the
-     * currently owning thread.
+     * @throws IllegalStateException if this object has any outstanding acquires; that is, if this object has been
+     * {@link #acquire() acquired} more times than it has been {@link #close() closed}.
      */
     @Override
     public final Send<I> send() {
+        if (acquires != 0) {
+            throw new IllegalStateException(
+                    "Cannot send() a reference counted object with " + acquires + " outstanding acquires: " + this);
+        }
+        var owned = prepareSend();
         acquires = -2; // close without dropping (also ignore future double-free attempts)
-        return new TransferSend<I, T>(prepareSend(), drop);
+        return new TransferSend<I, T>(owned, drop);
     }
 
     /**

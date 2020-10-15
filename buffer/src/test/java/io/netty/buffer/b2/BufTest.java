@@ -148,6 +148,22 @@ public abstract class BufTest {
     }
 
     @Test
+    public void sendMustThrowWhenBufIsAcquired() {
+        try (Buf buf = allocate(8)) {
+            try (Buf ignored = buf.acquire()) {
+                try {
+                    buf.send();
+                    fail("Should not be able to send() a borrowed buffer.");
+                } catch (IllegalStateException ignore) {
+                    // Good.
+                }
+            }
+            // Now send() should work again.
+            buf.send().receive().close();
+        }
+    }
+
+    @Test
     public void mustThrowWhenAllocatingZeroSizedBuffer() {
         try {
             allocate(0);
@@ -301,6 +317,193 @@ public abstract class BufTest {
             } catch (IndexOutOfBoundsException ignore) {
                 // Good.
             }
+        }
+    }
+
+    @Test
+    public void sliceWithoutOffsetAndSizeMustReturnReadableRegion() {
+        try (Buf buf = allocate(8)) {
+            for (byte b : new byte[] { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08 }) {
+                buf.writeByte(b);
+            }
+            assertEquals(0x01, buf.readByte());
+            buf.writerIndex(buf.writerIndex() - 1);
+            try (Buf slice = buf.slice()) {
+                assertArrayEquals(new byte[] {0x02, 0x03, 0x04, 0x05, 0x06, 0x07}, slice.copy());
+                assertEquals(0, slice.readerIndex());
+                assertEquals(6, slice.readableBytes());
+                assertEquals(6, slice.writerIndex());
+                assertEquals(6, slice.capacity());
+                assertEquals(0x02, slice.readByte());
+                assertEquals(0x03, slice.readByte());
+                assertEquals(0x04, slice.readByte());
+                assertEquals(0x05, slice.readByte());
+                assertEquals(0x06, slice.readByte());
+                assertEquals(0x07, slice.readByte());
+                try {
+                    slice.readByte();
+                    fail("Should have bounds checked.");
+                } catch (IndexOutOfBoundsException ignore) {
+                    // Good.
+                }
+            }
+        }
+    }
+
+    @Test
+    public void sliceWithOffsetAndSizeMustReturnGivenRegion() {
+        try (Buf buf = allocate(8)) {
+            for (byte b : new byte[] { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08 }) {
+                buf.writeByte(b);
+            }
+            buf.readerIndex(3); // Reader and writer offsets must be ignored.
+            buf.writerIndex(6);
+            try (Buf slice = buf.slice(1, 6)) {
+                assertArrayEquals(new byte[] {0x02, 0x03, 0x04, 0x05, 0x06, 0x07}, slice.copy());
+                assertEquals(0, slice.readerIndex());
+                assertEquals(6, slice.readableBytes());
+                assertEquals(6, slice.writerIndex());
+                assertEquals(6, slice.capacity());
+                assertEquals(0x02, slice.readByte());
+                assertEquals(0x03, slice.readByte());
+                assertEquals(0x04, slice.readByte());
+                assertEquals(0x05, slice.readByte());
+                assertEquals(0x06, slice.readByte());
+                assertEquals(0x07, slice.readByte());
+                try {
+                    slice.readByte();
+                    fail("Should have bounds checked.");
+                } catch (IndexOutOfBoundsException ignore) {
+                    // Good.
+                }
+            }
+        }
+    }
+
+    @Test
+    public void sliceWithoutOffsetAndSizeWillIncreaseReferenceCount() {
+        try (Buf buf = allocate(8)) {
+            try (Buf ignored = buf.slice()) {
+                buf.send();
+                fail("Should have refused send() of acquired buffer.");
+            } catch (IllegalStateException ignore) {
+                // Good.
+            }
+        }
+    }
+
+    @Test
+    public void sliceWithOffsetAndSizeWillIncreaseReferenceCount() {
+        try (Buf buf = allocate(8)) {
+            try (Buf ignored = buf.slice(0, 8)) {
+                buf.send();
+                fail("Should have refused send() of acquired buffer.");
+            } catch (IllegalStateException ignore) {
+                // Good.
+            }
+        }
+    }
+
+    @Test
+    public void sliceWithoutOffsetAndSizeHasSameEndianAsParent() {
+        try (Buf buf = allocate(8)) {
+            buf.order(ByteOrder.BIG_ENDIAN);
+            buf.writeLong(0x0102030405060708L);
+            try (Buf slice = buf.slice()) {
+                assertEquals(0x0102030405060708L, slice.readLong());
+            }
+            buf.order(ByteOrder.LITTLE_ENDIAN);
+            try (Buf slice = buf.slice()) {
+                assertEquals(0x0807060504030201L, slice.readLong());
+            }
+        }
+    }
+
+    @Test
+    public void sliceWithOffsetAndSizeHasSameEndianAsParent() {
+        try (Buf buf = allocate(8)) {
+            buf.order(ByteOrder.BIG_ENDIAN);
+            buf.writeLong(0x0102030405060708L);
+            try (Buf slice = buf.slice(0, 8)) {
+                assertEquals(0x0102030405060708L, slice.readLong());
+            }
+            buf.order(ByteOrder.LITTLE_ENDIAN);
+            try (Buf slice = buf.slice(0, 8)) {
+                assertEquals(0x0807060504030201L, slice.readLong());
+            }
+        }
+    }
+
+    @Test
+    public void sendOnSliceWithoutOffsetAndSizeMustThrow() {
+        try (Buf buf = allocate(8)) {
+            try (Buf slice = buf.slice()) {
+                slice.send();
+                fail("Should not be able to send a slice.");
+            } catch (IllegalStateException ignore) {
+                // Good.
+            }
+            // Verify that the slice is closed properly afterwards.
+            buf.send().receive().close();
+        }
+    }
+
+    @Test
+    public void sendOnSliceWithOffsetAndSizeMustThrow() {
+        try (Buf buf = allocate(8)) {
+            try (Buf slice = buf.slice(0, 8)) {
+                slice.send();
+                fail("Should not be able to send a slice.");
+            } catch (IllegalStateException ignore) {
+                // Good.
+            }
+            // Verify that the slice is closed properly afterwards.
+            buf.send().receive().close();
+        }
+    }
+
+    @Test
+    public void sliceWithNegativeOffsetMustThrow() {
+        try (Buf buf = allocate(8)) {
+            try (Buf ignored = buf.slice(-1, 1)) {
+                fail("Should not allow negative offsets to slice().");
+            } catch (IndexOutOfBoundsException ignore) {
+                // Good.
+            }
+            // Verify that the slice is closed properly afterwards.
+            buf.send().receive().close();
+        }
+    }
+
+    @Test
+    public void sliceWithNegativeSizeMustThrow() {
+        try (Buf buf = allocate(8)) {
+            try (Buf ignored = buf.slice(0, -1)) {
+                fail("Should not allow negative size to slice().");
+            } catch (IndexOutOfBoundsException ignore) {
+                // Good.
+            }
+            // Verify that the slice is closed properly afterwards.
+            buf.send().receive().close();
+        }
+    }
+
+    @Test
+    public void sliceWithSizeGreaterThanCapacityMustThrow() {
+        try (Buf buf = allocate(8)) {
+            try (Buf ignored = buf.slice(0, 9)) {
+                fail("Should not allow slice() size greater than parent capacity.");
+            } catch (IndexOutOfBoundsException ignore) {
+                // Good.
+            }
+            buf.slice(0, 8).close(); // This is still fine.
+            try (Buf ignored = buf.slice(1, 8)) {
+                fail("Should not allow slice() size greater than parent capacity.");
+            } catch (IndexOutOfBoundsException ignore) {
+                // Good.
+            }
+            // Verify that the slice is closed properly afterwards.
+            buf.send().receive().close();
         }
     }
 
