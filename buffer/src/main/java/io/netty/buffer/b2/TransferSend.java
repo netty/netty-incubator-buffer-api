@@ -5,7 +5,7 @@
  * version 2.0 (the "License"); you may not use this file except in compliance
  * with the License. You may obtain a copy of the License at:
  *
- *   http://www.apache.org/licenses/LICENSE-2.0
+ *   https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
@@ -17,8 +17,8 @@ package io.netty.buffer.b2;
 
 import java.lang.invoke.VarHandle;
 
-import static io.netty.buffer.b2.Statics.*;
-import static java.lang.invoke.MethodHandles.*;
+import static io.netty.buffer.b2.Statics.findVarHandle;
+import static java.lang.invoke.MethodHandles.lookup;
 
 class TransferSend<I extends Rc<I>, T extends Rc<I>> implements Send<I> {
     private static final VarHandle RECEIVED = findVarHandle(lookup(), TransferSend.class, "received", boolean.class);
@@ -38,7 +38,7 @@ class TransferSend<I extends Rc<I>, T extends Rc<I>> implements Send<I> {
         if (!RECEIVED.compareAndSet(this, false, true)) {
             throw new IllegalStateException("This object has already been received.");
         }
-        var copy = outgoing.transferOwnership(Thread.currentThread(), drop);
+        var copy = outgoing.transferOwnership(drop);
         drop.accept(copy);
         return (I) copy;
     }

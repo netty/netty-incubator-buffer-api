@@ -5,7 +5,7 @@
  * version 2.0 (the "License"); you may not use this file except in compliance
  * with the License. You may obtain a copy of the License at:
  *
- *   http://www.apache.org/licenses/LICENSE-2.0
+ *   https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
@@ -29,10 +29,9 @@ public interface MemoryManager {
     }
 
     boolean isNative();
-    Buf allocateConfined(long size, Drop<Buf> drop);
-    Buf allocateShared(long size, Drop<Buf> drop);
+    Buf allocateConfined(long size, Drop<Buf> drop, Cleaner cleaner);
+    Buf allocateShared(long size, Drop<Buf> drop, Cleaner cleaner);
     Drop<Buf> drop();
-    void registerCleaner(Buf buf, Cleaner cleaner);
     Object unwrapRecoverableMemory(Buf buf);
     Buf recoverMemory(Object recoverableMemory, Drop<Buf> drop);
 
@@ -41,14 +40,20 @@ public interface MemoryManager {
         public abstract boolean isNative();
 
         @Override
-        public Buf allocateConfined(long size, Drop<Buf> drop) {
+        public Buf allocateConfined(long size, Drop<Buf> drop, Cleaner cleaner) {
             var segment = createSegment(size);
+            if (cleaner != null) {
+                segment = segment.registerCleaner(cleaner);
+            }
             return new MemSegBuf(segment, convert(drop));
         }
 
         @Override
-        public Buf allocateShared(long size, Drop<Buf> drop) {
-            var segment = createSegment(size).withOwnerThread(null);
+        public Buf allocateShared(long size, Drop<Buf> drop, Cleaner cleaner) {
+            var segment = createSegment(size).share();
+            if (cleaner != null) {
+                segment = segment.registerCleaner(cleaner);
+            }
             return new MemSegBuf(segment, convert(drop));
         }
 
@@ -57,12 +62,6 @@ public interface MemoryManager {
         @Override
         public Drop<Buf> drop() {
             return convert(MemSegBuf.SEGMENT_CLOSE);
-        }
-
-        @Override
-        public void registerCleaner(Buf buf, Cleaner cleaner) {
-            var b = (MemSegBuf) buf;
-            b.seg.registerCleaner(cleaner);
         }
 
         @Override
@@ -103,8 +102,8 @@ public interface MemoryManager {
 
         @Override
         protected MemorySegment createSegment(long size) {
-            var segment = MemorySegment.allocateNative(size)
-                                       .withCleanupAction(Statics.getCleanupAction(size));
+            var segment = MemorySegment.allocateNative(size);
+//                                       .withCleanupAction(Statics.getCleanupAction(size));
             Statics.MEM_USAGE_NATIVE.add(size);
             return segment;
         }

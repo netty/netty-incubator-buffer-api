@@ -5,7 +5,7 @@
  * version 2.0 (the "License"); you may not use this file except in compliance
  * with the License. You may obtain a copy of the License at:
  *
- *   http://www.apache.org/licenses/LICENSE-2.0
+ *   https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
@@ -47,14 +47,10 @@ public interface Rc<I extends Rc<I>> extends AutoCloseable {
     void close();
 
     /**
-     * Send this Rc instance to another Thread, transferring the ownership to the recipient. This method can be used
-     * when the receiving thread is not known up front.
+     * Send this Rc instance to another Thread, transferring the ownership to the recipient.
      * <p>
      * This instance immediately becomes inaccessible, and all attempts at accessing this Rc will throw. Calling {@link
      * #close()} will have no effect, so this method is safe to call within a try-with-resources statement.
-     *
-     * @implNote Not possible without hacks because we need the receiving thread in order to set the new owner in the
-     * currently owning thread.
      */
     Send<I> send();
 }

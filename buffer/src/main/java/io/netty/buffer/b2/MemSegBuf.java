@@ -5,7 +5,7 @@
  * version 2.0 (the "License"); you may not use this file except in compliance
  * with the License. You may obtain a copy of the License at:
  *
- *   http://www.apache.org/licenses/LICENSE-2.0
+ *   https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
@@ -52,7 +52,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
     static final Drop<MemSegBuf> SEGMENT_CLOSE = buf -> buf.seg.close();
     final MemorySegment seg;
     private boolean isBigEndian;
-    private boolean isSendable;
+    private final boolean isSendable;
     private int roff;
     private int woff;
 
@@ -105,16 +105,6 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
         checkWrite(index, 0);
         woff = index;
         return this;
-    }
-
-    @Override
-    public int readableBytes() {
-        return writerIndex() - readerIndex();
-    }
-
-    @Override
-    public int writableBytes() {
-        return capacity() - writerIndex();
     }
 
     @Override
@@ -623,11 +613,11 @@ getByteAtOffset_BE(seg, roff) & 0xFF |
         }
         MemSegBuf outer = this;
         boolean isConfined = seg.ownerThread() == null;
-        MemorySegment transferSegment = isConfined? seg : seg.withOwnerThread(null);
+        MemorySegment transferSegment = isConfined? seg : seg.share();
         return new Owned<MemSegBuf>() {
             @Override
-            public MemSegBuf transferOwnership(Thread recipient, Drop<MemSegBuf> drop) {
-                var newSegment = isConfined? transferSegment.withOwnerThread(recipient) : transferSegment;
+            public MemSegBuf transferOwnership(Drop<MemSegBuf> drop) {
+                var newSegment = isConfined? transferSegment.handoff(Thread.currentThread()) : transferSegment;
                 MemSegBuf copy = new MemSegBuf(newSegment, drop);
                 copy.isBigEndian = outer.isBigEndian;
                 copy.roff = outer.roff;

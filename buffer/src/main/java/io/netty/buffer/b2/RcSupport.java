@@ -5,7 +5,7 @@
  * version 2.0 (the "License"); you may not use this file except in compliance
  * with the License. You may obtain a copy of the License at:
  *
- *   http://www.apache.org/licenses/LICENSE-2.0
+ *   https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
@@ -84,7 +84,7 @@ public abstract class RcSupport<I extends Rc<I>, T extends RcSupport<I, T>> impl
     /**
      * Prepare this instance for ownsership transfer. This method is called from {@link #send()} in the sending thread.
      * This method should put this Rc in a deactivated state where it is no longer accessible from the currently owning
-     * thread. In this state, the Rc instance should only allow a call to {@link Owned#transferOwnership(Thread, Drop)} in
+     * thread. In this state, the Rc instance should only allow a call to {@link Owned#transferOwnership(Drop)} in
      * the recipient thread.
      *
      * @return This Rc instance in a deactivated state.
