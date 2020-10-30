@@ -15,6 +15,7 @@
  */
 package io.netty.buffer.b2;
 
+import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
 /**
@@ -190,4 +191,73 @@ public interface Buf extends Rc<Buf>, BufAccessors {
      * that is a view of the given region of this buffer.
      */
     Buf slice(int offset, int length);
+
+    /**
+     * Copies the given length of data from this buffer into the given destination array, beginning at the given source
+     * position in this buffer, and the given destination position in the destination array.
+     * <p>
+     * This method does not read or modify the {@linkplain #writerIndex() write offset} or the
+     * {@linkplain #readerIndex() read offset}.
+     *
+     * @param srcPos The byte offset into this buffer wherefrom the copying should start; the byte at this offset in
+     *              this buffer will be copied to the {@code destPos} index in the {@code dest} array.
+     * @param dest The destination byte array.
+     * @param destPos The index into the {@code dest} array wherefrom the copying should start.
+     * @param length The number of bytes to copy.
+     * @throws NullPointerException if the destination array is null.
+     * @throws IndexOutOfBoundsException if the source or destination positions, or the length, are negative,
+     * or if the resulting end positions reaches beyond the end of either this buffer or the destination array.
+     */
+    void copyInto(int srcPos, byte[] dest, int destPos, int length);
+
+    /**
+     * Copies the given length of data from this buffer into the given destination byte buffer, beginning at the given
+     * source position in this buffer, and the given destination position in the destination byte buffer.
+     * <p>
+     * This method does not read or modify the {@linkplain #writerIndex() write offset} or the
+     * {@linkplain #readerIndex() read offset}, nor is the position of the destination buffer changed.
+     * <p>
+     * The position and limit of the destination byte buffer are also ignored, and do not influence {@code destPos}
+     * or {@code length}.
+     *
+     * @param srcPos The byte offset into this buffer wherefrom the copying should start; the byte at this offset in
+     *              this buffer will be copied to the {@code destPos} index in the {@code dest} array.
+     * @param dest The destination byte buffer.
+     * @param destPos The index into the {@code dest} array wherefrom the copying should start.
+     * @param length The number of bytes to copy.
+     * @throws NullPointerException if the destination array is null.
+     * @throws IndexOutOfBoundsException if the source or destination positions, or the length, are negative,
+     * or if the resulting end positions reaches beyond the end of either this buffer or the destination array.
+     */
+    void copyInto(int srcPos, ByteBuffer dest, int destPos, int length);
+
+    /**
+     * Copies the given length of data from this buffer into the given destination buffer, beginning at the given
+     * source position in this buffer, and the given destination position in the destination buffer.
+     * <p>
+     * This method does not read or modify the {@linkplain #writerIndex() write offset} or the
+     * {@linkplain #readerIndex() read offset} on this buffer, nor on the destination buffer.
+     * <p>
+     * The read and write offsets of the destination buffer are also ignored, and do not influence {@code destPos}
+     * or {@code length}.
+     *
+     * @param srcPos The byte offset into this buffer wherefrom the copying should start; the byte at this offset in
+     *              this buffer will be copied to the {@code destPos} index in the {@code dest} array.
+     * @param dest The destination buffer.
+     * @param destPos The index into the {@code dest} array wherefrom the copying should start.
+     * @param length The number of bytes to copy.
+     * @throws NullPointerException if the destination array is null.
+     * @throws IndexOutOfBoundsException if the source or destination positions, or the length, are negative,
+     * or if the resulting end positions reaches beyond the end of either this buffer or the destination array.
+     */
+    void copyInto(int srcPos, Buf dest, int destPos, int length);
+
+    /**
+     * Resets the {@linkplain #readerIndex() read offset} and the {@linkplain #writerIndex() write offset} on this
+     * buffer to their initial values.
+     */
+    default void reset() {
+        readerIndex(0);
+        writerIndex(0);
+    }
 }

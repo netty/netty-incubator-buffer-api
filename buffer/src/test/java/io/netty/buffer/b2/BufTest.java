@@ -21,12 +21,14 @@ import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
 
+import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.SynchronousQueue;
+import java.util.function.Function;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
@@ -327,6 +329,16 @@ public abstract class BufTest {
     }
 
     @Test
+    public void resetMustSetReaderAndWriterOffsetsToTheirInitialPositions() {
+        try (Buf buf = allocate(8)) {
+            buf.writeInt(0).readShort();
+            buf.reset();
+            assertEquals(0, buf.readerIndex());
+            assertEquals(0, buf.writerIndex());
+        }
+    }
+
+    @Test
     public void sliceWithoutOffsetAndSizeMustReturnReadableRegion() {
         try (Buf buf = allocate(8)) {
             for (byte b : new byte[] { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08 }) {
@@ -517,6 +529,306 @@ public abstract class BufTest {
             assertTrue(buf.isSendable());
         }
     }
+
+    @Test
+    public void copyIntoByteArray() {
+        try (Buf buf = allocate(8)) {
+            buf.order(ByteOrder.BIG_ENDIAN).writeLong(0x0102030405060708L);
+            byte[] array = new byte[8];
+            buf.copyInto(0, array, 0, array.length);
+            assertArrayEquals(new byte[]{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08}, array);
+
+            buf.writerIndex(0).order(ByteOrder.LITTLE_ENDIAN).writeLong(0x0102030405060708L);
+            buf.copyInto(0, array, 0, array.length);
+            assertArrayEquals(new byte[]{0x08, 0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01}, array);
+
+            array = new byte[6];
+            buf.copyInto(1, array, 1, 3);
+            assertArrayEquals(new byte[] {0x00, 0x07, 0x06, 0x05, 0x00, 0x00}, array);
+        }
+    }
+
+    @Test
+    public void copyIntoHeapByteBuffer() {
+        testCopyIntoByteBuffer(ByteBuffer::allocate);
+    }
+
+    @Test
+    public void copyIntoDirectByteBuffer() {
+        testCopyIntoByteBuffer(ByteBuffer::allocateDirect);
+    }
+
+    private void testCopyIntoByteBuffer(Function<Integer, ByteBuffer> bbAlloc) {
+        try (Buf buf = allocate(8)) {
+            buf.order(ByteOrder.BIG_ENDIAN).writeLong(0x0102030405060708L);
+            ByteBuffer buffer = bbAlloc.apply(8);
+            buf.copyInto(0, buffer, 0, buffer.capacity());
+            assertEquals((byte) 0x01, buffer.get());
+            assertEquals((byte) 0x02, buffer.get());
+            assertEquals((byte) 0x03, buffer.get());
+            assertEquals((byte) 0x04, buffer.get());
+            assertEquals((byte) 0x05, buffer.get());
+            assertEquals((byte) 0x06, buffer.get());
+            assertEquals((byte) 0x07, buffer.get());
+            assertEquals((byte) 0x08, buffer.get());
+            buffer.clear();
+
+            buf.writerIndex(0).order(ByteOrder.LITTLE_ENDIAN).writeLong(0x0102030405060708L);
+            buf.copyInto(0, buffer, 0, buffer.capacity());
+            assertEquals((byte) 0x08, buffer.get());
+            assertEquals((byte) 0x07, buffer.get());
+            assertEquals((byte) 0x06, buffer.get());
+            assertEquals((byte) 0x05, buffer.get());
+            assertEquals((byte) 0x04, buffer.get());
+            assertEquals((byte) 0x03, buffer.get());
+            assertEquals((byte) 0x02, buffer.get());
+            assertEquals((byte) 0x01, buffer.get());
+            buffer.clear();
+
+            buffer = bbAlloc.apply(6);
+            buf.copyInto(1, buffer, 1, 3);
+            assertEquals((byte) 0x00, buffer.get());
+            assertEquals((byte) 0x07, buffer.get());
+            assertEquals((byte) 0x06, buffer.get());
+            assertEquals((byte) 0x05, buffer.get());
+            assertEquals((byte) 0x00, buffer.get());
+            assertEquals((byte) 0x00, buffer.get());
+            buffer.clear();
+
+            buffer = bbAlloc.apply(6);
+            buffer.position(3).limit(3);
+            buf.copyInto(1, buffer, 1, 3);
+            assertEquals(3, buffer.position());
+            assertEquals(3, buffer.limit());
+            buffer.clear();
+            assertEquals((byte) 0x00, buffer.get());
+            assertEquals((byte) 0x07, buffer.get());
+            assertEquals((byte) 0x06, buffer.get());
+            assertEquals((byte) 0x05, buffer.get());
+            assertEquals((byte) 0x00, buffer.get());
+            assertEquals((byte) 0x00, buffer.get());
+        }
+    }
+
+    @Test
+    public void copyIntoOnHeapBuf() {
+        testCopyIntoBuf(Allocator.heap()::allocate);
+    }
+
+    @Test
+    public void copyIntoOffHeapBuf() {
+        testCopyIntoBuf(Allocator.direct()::allocate);
+    }
+
+    @Test
+    public void copyIntoOnHeapBufSlice() {
+        try (Scope scope = new Scope()) {
+            testCopyIntoBuf(size -> scope.add(Allocator.heap().allocate(size)).writerIndex(size).slice());
+        }
+    }
+
+    @Test
+    public void copyIntoOffHeapBufSlice() {
+        try (Scope scope = new Scope()) {
+            testCopyIntoBuf(size -> scope.add(Allocator.direct().allocate(size)).writerIndex(size).slice());
+        }
+    }
+
+    @Test
+    public void copyIntoCompositeOnHeapOnHeapBuf() {
+        try (var a = Allocator.heap();
+             var b = Allocator.heap()) {
+            testCopyIntoBuf(size -> {
+                int first = size / 2;
+                int second = size - first;
+                try (var bufFirst = a.allocate(first);
+                     var bufSecond = b.allocate(second)) {
+                    return Buf.compose(bufFirst, bufSecond);
+                }
+            });
+        }
+    }
+
+    @Test
+    public void copyIntoCompositeOnHeapOffHeapBuf() {
+        try (var a = Allocator.heap();
+             var b = Allocator.direct()) {
+            testCopyIntoBuf(size -> {
+                int first = size / 2;
+                int second = size - first;
+                try (var bufFirst = a.allocate(first);
+                     var bufSecond = b.allocate(second)) {
+                    return Buf.compose(bufFirst, bufSecond);
+                }
+            });
+        }
+    }
+
+    @Test
+    public void copyIntoCompositeOffHeapOnHeapBuf() {
+        try (var a = Allocator.direct();
+             var b = Allocator.heap()) {
+            testCopyIntoBuf(size -> {
+                int first = size / 2;
+                int second = size - first;
+                try (var bufFirst = a.allocate(first);
+                     var bufSecond = b.allocate(second)) {
+                    return Buf.compose(bufFirst, bufSecond);
+                }
+            });
+        }
+    }
+
+    @Test
+    public void copyIntoCompositeOffHeapOffHeapBuf() {
+        try (var a = Allocator.direct();
+             var b = Allocator.direct()) {
+            testCopyIntoBuf(size -> {
+                int first = size / 2;
+                int second = size - first;
+                try (var bufFirst = a.allocate(first);
+                     var bufSecond = b.allocate(second)) {
+                    return Buf.compose(bufFirst, bufSecond);
+                }
+            });
+        }
+    }
+
+    @Test
+    public void copyIntoCompositeOnHeapOnHeapBufSlice() {
+        try (var a = Allocator.heap();
+             var b = Allocator.heap();
+             var scope = new Scope()) {
+            testCopyIntoBuf(size -> {
+                int first = size / 2;
+                int second = size - first;
+                try (var bufFirst = a.allocate(first);
+                     var bufSecond = b.allocate(second)) {
+                    return scope.add(Buf.compose(bufFirst, bufSecond)).writerIndex(size).slice();
+                }
+            });
+        }
+    }
+
+    @Test
+    public void copyIntoCompositeOnHeapOffHeapBufSlice() {
+        try (var a = Allocator.heap();
+             var b = Allocator.direct();
+             var scope = new Scope()) {
+            testCopyIntoBuf(size -> {
+                int first = size / 2;
+                int second = size - first;
+                try (var bufFirst = a.allocate(first);
+                     var bufSecond = b.allocate(second)) {
+                    return scope.add(Buf.compose(bufFirst, bufSecond)).writerIndex(size).slice();
+                }
+            });
+        }
+    }
+
+    @Test
+    public void copyIntoCompositeOffHeapOnHeapBufSlice() {
+        try (var a = Allocator.direct();
+             var b = Allocator.heap();
+             var scope = new Scope()) {
+            testCopyIntoBuf(size -> {
+                int first = size / 2;
+                int second = size - first;
+                try (var bufFirst = a.allocate(first);
+                     var bufSecond = b.allocate(second)) {
+                    return scope.add(Buf.compose(bufFirst, bufSecond)).writerIndex(size).slice();
+                }
+            });
+        }
+    }
+
+    @Test
+    public void copyIntoCompositeOffHeapOffHeapBufSlice() {
+        try (var a = Allocator.direct();
+             var b = Allocator.direct();
+             var scope = new Scope()) {
+            testCopyIntoBuf(size -> {
+                int first = size / 2;
+                int second = size - first;
+                try (var bufFirst = a.allocate(first);
+                     var bufSecond = b.allocate(second)) {
+                    return scope.add(Buf.compose(bufFirst, bufSecond)).writerIndex(size).slice();
+                }
+            });
+        }
+    }
+
+    private void testCopyIntoBuf(Function<Integer, Buf> bbAlloc) {
+        try (Buf buf = allocate(8)) {
+            buf.order(ByteOrder.BIG_ENDIAN).writeLong(0x0102030405060708L);
+            Buf buffer = bbAlloc.apply(8);
+            buffer.writerIndex(8);
+            buf.copyInto(0, buffer, 0, buffer.capacity());
+            assertEquals((byte) 0x01, buffer.readByte());
+            assertEquals((byte) 0x02, buffer.readByte());
+            assertEquals((byte) 0x03, buffer.readByte());
+            assertEquals((byte) 0x04, buffer.readByte());
+            assertEquals((byte) 0x05, buffer.readByte());
+            assertEquals((byte) 0x06, buffer.readByte());
+            assertEquals((byte) 0x07, buffer.readByte());
+            assertEquals((byte) 0x08, buffer.readByte());
+            buffer.reset();
+
+            buf.writerIndex(0).order(ByteOrder.LITTLE_ENDIAN).writeLong(0x0102030405060708L);
+            buf.copyInto(0, buffer, 0, buffer.capacity());
+            buffer.writerIndex(8);
+            assertEquals((byte) 0x08, buffer.readByte());
+            assertEquals((byte) 0x07, buffer.readByte());
+            assertEquals((byte) 0x06, buffer.readByte());
+            assertEquals((byte) 0x05, buffer.readByte());
+            assertEquals((byte) 0x04, buffer.readByte());
+            assertEquals((byte) 0x03, buffer.readByte());
+            assertEquals((byte) 0x02, buffer.readByte());
+            assertEquals((byte) 0x01, buffer.readByte());
+            buffer.reset();
+
+            buffer.close();
+            buffer = bbAlloc.apply(6);
+            buf.copyInto(1, buffer, 1, 3);
+            buffer.writerIndex(6);
+            assertEquals((byte) 0x00, buffer.readByte());
+            assertEquals((byte) 0x07, buffer.readByte());
+            assertEquals((byte) 0x06, buffer.readByte());
+            assertEquals((byte) 0x05, buffer.readByte());
+            assertEquals((byte) 0x00, buffer.readByte());
+            assertEquals((byte) 0x00, buffer.readByte());
+
+            buffer.close();
+            buffer = bbAlloc.apply(6);
+            buffer.writerIndex(3).readerIndex(3);
+            buf.copyInto(1, buffer, 1, 3);
+            assertEquals(3, buffer.readerIndex());
+            assertEquals(3, buffer.writerIndex());
+            buffer.reset();
+            buffer.writerIndex(6);
+            assertEquals((byte) 0x00, buffer.readByte());
+            assertEquals((byte) 0x07, buffer.readByte());
+            assertEquals((byte) 0x06, buffer.readByte());
+            assertEquals((byte) 0x05, buffer.readByte());
+            assertEquals((byte) 0x00, buffer.readByte());
+            assertEquals((byte) 0x00, buffer.readByte());
+            buffer.close();
+
+            buf.reset();
+            buf.order(ByteOrder.BIG_ENDIAN).writeLong(0x0102030405060708L);
+            // Testing copyInto for overlapping writes:
+            //
+            //          0x0102030405060708
+            //            └──┬──┬──┘     │
+            //               └─▶└┬───────┘
+            //                   ▼
+            //          0x0102030102030405
+            buf.copyInto(0, buf, 3, 5);
+            assertArrayEquals(new byte[] {0x01, 0x02, 0x03, 0x01, 0x02, 0x03, 0x04, 0x05}, buf.copy());
+        }
+    }
+    // todo resize copying must preserve contents
+    // todo resize sharing
 
     // ### CODEGEN START primitive accessors tests
     // <editor-fold defaultstate="collapsed" desc="Generated primitive accessors tests.">

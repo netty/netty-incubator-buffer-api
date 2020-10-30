@@ -17,6 +17,7 @@ package io.netty.buffer.b2;
 
 import jdk.incubator.foreign.MemorySegment;
 
+import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
 import static jdk.incubator.foreign.MemoryAccess.getByteAtOffset_BE;
@@ -51,8 +52,8 @@ import static jdk.incubator.foreign.MemoryAccess.setShortAtOffset_LE;
 class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
     static final Drop<MemSegBuf> SEGMENT_CLOSE = buf -> buf.seg.close();
     final MemorySegment seg;
-    private boolean isBigEndian;
     private final boolean isSendable;
+    private boolean isBigEndian;
     private int roff;
     private int woff;
 
@@ -134,6 +135,32 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
         Drop<MemSegBuf> drop = b -> close();
         var sendable = false; // Sending implies ownership change, which we can't do for slices.
         return new MemSegBuf(slice, drop, sendable).writerIndex(length).order(order());
+    }
+
+    @Override
+    public void copyInto(int srcPos, byte[] dest, int destPos, int length) {
+        try (var target = MemorySegment.ofArray(dest)) {
+            copyInto(srcPos, target, destPos, length);
+        }
+    }
+
+    @Override
+    public void copyInto(int srcPos, ByteBuffer dest, int destPos, int length) {
+        try (var target = MemorySegment.ofByteBuffer(dest.duplicate().clear())) {
+            copyInto(srcPos, target, destPos, length);
+        }
+    }
+
+    @Override
+    public void copyInto(int srcPos, Buf dest, int destPos, int length) {
+        // todo optimise: specialise for MemSegBuf; use ByteIterator.
+        for (int i = length - 1; i >= 0; i--) { // Iterate in reverse to account for src and dest buffer overlap.
+            dest.writeByte(destPos + i, readByte(srcPos + i));
+        }
+    }
+
+    private void copyInto(int srcPos, MemorySegment dest, int destPos, int length) {
+        dest.asSlice(destPos, length).copyFrom(seg.asSlice(srcPos, length));
     }
 
     // ### CODEGEN START primitive accessors implementation

@@ -15,6 +15,7 @@
  */
 package io.netty.buffer.b2;
 
+import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Arrays;
 
@@ -235,6 +236,58 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
                 }
             }
         }
+    }
+
+    @Override
+    public void copyInto(int srcPos, byte[] dest, int destPos, int length) {
+        copyInto(srcPos, (b, s, d, l) -> b.copyInto(s, dest, d, l), destPos, length);
+    }
+
+    @Override
+    public void copyInto(int srcPos, ByteBuffer dest, int destPos, int length) {
+        copyInto(srcPos, (b, s, d, l) -> b.copyInto(s, dest, d, l), destPos, length);
+    }
+
+    @Override
+    public void copyInto(int srcPos, Buf dest, int destPos, int length) {
+        if (length < 0) {
+            throw new IndexOutOfBoundsException("Length cannot be negative: " + length + '.');
+        }
+        if (srcPos < 0) {
+            throw indexOutOfBounds(srcPos);
+        }
+        if (srcPos + length > capacity) {
+            throw indexOutOfBounds(srcPos + length);
+        }
+        // todo optimise by doing bulk copy via consituent buffers
+        for (int i = length - 1; i >= 0; i--) { // Iterate in reverse to account for src and dest buffer overlap.
+            dest.writeByte(destPos + i, readByte(srcPos + i));
+        }
+    }
+
+    private void copyInto(int srcPos, CopyInto dest, int destPos, int length) {
+        if (length < 0) {
+            throw new IndexOutOfBoundsException("Length cannot be negative: " + length + '.');
+        }
+        if (srcPos < 0) {
+            throw indexOutOfBounds(srcPos);
+        }
+        if (srcPos + length > capacity) {
+            throw indexOutOfBounds(srcPos + length);
+        }
+        while (length > 0) {
+            var buf = (Buf) chooseBuffer(srcPos, 0);
+            int toCopy = buf.capacity() - subOffset;
+            dest.copyInto(buf, subOffset, destPos, toCopy);
+            srcPos += toCopy;
+            destPos += toCopy;
+            length -= toCopy;
+        }
+    }
+
+    @FunctionalInterface
+    private interface CopyInto {
+        void copyInto(Buf src, int srcPos, int destPos, int length);
     }
 
     // <editor-fold defaultstate="collapsed" desc="Primitive accessors.">
