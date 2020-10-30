@@ -36,20 +36,20 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
 
     private final TornBufAccessors tornBufAccessors;
     private final boolean isSendable;
-    private Buf[] bufs;
-    private int[] offsets; // The offset, for the composite buffer, where each constituent buffer starts.
-    private int[] offsetSums; // The cumulative composite buffer offset.
-    private int capacity;
+    private final Buf[] bufs;
+    private final int[] offsets; // The offset, for the composite buffer, where each constituent buffer starts.
+    private final int[] offsetSums; // The cumulative composite buffer offset.
+    private final int capacity;
     private int roff;
     private int woff;
     private int subOffset; // The next offset *within* a consituent buffer to read from or write to.
 
     CompositeBuf(Buf[] bufs) {
-        this(true, bufs.clone()); // Clone prevents external modification of array.
+        this(true, bufs.clone(), COMPOSITE_DROP); // Clone prevents external modification of array.
     }
 
-    private CompositeBuf(boolean isSendable, Buf[] bufs) {
-        super(COMPOSITE_DROP);
+    private CompositeBuf(boolean isSendable, Buf[] bufs, Drop<CompositeBuf> drop) {
+        super(drop);
         this.isSendable = isSendable;
         for (Buf buf : bufs) {
             buf.acquire();
@@ -196,6 +196,11 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
         }
         Buf choice = (Buf) chooseBuffer(offset, 0);
         Buf[] slices = null;
+        acquire(); // Increase reference count of the original composite buffer.
+        Drop<CompositeBuf> drop = obj -> {
+            close(); // Decrement the reference count of the original composite buffer.
+            COMPOSITE_DROP.drop(obj);
+        };
 
         try {
             if (length > 0) {
@@ -216,7 +221,11 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
                 slices = new Buf[] { choice.slice(subOffset, 0) };
             }
 
-            return new CompositeBuf(false, slices).writerIndex(length);
+            return new CompositeBuf(false, slices, drop).writerIndex(length);
+        } catch (Throwable throwable) {
+            // We called acquire prior to the try-clause. We need to undo that if we're not creating a composite buffer:
+            close();
+            throw throwable;
         } finally {
             if (slices != null) {
                 for (Buf slice : slices) {
@@ -496,10 +505,6 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
 
     @Override
     protected Owned<CompositeBuf> prepareSend() {
-        if (!isSendable) {
-            throw new IllegalStateException(
-                    "Cannot send() this buffer. This buffer might be a slice of another buffer.");
-        }
         @SuppressWarnings("unchecked")
         Send<Buf>[] sends = new Send[bufs.length];
         try {
@@ -526,14 +531,26 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
                 for (int i = 0; i < sends.length; i++) {
                     received[i] = sends[i].receive();
                 }
-                var composite = new CompositeBuf(true, received);
+                var composite = new CompositeBuf(true, received, drop);
                 drop.accept(composite);
                 return composite;
             }
         };
     }
 
+    @Override
+    protected IllegalStateException notSendableException() {
+        if (!isSendable) {
+            return new IllegalStateException(
+                    "Cannot send() this buffer. This buffer might be a slice of another buffer.");
+        }
+        return super.notSendableException();
+    }
 
+    @Override
+    public boolean isSendable() {
+        return isSendable && super.isSendable();
+    }
 
     long readPassThrough() {
         var buf = choosePassThroughBuffer(subOffset++);

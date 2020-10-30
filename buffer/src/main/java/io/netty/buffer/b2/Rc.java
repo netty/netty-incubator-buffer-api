@@ -30,7 +30,7 @@ public interface Rc<I extends Rc<I>> extends AutoCloseable {
     /**
      * Increment the reference count.
      * <p>
-     * Note, this method is not thread-safe because Rc's are meant to thread-confined.
+     * Note, this method is not thread-safe because reference counted objects are meant to thread-confined.
      *
      * @return This Rc instance.
      */
@@ -39,7 +39,7 @@ public interface Rc<I extends Rc<I>> extends AutoCloseable {
     /**
      * Decrement the reference count, and despose of the resource if the last reference is closed.
      * <p>
-     * Note, this method is not thread-safe because Rc's are meant to be thread-confined.
+     * Note, this method is not thread-safe because reference counted objects are meant to be thread-confined.
      *
      * @throws IllegalStateException If this Rc has already been closed.
      */
@@ -47,10 +47,25 @@ public interface Rc<I extends Rc<I>> extends AutoCloseable {
     void close();
 
     /**
-     * Send this Rc instance to another Thread, transferring the ownership to the recipient.
+     * Send this reference counted object instance to another Thread, transferring the ownership to the recipient.
      * <p>
-     * This instance immediately becomes inaccessible, and all attempts at accessing this Rc will throw. Calling {@link
-     * #close()} will have no effect, so this method is safe to call within a try-with-resources statement.
+     * Note that the object must be {@linkplain #isSendable() sendable}, and cannot have any outstanding borrows,
+     * when it's being sent.
+     * That is, all previous acquires must have been closed, and {@link #isSendable()} must return {@code true}.
+     * <p>
+     * This instance immediately becomes inaccessible, and all attempts at accessing this reference counted object
+     * will throw. Calling {@link #close()} will have no effect, so this method is safe to call within a
+     * try-with-resources statement.
      */
     Send<I> send();
+
+    /**
+     * Check that this reference counted object is sendable.
+     * <p>
+     * To be sendable, the object must have no outstanding acquires, and no other implementation defined restrictions.
+     *
+     * @return {@code true} if this object can be {@linkplain #send() sent},
+     * or {@code false} if calling {@link #send()} would throw an exception.
+     */
+    boolean isSendable();
 }

@@ -31,6 +31,7 @@ import java.util.concurrent.SynchronousQueue;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
@@ -152,6 +153,7 @@ public abstract class BufTest {
     public void sendMustThrowWhenBufIsAcquired() {
         try (Buf buf = allocate(8)) {
             try (Buf ignored = buf.acquire()) {
+                assertFalse(buf.isSendable());
                 try {
                     buf.send();
                     fail("Should not be able to send() a borrowed buffer.");
@@ -160,6 +162,7 @@ public abstract class BufTest {
                 }
             }
             // Now send() should work again.
+            assertTrue(buf.isSendable());
             buf.send().receive().close();
         }
     }
@@ -387,6 +390,7 @@ public abstract class BufTest {
     public void sliceWithoutOffsetAndSizeWillIncreaseReferenceCount() {
         try (Buf buf = allocate(8)) {
             try (Buf ignored = buf.slice()) {
+                assertFalse(buf.isSendable());
                 buf.send();
                 fail("Should have refused send() of acquired buffer.");
             } catch (IllegalStateException ignore) {
@@ -399,6 +403,7 @@ public abstract class BufTest {
     public void sliceWithOffsetAndSizeWillIncreaseReferenceCount() {
         try (Buf buf = allocate(8)) {
             try (Buf ignored = buf.slice(0, 8)) {
+                assertFalse(buf.isSendable());
                 buf.send();
                 fail("Should have refused send() of acquired buffer.");
             } catch (IllegalStateException ignore) {
@@ -441,12 +446,14 @@ public abstract class BufTest {
     public void sendOnSliceWithoutOffsetAndSizeMustThrow() {
         try (Buf buf = allocate(8)) {
             try (Buf slice = buf.slice()) {
+                assertFalse(buf.isSendable());
                 slice.send();
                 fail("Should not be able to send a slice.");
             } catch (IllegalStateException ignore) {
                 // Good.
             }
             // Verify that the slice is closed properly afterwards.
+            assertTrue(buf.isSendable());
             buf.send().receive().close();
         }
     }
@@ -455,13 +462,14 @@ public abstract class BufTest {
     public void sendOnSliceWithOffsetAndSizeMustThrow() {
         try (Buf buf = allocate(8)) {
             try (Buf slice = buf.slice(0, 8)) {
+                assertFalse(buf.isSendable());
                 slice.send();
                 fail("Should not be able to send a slice.");
             } catch (IllegalStateException ignore) {
                 // Good.
             }
             // Verify that the slice is closed properly afterwards.
-            buf.send().receive().close();
+            assertTrue(buf.isSendable());
         }
     }
 
@@ -474,7 +482,7 @@ public abstract class BufTest {
                 // Good.
             }
             // Verify that the slice is closed properly afterwards.
-            buf.send().receive().close();
+            assertTrue(buf.isSendable());
         }
     }
 
@@ -487,7 +495,7 @@ public abstract class BufTest {
                 // Good.
             }
             // Verify that the slice is closed properly afterwards.
-            buf.send().receive().close();
+            assertTrue(buf.isSendable());
         }
     }
 
@@ -506,7 +514,7 @@ public abstract class BufTest {
                 // Good.
             }
             // Verify that the slice is closed properly afterwards.
-            buf.send().receive().close();
+            assertTrue(buf.isSendable());
         }
     }
 

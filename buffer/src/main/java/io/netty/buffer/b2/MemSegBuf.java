@@ -607,10 +607,6 @@ getByteAtOffset_BE(seg, roff) & 0xFF |
 
     @Override
     protected Owned<MemSegBuf> prepareSend() {
-        if (!isSendable) {
-            throw new IllegalStateException(
-                    "Cannot send() this buffer. This buffer might be a slice of another buffer.");
-        }
         MemSegBuf outer = this;
         boolean isConfined = seg.ownerThread() == null;
         MemorySegment transferSegment = isConfined? seg : seg.share();
@@ -625,6 +621,20 @@ getByteAtOffset_BE(seg, roff) & 0xFF |
                 return copy;
             }
         };
+    }
+
+    @Override
+    protected IllegalStateException notSendableException() {
+        if (!isSendable) {
+            return new IllegalStateException(
+                    "Cannot send() this buffer. This buffer might be a slice of another buffer.");
+        }
+        return super.notSendableException();
+    }
+
+    @Override
+    public boolean isSendable() {
+        return isSendable && super.isSendable();
     }
 
     private void checkRead(int index, int size) {

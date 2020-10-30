@@ -72,13 +72,22 @@ public abstract class RcSupport<I extends Rc<I>, T extends RcSupport<I, T>> impl
      */
     @Override
     public final Send<I> send() {
-        if (acquires != 0) {
-            throw new IllegalStateException(
-                    "Cannot send() a reference counted object with " + acquires + " outstanding acquires: " + this);
+        if (!isSendable()) {
+            throw notSendableException();
         }
         var owned = prepareSend();
         acquires = -2; // close without dropping (also ignore future double-free attempts)
         return new TransferSend<I, T>(owned, drop);
+    }
+
+    protected IllegalStateException notSendableException() {
+        return new IllegalStateException(
+                "Cannot send() a reference counted object with " + acquires + " outstanding acquires: " + this);
+    }
+
+    @Override
+    public boolean isSendable() {
+        return acquires == 0;
     }
 
     /**
