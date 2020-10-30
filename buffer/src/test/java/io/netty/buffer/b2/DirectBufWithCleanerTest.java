@@ -44,7 +44,7 @@ public class DirectBufWithCleanerTest extends DirectBufTest {
         assertThat(sum, lessThan(totalAllocated));
     }
 
-    protected void allocateAndForget(Allocator allocator, long size) {
+    protected void allocateAndForget(Allocator allocator, int size) {
         allocator.allocate(size);
     }
 }

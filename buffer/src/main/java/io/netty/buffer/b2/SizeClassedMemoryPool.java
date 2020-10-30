@@ -36,7 +36,7 @@ class SizeClassedMemoryPool implements Allocator, Drop<Buf> {
     }
 
     @Override
-    public Buf allocate(long size) {
+    public Buf allocate(int size) {
         Allocator.checkSize(size);
         var sizeClassPool = getSizeClassPool(size);
         Send<Buf> send = sizeClassPool.poll();

@@ -43,7 +43,7 @@ public interface Allocator extends AutoCloseable {
      * @param size The size of {@link Buf} to allocate.
      * @return The newly allocated {@link Buf}.
      */
-    Buf allocate(long size);
+    Buf allocate(int size);
 
     /**
      * Allocate a {@link Buf} of the given size in bytes. This method may throw an {@link OutOfMemoryError} if there is
@@ -55,7 +55,7 @@ public interface Allocator extends AutoCloseable {
      * @param order The default byte order used by the accessor methods that don't have an explicit byte order.
      * @return The newly allocated {@link Buf}.
      */
-    default Buf allocate(long size, ByteOrder order) {
+    default Buf allocate(int size, ByteOrder order) {
         return allocate(size).order(order);
     }
 
@@ -71,7 +71,7 @@ public interface Allocator extends AutoCloseable {
         var man = MemoryManager.getHeapMemoryManager();
         return new Allocator() {
             @Override
-            public Buf allocate(long size) {
+            public Buf allocate(int size) {
                 checkSize(size);
                 return man.allocateConfined(size, man.drop(), null);
             }
@@ -82,7 +82,7 @@ public interface Allocator extends AutoCloseable {
         var man = MemoryManager.getNativeMemoryManager();
         return new Allocator() {
             @Override
-            public Buf allocate(long size) {
+            public Buf allocate(int size) {
                 checkSize(size);
                 return man.allocateConfined(size, man.drop(), null);
             }
@@ -93,7 +93,7 @@ public interface Allocator extends AutoCloseable {
         var man = MemoryManager.getNativeMemoryManager();
         return new Allocator() {
             @Override
-            public Buf allocate(long size) {
+            public Buf allocate(int size) {
                 checkSize(size);
                 return man.allocateConfined(size, man.drop(), Statics.CLEANER);
             }

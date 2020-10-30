@@ -47,8 +47,8 @@ public class CompositeBufTest extends BufTest {
                     var b = secondAllocator.get();
                     return new Allocator() {
                         @Override
-                        public Buf allocate(long size) {
-                            long half = size / 2;
+                        public Buf allocate(int size) {
+                            int half = size / 2;
                             try (Buf firstHalf = a.allocate(half);
                                  Buf secondHalf = b.allocate(size - half)) {
                                 return Buf.compose(firstHalf, secondHalf);
