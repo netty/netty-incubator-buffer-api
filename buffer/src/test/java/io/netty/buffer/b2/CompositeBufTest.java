@@ -65,6 +65,29 @@ public class CompositeBufTest extends BufTest {
                 combinations.add(new Object[]{name, allocator});
             }
         }
+
+        // Also add a 3-way composite buffer.
+        String name = "compose(heap,heap,heap)";
+        Supplier<Allocator> allocator = () -> {
+            return new Allocator() {
+                final Allocator alloc = Allocator.heap();
+                @Override
+                public Buf allocate(int size) {
+                    int part = size / 3;
+                    try (Buf a = alloc.allocate(part);
+                         Buf b = alloc.allocate(part);
+                         Buf c = alloc.allocate(size - part * 2)) {
+                        return Buf.compose(a, b, c);
+                    }
+                }
+
+                @Override
+                public void close() {
+                    alloc.close();
+                }
+            };
+        };
+        combinations.add(new Object[]{name, allocator});
         return combinations;
     }
 

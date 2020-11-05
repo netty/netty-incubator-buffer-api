@@ -15,10 +15,14 @@
  */
 package io.netty.buffer.b2;
 
+import io.netty.util.ByteIterator;
+import io.netty.util.ByteProcessor;
+import io.netty.util.internal.PlatformDependent;
 import jdk.incubator.foreign.MemorySegment;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.util.NoSuchElementException;
 
 import static jdk.incubator.foreign.MemoryAccess.getByteAtOffset_BE;
 import static jdk.incubator.foreign.MemoryAccess.getByteAtOffset_LE;
@@ -157,6 +161,55 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
         for (int i = length - 1; i >= 0; i--) { // Iterate in reverse to account for src and dest buffer overlap.
             dest.writeByte(destPos + i, readByte(srcPos + i));
         }
+    }
+
+    @Override
+    public ByteIterator iterate(int fromOffset, int length) {
+        return new ByteIterator() {
+            final MemorySegment segment = seg;
+            int index = fromOffset;
+            final int end = index + length;
+
+            @Override
+            public boolean hasNextLong() {
+                return index + Long.BYTES <= end;
+            }
+
+            @Override
+            public long nextLong() {
+                if (!hasNextLong()) {
+                    throw new NoSuchElementException();
+                }
+                long val = getLongAtOffset_BE(segment, index);
+                index += Long.BYTES;
+                return val;
+            }
+
+            @Override
+            public boolean hasNextByte() {
+                return index < end;
+            }
+
+            @Override
+            public byte nextByte() {
+                if (!hasNextByte()) {
+                    throw new NoSuchElementException();
+                }
+                byte val = getByteAtOffset_BE(segment, index);
+                index++;
+                return val;
+            }
+
+            @Override
+            public int currentOffset() {
+                return index;
+            }
+
+            @Override
+            public int bytesLeft() {
+                return end - index;
+            }
+        };
     }
 
     private void copyInto(int srcPos, MemorySegment dest, int destPos, int length) {

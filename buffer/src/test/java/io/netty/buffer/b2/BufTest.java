@@ -23,6 +23,7 @@ import org.junit.Test;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.util.NoSuchElementException;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -827,6 +828,212 @@ public abstract class BufTest {
             assertArrayEquals(new byte[] {0x01, 0x02, 0x03, 0x01, 0x02, 0x03, 0x04, 0x05}, buf.copy());
         }
     }
+
+    @Test
+    public void readableBytesMustMatchWhatWasWritten() {
+        try (Buf buf = allocate(16)) {
+            buf.writeLong(0);
+            assertEquals(Long.BYTES, buf.readableBytes());
+            buf.readShort();
+            assertEquals(Long.BYTES - Short.BYTES, buf.readableBytes());
+        }
+    }
+
+    @Test
+    public void byteIterationOfBigEndianBuffers() {
+        try (Buf buf = allocate(0x28)) {
+            buf.order(ByteOrder.BIG_ENDIAN); // The byte order should have no impact.
+            checkByteIteration(buf);
+            buf.reset();
+            checkByteIterationOfRegion(buf);
+        }
+    }
+
+    @Test
+    public void byteIterationOfLittleEndianBuffers() {
+        try (Buf buf = allocate(0x28)) {
+            buf.order(ByteOrder.LITTLE_ENDIAN); // The byte order should have no impact.
+            checkByteIteration(buf);
+            buf.reset();
+            checkByteIterationOfRegion(buf);
+        }
+    }
+
+    private static void checkByteIteration(Buf buf) {
+        var itr = buf.iterate();
+        assertFalse(itr.hasNextByte());
+        assertFalse(itr.hasNextLong());
+        assertEquals(0, itr.bytesLeft());
+        try {
+            itr.nextLong();
+            fail("Expected a no such element exception.");
+        } catch (NoSuchElementException ignore) {
+            // Good.
+        }
+        try {
+            itr.nextByte();
+            fail("Expected a no such element exception.");
+        } catch (NoSuchElementException ignore) {
+            // Good.
+        }
+
+        for (int i = 0; i < 0x27; i++) {
+            buf.writeByte((byte) (i + 1));
+        }
+        int roff = buf.readerIndex();
+        int woff = buf.writerIndex();
+        itr = buf.iterate();
+        assertEquals(0x27, itr.bytesLeft());
+        assertTrue(itr.hasNextByte());
+        assertTrue(itr.hasNextLong());
+        assertEquals(0x0102030405060708L, itr.nextLong());
+        assertEquals(0x1F, itr.bytesLeft());
+        assertTrue(itr.hasNextLong());
+        assertEquals(0x090A0B0C0D0E0F10L, itr.nextLong());
+        assertTrue(itr.hasNextLong());
+        assertEquals(0x17, itr.bytesLeft());
+        assertEquals(0x1112131415161718L, itr.nextLong());
+        assertTrue(itr.hasNextLong());
+        assertEquals(0x0F, itr.bytesLeft());
+        assertEquals(0x191A1B1C1D1E1F20L, itr.nextLong());
+        assertFalse(itr.hasNextLong());
+        assertEquals(7, itr.bytesLeft());
+        try {
+            itr.nextLong();
+            fail("Expected a no such element exception.");
+        } catch (NoSuchElementException ignore) {
+            // Good.
+        }
+        assertTrue(itr.hasNextByte());
+        assertEquals((byte) 0x21, itr.nextByte());
+        assertTrue(itr.hasNextByte());
+        assertEquals(6, itr.bytesLeft());
+        assertEquals((byte) 0x22, itr.nextByte());
+        assertTrue(itr.hasNextByte());
+        assertEquals(5, itr.bytesLeft());
+        assertEquals((byte) 0x23, itr.nextByte());
+        assertTrue(itr.hasNextByte());
+        assertEquals(4, itr.bytesLeft());
+        assertEquals((byte) 0x24, itr.nextByte());
+        assertTrue(itr.hasNextByte());
+        assertEquals(3, itr.bytesLeft());
+        assertEquals((byte) 0x25, itr.nextByte());
+        assertTrue(itr.hasNextByte());
+        assertEquals(2, itr.bytesLeft());
+        assertEquals((byte) 0x26, itr.nextByte());
+        assertTrue(itr.hasNextByte());
+        assertEquals(1, itr.bytesLeft());
+        assertEquals((byte) 0x27, itr.nextByte());
+        assertFalse(itr.hasNextByte());
+        assertEquals(0, itr.bytesLeft());
+        try {
+            itr.nextLong();
+            fail("Expected a no such element exception.");
+        } catch (NoSuchElementException ignore) {
+            // Good.
+        }
+        try {
+            itr.nextByte();
+            fail("Expected a no such element exception.");
+        } catch (NoSuchElementException ignore) {
+            // Good.
+        }
+        assertEquals(roff, buf.readerIndex());
+        assertEquals(woff, buf.writerIndex());
+    }
+
+    private static void checkByteIterationOfRegion(Buf buf) {
+        var itr = buf.iterate(1, 0);
+        assertFalse(itr.hasNextByte());
+        assertFalse(itr.hasNextLong());
+        assertEquals(0, itr.bytesLeft());
+        try {
+            itr.nextLong();
+            fail("Expected a no such element exception.");
+        } catch (NoSuchElementException ignore) {
+            // Good.
+        }
+        try {
+            itr.nextByte();
+            fail("Expected a no such element exception.");
+        } catch (NoSuchElementException ignore) {
+            // Good.
+        }
+
+        for (int i = 0; i < 0x27; i++) {
+            buf.writeByte((byte) (i + 1));
+        }
+        int roff = buf.readerIndex();
+        int woff = buf.writerIndex();
+        itr = buf.iterate(buf.readerIndex() + 1, buf.readableBytes() - 2);
+        assertEquals(0x25, itr.bytesLeft());
+        assertTrue(itr.hasNextByte());
+        assertTrue(itr.hasNextLong());
+        assertEquals(0x0203040506070809L, itr.nextLong());
+        assertEquals(0x1D, itr.bytesLeft());
+        assertTrue(itr.hasNextLong());
+        assertEquals(0x0A0B0C0D0E0F1011L, itr.nextLong());
+        assertTrue(itr.hasNextLong());
+        assertEquals(0x15, itr.bytesLeft());
+        assertEquals(0x1213141516171819L, itr.nextLong());
+        assertTrue(itr.hasNextLong());
+        assertEquals(0x0D, itr.bytesLeft());
+        assertEquals(0x1A1B1C1D1E1F2021L, itr.nextLong());
+        assertFalse(itr.hasNextLong());
+        assertEquals(5, itr.bytesLeft());
+        try {
+            itr.nextLong();
+            fail("Expected a no such element exception.");
+        } catch (NoSuchElementException ignore) {
+            // Good.
+        }
+        assertTrue(itr.hasNextByte());
+        assertEquals((byte) 0x22, itr.nextByte());
+        assertTrue(itr.hasNextByte());
+        assertEquals(4, itr.bytesLeft());
+        assertEquals((byte) 0x23, itr.nextByte());
+        assertTrue(itr.hasNextByte());
+        assertEquals(3, itr.bytesLeft());
+        assertEquals((byte) 0x24, itr.nextByte());
+        assertTrue(itr.hasNextByte());
+        assertEquals(2, itr.bytesLeft());
+        assertEquals((byte) 0x25, itr.nextByte());
+        assertTrue(itr.hasNextByte());
+        assertEquals(1, itr.bytesLeft());
+        assertEquals((byte) 0x26, itr.nextByte());
+        assertFalse(itr.hasNextByte());
+        assertEquals(0, itr.bytesLeft());
+        try {
+            itr.nextLong();
+            fail("Expected a no such element exception.");
+        } catch (NoSuchElementException ignore) {
+            // Good.
+        }
+        try {
+            itr.nextByte();
+            fail("Expected a no such element exception.");
+        } catch (NoSuchElementException ignore) {
+            // Good.
+        }
+
+        itr = buf.iterate(buf.readerIndex() + 1, 2);
+        assertEquals(2, itr.bytesLeft());
+        assertTrue(itr.hasNextByte());
+        assertFalse(itr.hasNextLong());
+        assertEquals((byte) 0x02, itr.nextByte());
+        assertEquals(1, itr.bytesLeft());
+        assertTrue(itr.hasNextByte());
+        assertFalse(itr.hasNextLong());
+        assertEquals((byte) 0x03, itr.nextByte());
+        assertEquals(0, itr.bytesLeft());
+        assertFalse(itr.hasNextByte());
+        assertFalse(itr.hasNextLong());
+        assertEquals(roff, buf.readerIndex());
+        assertEquals(woff, buf.writerIndex());
+    }
+    // todo reverse iteration
+    // todo reverse iteration of region
+
     // todo resize copying must preserve contents
     // todo resize sharing
 

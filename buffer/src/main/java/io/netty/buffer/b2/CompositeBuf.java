@@ -15,9 +15,12 @@
  */
 package io.netty.buffer.b2;
 
+import io.netty.util.ByteIterator;
+
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Arrays;
+import java.util.NoSuchElementException;
 
 final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
     /**
@@ -39,7 +42,6 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
     private final boolean isSendable;
     private final Buf[] bufs;
     private final int[] offsets; // The offset, for the composite buffer, where each constituent buffer starts.
-    private final int[] offsetSums; // The cumulative composite buffer offset.
     private final int capacity;
     private int roff;
     private int woff;
@@ -92,11 +94,9 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
                     "The given buffers place the read offset ahead of the write offset: " + Arrays.toString(bufs) + '.';
         }
         offsets = new int[bufs.length];
-        offsetSums = new int[bufs.length];
         long cap = 0;
         for (int i = 0; i < bufs.length; i++) {
             offsets[i] = (int) cap;
-            offsetSums[i] = (int) (cap + (i == 0? 0 : offsets[i - 1]));
             cap += bufs[i].capacity();
         }
         if (cap > MAX_CAPACITY) {
@@ -263,6 +263,80 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
         for (int i = length - 1; i >= 0; i--) { // Iterate in reverse to account for src and dest buffer overlap.
             dest.writeByte(destPos + i, readByte(srcPos + i));
         }
+    }
+
+    @Override
+    public ByteIterator iterate(int fromOffset, int length) {
+        int startBufferIndex = searchOffsets(fromOffset);
+        int off = fromOffset - offsets[startBufferIndex];
+        Buf startBuf = bufs[startBufferIndex];
+        ByteIterator startIterator = startBuf.iterate(off, Math.min(startBuf.capacity() - off, length));
+        return new ByteIterator() {
+            int index = fromOffset;
+            final int end = fromOffset + length;
+            int bufferIndex = startBufferIndex;
+            ByteIterator itr = startIterator;
+
+            @Override
+            public boolean hasNextLong() {
+                return bytesLeft() >= Long.BYTES;
+            }
+
+            @Override
+            public long nextLong() {
+                if (itr.hasNextLong()) {
+                    long val = itr.nextLong();
+                    index += Long.BYTES;
+                    return val;
+                }
+                if (!hasNextLong()) {
+                    throw new NoSuchElementException();
+                }
+                return nextLongFromBytes(); // Leave index increments to 'nextByte'
+            }
+
+            private long nextLongFromBytes() {
+                long val = 0;
+                for (int i = 0; i < 8; i++) {
+                    val <<= 8;
+                    val |= nextByte();
+                }
+                return val;
+            }
+
+            @Override
+            public boolean hasNextByte() {
+                return index < end;
+            }
+
+            @Override
+            public byte nextByte() {
+                if (itr.hasNextByte()) {
+                    byte val = itr.nextByte();
+                    index++;
+                    return val;
+                }
+                if (!hasNextByte()) {
+                    throw new NoSuchElementException();
+                }
+                bufferIndex++;
+                Buf nextBuf = bufs[bufferIndex];
+                itr = nextBuf.iterate(0, Math.min(nextBuf.capacity(), bytesLeft()));
+                byte val = itr.nextByte();
+                index++;
+                return val;
+            }
+
+            @Override
+            public int currentOffset() {
+                return index;
+            }
+
+            @Override
+            public int bytesLeft() {
+                return end - index;
+            }
+        };
     }
 
     private void copyInto(int srcPos, CopyInto dest, int destPos, int length) {
@@ -676,7 +750,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
             // In that case it should not matter what buffer is returned, because it shouldn't be used anyway.
             return null;
         }
-        int off = index - offsetSums[i];
+        int off = index - offsets[i];
         Buf candidate = bufs[i];
         if (off + size <= candidate.capacity()) {
             subOffset = off;
@@ -696,6 +770,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
         return i < 0? -(i+2) : i;
     }
 
+    // <editor-fold defaultstate="collapsed" desc="Torn buffer access.">
     private static final class TornBufAccessors implements BufAccessors {
         private final CompositeBuf buf;
 
@@ -1191,4 +1266,5 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
             buf.writePassThrough(woff, value);
         }
     }
+    // </editor-fold>
 }

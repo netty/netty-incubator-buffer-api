@@ -15,6 +15,8 @@
  */
 package io.netty.buffer.b2;
 
+import io.netty.util.ByteIterator;
+
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
@@ -260,4 +262,20 @@ public interface Buf extends Rc<Buf>, BufAccessors {
         readerIndex(0);
         writerIndex(0);
     }
+
+    /**
+     * Iterate the readable bytes of this buffer. The {@linkplain #readerIndex() reader offset} and
+     * {@linkplain #writerIndex() witer offset} are not modified by the iterator.
+     *
+     * Care should be taken to ensure that the buffers lifetime extends beyond the iteration, and the
+     * {@linkplain #readerIndex() reader offset} and {@linkplain #writerIndex() writer offset} are not modified while
+     * the iteration takes place. Otherwise unpredictable behaviour might result.
+     *
+     * @return A {@link ByteIterator} for the readable bytes of this buffer.
+     */
+    default ByteIterator iterate() {
+        return iterate(readerIndex(), readableBytes());
+    }
+
+    ByteIterator iterate(int fromOffset, int length);
 }
