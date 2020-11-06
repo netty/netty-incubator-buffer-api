@@ -248,6 +248,31 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
         copyInto(srcPos, (b, s, d, l) -> b.copyInto(s, dest, d, l), destPos, length);
     }
 
+    private void copyInto(int srcPos, CopyInto dest, int destPos, int length) {
+        if (length < 0) {
+            throw new IndexOutOfBoundsException("Length cannot be negative: " + length + '.');
+        }
+        if (srcPos < 0) {
+            throw indexOutOfBounds(srcPos);
+        }
+        if (srcPos + length > capacity) {
+            throw indexOutOfBounds(srcPos + length);
+        }
+        while (length > 0) {
+            var buf = (Buf) chooseBuffer(srcPos, 0);
+            int toCopy = buf.capacity() - subOffset;
+            dest.copyInto(buf, subOffset, destPos, toCopy);
+            srcPos += toCopy;
+            destPos += toCopy;
+            length -= toCopy;
+        }
+    }
+
+    @FunctionalInterface
+    private interface CopyInto {
+        void copyInto(Buf src, int srcPos, int destPos, int length);
+    }
+
     @Override
     public void copyInto(int srcPos, Buf dest, int destPos, int length) {
         if (length < 0) {
@@ -259,14 +284,39 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
         if (srcPos + length > capacity) {
             throw indexOutOfBounds(srcPos + length);
         }
-        // todo optimise by doing bulk copy via consituent buffers
-        for (int i = length - 1; i >= 0; i--) { // Iterate in reverse to account for src and dest buffer overlap.
-            dest.writeByte(destPos + i, readByte(srcPos + i));
+
+        // Iterate in reverse to account for src and dest buffer overlap.
+        // todo optimise by delegating to constituent buffers.
+        var itr = iterateReverse(srcPos + length - 1, length);
+        ByteOrder prevOrder = dest.order();
+        // We read longs in BE, in reverse, so they need to be flipped for writing.
+        dest.order(ByteOrder.LITTLE_ENDIAN);
+        try {
+            while (itr.hasNextLong()) {
+                long val = itr.nextLong();
+                length -= Long.BYTES;
+                dest.writeLong(destPos + length, val);
+            }
+            while (itr.hasNextByte()) {
+                dest.writeByte(destPos + --length, itr.nextByte());
+            }
+        } finally {
+            dest.order(prevOrder);
         }
     }
 
     @Override
     public ByteIterator iterate(int fromOffset, int length) {
+        if (fromOffset < 0) {
+            throw new IllegalArgumentException("The fromOffset cannot be negative: " + fromOffset + '.');
+        }
+        if (length < 0) {
+            throw new IllegalArgumentException("The length cannot be negative: " + length + '.');
+        }
+        if (capacity < fromOffset + length) {
+            throw new IllegalArgumentException("The fromOffset+length is beyond the end of the buffer: " +
+                                               "fromOffset=" + fromOffset + ", length=" + length + '.');
+        }
         int startBufferIndex = searchOffsets(fromOffset);
         int off = fromOffset - offsets[startBufferIndex];
         Buf startBuf = bufs[startBufferIndex];
@@ -339,29 +389,87 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
         };
     }
 
-    private void copyInto(int srcPos, CopyInto dest, int destPos, int length) {
+    @Override
+    public ByteIterator iterateReverse(int fromOffset, int length) {
+        if (fromOffset < 0) {
+            throw new IllegalArgumentException("The fromOffset cannot be negative: " + fromOffset + '.');
+        }
         if (length < 0) {
-            throw new IndexOutOfBoundsException("Length cannot be negative: " + length + '.');
+            throw new IllegalArgumentException("The length cannot be negative: " + length + '.');
         }
-        if (srcPos < 0) {
-            throw indexOutOfBounds(srcPos);
+        if (fromOffset - length < -1) {
+            throw new IllegalArgumentException("The fromOffset-length would underflow the buffer: " +
+                                               "fromOffset=" + fromOffset + ", length=" + length + '.');
         }
-        if (srcPos + length > capacity) {
-            throw indexOutOfBounds(srcPos + length);
-        }
-        while (length > 0) {
-            var buf = (Buf) chooseBuffer(srcPos, 0);
-            int toCopy = buf.capacity() - subOffset;
-            dest.copyInto(buf, subOffset, destPos, toCopy);
-            srcPos += toCopy;
-            destPos += toCopy;
-            length -= toCopy;
-        }
-    }
+        int startBufferIndex = searchOffsets(fromOffset);
+        int off = fromOffset - offsets[startBufferIndex];
+        Buf startBuf = bufs[startBufferIndex];
+        ByteIterator startIterator = startBuf.iterateReverse(off, Math.min(off + 1, length));
+        return new ByteIterator() {
+            int index = fromOffset;
+            final int end = fromOffset - length;
+            int bufferIndex = startBufferIndex;
+            ByteIterator itr = startIterator;
 
-    @FunctionalInterface
-    private interface CopyInto {
-        void copyInto(Buf src, int srcPos, int destPos, int length);
+            @Override
+            public boolean hasNextLong() {
+                return bytesLeft() >= Long.BYTES;
+            }
+
+            @Override
+            public long nextLong() {
+                if (itr.hasNextLong()) {
+                    index -= Long.BYTES;
+                    return itr.nextLong();
+                }
+                if (!hasNextLong()) {
+                    throw new NoSuchElementException();
+                }
+                return nextLongFromBytes(); // Leave index increments to 'nextByte'
+            }
+
+            private long nextLongFromBytes() {
+                long val = 0;
+                for (int i = 0; i < 8; i++) {
+                    val <<= 8;
+                    val |= nextByte();
+                }
+                return val;
+            }
+
+            @Override
+            public boolean hasNextByte() {
+                return index > end;
+            }
+
+            @Override
+            public byte nextByte() {
+                if (itr.hasNextByte()) {
+                    byte val = itr.nextByte();
+                    index--;
+                    return val;
+                }
+                if (!hasNextByte()) {
+                    throw new NoSuchElementException();
+                }
+                bufferIndex--;
+                Buf nextBuf = bufs[bufferIndex];
+                itr = nextBuf.iterateReverse(nextBuf.capacity() - 1, Math.min(nextBuf.capacity(), bytesLeft()));
+                byte val = itr.nextByte();
+                index--;
+                return val;
+            }
+
+            @Override
+            public int currentOffset() {
+                return index;
+            }
+
+            @Override
+            public int bytesLeft() {
+                return index - end;
+            }
+        };
     }
 
     // <editor-fold defaultstate="collapsed" desc="Primitive accessors.">

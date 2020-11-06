@@ -943,6 +943,37 @@ public abstract class BufTest {
     }
 
     private static void checkByteIterationOfRegion(Buf buf) {
+        try {
+            buf.iterate(-1, 1);
+            fail("Should throw on negative offset.");
+        } catch (IllegalArgumentException ignore) {
+            // Good.
+        }
+        try {
+            buf.iterate(1, -1);
+            fail("Should throw on negative length.");
+        } catch (IllegalArgumentException ignore) {
+            // Good.
+        }
+        try {
+            buf.iterate(buf.capacity(), 1);
+            fail("Should throw on offset overflow.");
+        } catch (IllegalArgumentException ignore) {
+            // Good.
+        }
+        try {
+            buf.iterate(buf.capacity() - 1, 2);
+            fail("Should throw on offset + length overflow.");
+        } catch (IllegalArgumentException ignore) {
+            // Good.
+        }
+        try {
+            buf.iterate(buf.capacity() - 2, 3);
+            fail("Should throw on offset + length overflow.");
+        } catch (IllegalArgumentException ignore) {
+            // Good.
+        }
+
         var itr = buf.iterate(1, 0);
         assertFalse(itr.hasNextByte());
         assertFalse(itr.hasNextLong());
@@ -1031,8 +1062,230 @@ public abstract class BufTest {
         assertEquals(roff, buf.readerIndex());
         assertEquals(woff, buf.writerIndex());
     }
-    // todo reverse iteration
-    // todo reverse iteration of region
+
+    @Test
+    public void reverseByteIterationOfBigEndianBuffers() {
+        try (Buf buf = allocate(0x28)) {
+            buf.order(ByteOrder.BIG_ENDIAN); // The byte order should have no impact.
+            checkReverseByteIteration(buf);
+            buf.reset();
+            checkReverseByteIterationOfRegion(buf);
+        }
+    }
+
+    @Test
+    public void reverseByteIterationOfLittleEndianBuffers() {
+        try (Buf buf = allocate(0x28)) {
+            buf.order(ByteOrder.LITTLE_ENDIAN); // The byte order should have no impact.
+            checkReverseByteIteration(buf);
+            buf.reset();
+            checkReverseByteIterationOfRegion(buf);
+        }
+    }
+
+    private static void checkReverseByteIteration(Buf buf) {
+        var itr = buf.iterateReverse();
+        assertFalse(itr.hasNextByte());
+        assertFalse(itr.hasNextLong());
+        assertEquals(0, itr.bytesLeft());
+        try {
+            itr.nextLong();
+            fail("Expected a no such element exception.");
+        } catch (NoSuchElementException ignore) {
+            // Good.
+        }
+        try {
+            itr.nextByte();
+            fail("Expected a no such element exception.");
+        } catch (NoSuchElementException ignore) {
+            // Good.
+        }
+
+        for (int i = 0; i < 0x27; i++) {
+            buf.writeByte((byte) (i + 1));
+        }
+        int roff = buf.readerIndex();
+        int woff = buf.writerIndex();
+        itr = buf.iterateReverse();
+        assertEquals(0x27, itr.bytesLeft());
+        assertTrue(itr.hasNextByte());
+        assertTrue(itr.hasNextLong());
+        assertEquals(0x2726252423222120L, itr.nextLong());
+        assertEquals(0x1F, itr.bytesLeft());
+        assertTrue(itr.hasNextLong());
+        assertEquals(0x1F1E1D1C1B1A1918L, itr.nextLong());
+        assertTrue(itr.hasNextLong());
+        assertEquals(0x17, itr.bytesLeft());
+        assertEquals(0x1716151413121110L, itr.nextLong());
+        assertTrue(itr.hasNextLong());
+        assertEquals(0x0F, itr.bytesLeft());
+        assertEquals(0x0F0E0D0C0B0A0908L, itr.nextLong());
+        assertFalse(itr.hasNextLong());
+        assertEquals(7, itr.bytesLeft());
+        try {
+            itr.nextLong();
+            fail("Expected a no such element exception.");
+        } catch (NoSuchElementException ignore) {
+            // Good.
+        }
+        assertTrue(itr.hasNextByte());
+        assertEquals((byte) 0x07, itr.nextByte());
+        assertTrue(itr.hasNextByte());
+        assertEquals(6, itr.bytesLeft());
+        assertEquals((byte) 0x06, itr.nextByte());
+        assertTrue(itr.hasNextByte());
+        assertEquals(5, itr.bytesLeft());
+        assertEquals((byte) 0x05, itr.nextByte());
+        assertTrue(itr.hasNextByte());
+        assertEquals(4, itr.bytesLeft());
+        assertEquals((byte) 0x04, itr.nextByte());
+        assertTrue(itr.hasNextByte());
+        assertEquals(3, itr.bytesLeft());
+        assertEquals((byte) 0x03, itr.nextByte());
+        assertTrue(itr.hasNextByte());
+        assertEquals(2, itr.bytesLeft());
+        assertEquals((byte) 0x02, itr.nextByte());
+        assertTrue(itr.hasNextByte());
+        assertEquals(1, itr.bytesLeft());
+        assertEquals((byte) 0x01, itr.nextByte());
+        assertFalse(itr.hasNextByte());
+        assertEquals(0, itr.bytesLeft());
+        try {
+            itr.nextLong();
+            fail("Expected a no such element exception.");
+        } catch (NoSuchElementException ignore) {
+            // Good.
+        }
+        try {
+            itr.nextByte();
+            fail("Expected a no such element exception.");
+        } catch (NoSuchElementException ignore) {
+            // Good.
+        }
+        assertEquals(roff, buf.readerIndex());
+        assertEquals(woff, buf.writerIndex());
+    }
+
+    private static void checkReverseByteIterationOfRegion(Buf buf) {
+        try {
+            buf.iterateReverse(-1, 0);
+            fail("Should throw on negative offset.");
+        } catch (IllegalArgumentException ignore) {
+            // Good.
+        }
+        try {
+            buf.iterateReverse(0, -1);
+            fail("Should throw on negative length.");
+        } catch (IllegalArgumentException ignore) {
+            // Good.
+        }
+        try {
+            buf.iterateReverse(0, 2);
+            fail("Should throw on offset + length underflow.");
+        } catch (IllegalArgumentException ignore) {
+            // Good.
+        }
+        try {
+            buf.iterateReverse(1, 3);
+            fail("Should throw on offset + length underflow.");
+        } catch (IllegalArgumentException ignore) {
+            // Good.
+        }
+        try {
+            buf.iterateReverse(buf.capacity(), 0);
+            fail("Should throw on offset overflow.");
+        } catch (IllegalArgumentException ignore) {
+            // Good.
+        }
+
+        var itr = buf.iterateReverse(1, 0);
+        assertFalse(itr.hasNextByte());
+        assertFalse(itr.hasNextLong());
+        assertEquals(0, itr.bytesLeft());
+        try {
+            itr.nextLong();
+            fail("Expected a no such element exception.");
+        } catch (NoSuchElementException ignore) {
+            // Good.
+        }
+        try {
+            itr.nextByte();
+            fail("Expected a no such element exception.");
+        } catch (NoSuchElementException ignore) {
+            // Good.
+        }
+
+        for (int i = 0; i < 0x27; i++) {
+            buf.writeByte((byte) (i + 1));
+        }
+        int roff = buf.readerIndex();
+        int woff = buf.writerIndex();
+        itr = buf.iterateReverse(buf.writerIndex() - 2, buf.readableBytes() - 2);
+        assertEquals(0x25, itr.bytesLeft());
+        assertTrue(itr.hasNextByte());
+        assertTrue(itr.hasNextLong());
+        assertEquals(0x262524232221201FL, itr.nextLong());
+        assertEquals(0x1D, itr.bytesLeft());
+        assertTrue(itr.hasNextLong());
+        assertEquals(0x1E1D1C1B1A191817L, itr.nextLong());
+        assertTrue(itr.hasNextLong());
+        assertEquals(0x15, itr.bytesLeft());
+        assertEquals(0x161514131211100FL, itr.nextLong());
+        assertTrue(itr.hasNextLong());
+        assertEquals(0x0D, itr.bytesLeft());
+        assertEquals(0x0E0D0C0B0A090807L, itr.nextLong());
+        assertFalse(itr.hasNextLong());
+        assertEquals(5, itr.bytesLeft());
+        try {
+            itr.nextLong();
+            fail("Expected a no such element exception.");
+        } catch (NoSuchElementException ignore) {
+            // Good.
+        }
+        assertTrue(itr.hasNextByte());
+        assertEquals((byte) 0x06, itr.nextByte());
+        assertTrue(itr.hasNextByte());
+        assertEquals(4, itr.bytesLeft());
+        assertEquals((byte) 0x05, itr.nextByte());
+        assertTrue(itr.hasNextByte());
+        assertEquals(3, itr.bytesLeft());
+        assertEquals((byte) 0x04, itr.nextByte());
+        assertTrue(itr.hasNextByte());
+        assertEquals(2, itr.bytesLeft());
+        assertEquals((byte) 0x03, itr.nextByte());
+        assertTrue(itr.hasNextByte());
+        assertEquals(1, itr.bytesLeft());
+        assertEquals((byte) 0x02, itr.nextByte());
+        assertFalse(itr.hasNextByte());
+        assertEquals(0, itr.bytesLeft());
+        try {
+            itr.nextLong();
+            fail("Expected a no such element exception.");
+        } catch (NoSuchElementException ignore) {
+            // Good.
+        }
+        try {
+            itr.nextByte();
+            fail("Expected a no such element exception.");
+        } catch (NoSuchElementException ignore) {
+            // Good.
+        }
+
+        itr = buf.iterateReverse(buf.readerIndex() + 2, 2);
+        assertEquals(2, itr.bytesLeft());
+        assertTrue(itr.hasNextByte());
+        assertFalse(itr.hasNextLong());
+        assertEquals((byte) 0x03, itr.nextByte());
+        assertEquals(1, itr.bytesLeft());
+        assertTrue(itr.hasNextByte());
+        assertFalse(itr.hasNextLong());
+        assertEquals((byte) 0x02, itr.nextByte());
+        assertEquals(0, itr.bytesLeft());
+        assertFalse(itr.hasNextByte());
+        assertFalse(itr.hasNextLong());
+        assertEquals(roff, buf.readerIndex());
+        assertEquals(woff, buf.writerIndex());
+    }
 
     // todo resize copying must preserve contents
     // todo resize sharing

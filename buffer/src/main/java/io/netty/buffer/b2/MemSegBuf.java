@@ -16,8 +16,6 @@
 package io.netty.buffer.b2;
 
 import io.netty.util.ByteIterator;
-import io.netty.util.ByteProcessor;
-import io.netty.util.internal.PlatformDependent;
 import jdk.incubator.foreign.MemorySegment;
 
 import java.nio.ByteBuffer;
@@ -155,16 +153,44 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
         }
     }
 
+    private void copyInto(int srcPos, MemorySegment dest, int destPos, int length) {
+        dest.asSlice(destPos, length).copyFrom(seg.asSlice(srcPos, length));
+    }
+
     @Override
     public void copyInto(int srcPos, Buf dest, int destPos, int length) {
-        // todo optimise: specialise for MemSegBuf; use ByteIterator.
-        for (int i = length - 1; i >= 0; i--) { // Iterate in reverse to account for src and dest buffer overlap.
-            dest.writeByte(destPos + i, readByte(srcPos + i));
+        // todo optimise: specialise for MemSegBuf.
+        // Iterate in reverse to account for src and dest buffer overlap.
+        var itr = iterateReverse(srcPos + length - 1, length);
+        ByteOrder prevOrder = dest.order();
+        // We read longs in BE, in reverse, so they need to be flipped for writing.
+        dest.order(ByteOrder.LITTLE_ENDIAN);
+        try {
+            while (itr.hasNextLong()) {
+                long val = itr.nextLong();
+                length -= Long.BYTES;
+                dest.writeLong(destPos + length, val);
+            }
+            while (itr.hasNextByte()) {
+                dest.writeByte(destPos + --length, itr.nextByte());
+            }
+        } finally {
+            dest.order(prevOrder);
         }
     }
 
     @Override
     public ByteIterator iterate(int fromOffset, int length) {
+        if (fromOffset < 0) {
+            throw new IllegalArgumentException("The fromOffset cannot be negative: " + fromOffset + '.');
+        }
+        if (length < 0) {
+            throw new IllegalArgumentException("The length cannot be negative: " + length + '.');
+        }
+        if (seg.byteSize() < fromOffset + length) {
+            throw new IllegalArgumentException("The fromOffset+length is beyond the end of the buffer: " +
+                                               "fromOffset=" + fromOffset + ", length=" + length + '.');
+        }
         return new ByteIterator() {
             final MemorySegment segment = seg;
             int index = fromOffset;
@@ -178,7 +204,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
             @Override
             public long nextLong() {
                 if (!hasNextLong()) {
-                    throw new NoSuchElementException();
+                    throw new NoSuchElementException("No 'long' value at offet " + currentOffset() + '.');
                 }
                 long val = getLongAtOffset_BE(segment, index);
                 index += Long.BYTES;
@@ -193,7 +219,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
             @Override
             public byte nextByte() {
                 if (!hasNextByte()) {
-                    throw new NoSuchElementException();
+                    throw new NoSuchElementException("No 'byte' value at offet " + currentOffset() + '.');
                 }
                 byte val = getByteAtOffset_BE(segment, index);
                 index++;
@@ -212,8 +238,67 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
         };
     }
 
-    private void copyInto(int srcPos, MemorySegment dest, int destPos, int length) {
-        dest.asSlice(destPos, length).copyFrom(seg.asSlice(srcPos, length));
+    @Override
+    public ByteIterator iterateReverse(int fromOffset, int length) {
+        if (fromOffset < 0) {
+            throw new IllegalArgumentException("The fromOffset cannot be negative: " + fromOffset + '.');
+        }
+        if (length < 0) {
+            throw new IllegalArgumentException("The length cannot be negative: " + length + '.');
+        }
+        if (seg.byteSize() <= fromOffset) {
+            throw new IllegalArgumentException("The fromOffset is beyond the end of the buffer: " + fromOffset + '.');
+        }
+        if (fromOffset - length < -1) {
+            throw new IllegalArgumentException("The fromOffset-length would underflow the buffer: " +
+                                               "fromOffset=" + fromOffset + ", length=" + length + '.');
+        }
+        return new ByteIterator() {
+            final MemorySegment segment = seg;
+            int index = fromOffset;
+            final int end = index - length;
+
+            @Override
+            public boolean hasNextLong() {
+                return index - Long.BYTES >= end;
+            }
+
+            @Override
+            public long nextLong() {
+                if (!hasNextLong()) {
+                    throw new NoSuchElementException("No 'long' value at offet " + currentOffset() + '.');
+                }
+                index -= 7;
+                long val = getLongAtOffset_LE(segment, index);
+                index--;
+                return val;
+            }
+
+            @Override
+            public boolean hasNextByte() {
+                return index > end;
+            }
+
+            @Override
+            public byte nextByte() {
+                if (!hasNextByte()) {
+                    throw new NoSuchElementException("No 'byte' value at offet " + currentOffset() + '.');
+                }
+                byte val = getByteAtOffset_LE(segment, index);
+                index--;
+                return val;
+            }
+
+            @Override
+            public int currentOffset() {
+                return index;
+            }
+
+            @Override
+            public int bytesLeft() {
+                return index - end;
+            }
+        };
     }
 
     // ### CODEGEN START primitive accessors implementation
