@@ -28,7 +28,6 @@ package io.netty.buffer.b2;
  *
  * @param <T>
  */
-@FunctionalInterface
 public interface Send<T extends Rc<T>> {
     /**
      * Receive the {@link Rc} instance being sent, and bind its ownership to the calling thread. The invalidation of the
