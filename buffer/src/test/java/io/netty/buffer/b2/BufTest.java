@@ -15,14 +15,19 @@
  */
 package io.netty.buffer.b2;
 
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.parallel.Isolated;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.text.ParseException;
+import java.util.Arrays;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -46,7 +51,38 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 public class BufTest {
-    static Stream<Fixture> allocators() {
+    private static volatile Fixture[] fixtures;
+    private static ExecutorService executor;
+
+    static Fixture[] allocators() {
+        Fixture[] fxs = fixtures;
+        if (fxs != null) {
+            return fxs;
+        }
+        return fixtures = fixtureCombinations().toArray(Fixture[]::new);
+    }
+
+    static Stream<Fixture> heapAllocators() {
+        return fixtureCombinations().filter(Fixture::isHeap);
+    }
+
+    static Stream<Fixture> directAllocators() {
+        return fixtureCombinations().filter(Fixture::isDirect);
+    }
+
+    static Stream<Fixture> directWithCleanerAllocators() {
+        return fixtureCombinations().filter(f -> f.isDirect() && f.isCleaner());
+    }
+
+    static Stream<Fixture> directPooledWithCleanerAllocators() {
+        return fixtureCombinations().filter(f -> f.isDirect() && f.isCleaner() && f.isPooled());
+    }
+
+    private static Stream<Fixture> fixtureCombinations() {
+        Fixture[] fxs = fixtures;
+        if (fxs != null) {
+            return Arrays.stream(fxs);
+        }
         List<Fixture> initFixtures = List.of(
                 new Fixture("heap", Allocator::heap, HEAP),
                 new Fixture("direct", Allocator::direct, DIRECT),
@@ -103,24 +139,17 @@ public class BufTest {
                 }
             };
         }, COMPOSITE));
-
         return builder.build();
     }
 
-    static Stream<Fixture> heapAllocators() {
-        return allocators().filter(Fixture::isHeap);
+    @BeforeAll
+    static void startExecutor() throws IOException, ParseException {
+        executor = Executors.newSingleThreadExecutor();
     }
 
-    static Stream<Fixture> directAllocators() {
-        return allocators().filter(Fixture::isDirect);
-    }
-
-    static Stream<Fixture> directWithCleanerAllocators() {
-        return allocators().filter(f -> f.isDirect() && f.isCleaner());
-    }
-
-    static Stream<Fixture> directPooledWithCleanerAllocators() {
-        return allocators().filter(f -> f.isDirect() && f.isCleaner() && f.isPooled());
+    @AfterAll
+    static void stopExecutor() throws IOException {
+        executor.shutdown();
     }
 
     @ParameterizedTest
@@ -154,7 +183,7 @@ public class BufTest {
             assertEquals((byte) 8, buf.readByte());
             var re = assertThrows(RuntimeException.class, buf::readByte);
             assertThat(re).hasMessageContaining("bound");
-            assertThat(buf.copy()).containsExactly(1, 2, 3, 4, 5, 6, 7, 8);
+            assertThat(toByteArray(buf)).containsExactly(1, 2, 3, 4, 5, 6, 7, 8);
         }
     }
 
@@ -173,13 +202,11 @@ public class BufTest {
     void allocateAndSendToThread(Fixture fixture) throws Exception {
         try (Allocator allocator = fixture.createAllocator()) {
             ArrayBlockingQueue<Send<Buf>> queue = new ArrayBlockingQueue<>(10);
-            ExecutorService executor = Executors.newSingleThreadExecutor();
             Future<Byte> future = executor.submit(() -> {
                 try (Buf byteBuf = queue.take().receive()) {
                     return byteBuf.readByte();
                 }
             });
-            executor.shutdown();
 
             try (Buf buf = allocator.allocate(8)) {
                 buf.writeByte((byte) 42);
@@ -194,13 +221,11 @@ public class BufTest {
     @MethodSource("allocators")
     void allocateAndSendToThreadViaSyncQueue(Fixture fixture) throws Exception {
         SynchronousQueue<Send<Buf>> queue = new SynchronousQueue<>();
-        ExecutorService executor = Executors.newSingleThreadExecutor();
         Future<Byte> future = executor.submit(() -> {
             try (Buf byteBuf = queue.take().receive()) {
                 return byteBuf.readByte();
             }
         });
-        executor.shutdown();
 
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
@@ -244,36 +269,36 @@ public class BufTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void setReaderIndexMustThrowOnNegativeIndex(Fixture fixture) {
+    void setReaderOffsetMustThrowOnNegativeIndex(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readerIndex(-1));
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.readerOffset(-1));
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void setReaderIndexMustThrowOnOversizedIndex(Fixture fixture) {
+    void setReaderOffsetMustThrowOnOversizedIndex(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readerIndex(1));
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.readerOffset(1));
             buf.writeLong(0);
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readerIndex(9));
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.readerOffset(9));
 
-            buf.readerIndex(8);
+            buf.readerOffset(8);
             assertThrows(IndexOutOfBoundsException.class, buf::readByte);
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void setReaderIndexMustNotThrowWithinBounds(Fixture fixture) {
+    void setReaderOffsetMustNotThrowWithinBounds(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            assertThat(buf.readerIndex(0)).isSameAs(buf);
+            assertThat(buf.readerOffset(0)).isSameAs(buf);
             buf.writeLong(0);
-            assertThat(buf.readerIndex(7)).isSameAs(buf);
-            assertThat(buf.readerIndex(8)).isSameAs(buf);
+            assertThat(buf.readerOffset(7)).isSameAs(buf);
+            assertThat(buf.readerOffset(8)).isSameAs(buf);
         }
     }
 
@@ -295,7 +320,7 @@ public class BufTest {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(16)) {
             assertThat(buf.fill((byte) 0xA5)).isSameAs(buf);
-            buf.writerIndex(16);
+            buf.writerOffset(16);
             assertEquals(0xA5A5A5A5_A5A5A5A5L, buf.readLong());
             assertEquals(0xA5A5A5A5_A5A5A5A5L, buf.readLong());
         }
@@ -303,34 +328,34 @@ public class BufTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void readerWriterIndexUpdates(Fixture fixture) {
+    void readerWriterOffsetUpdates(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(22)) {
-            assertEquals(0, buf.writerIndex());
-            assertThat(buf.writerIndex(1)).isSameAs(buf);
-            assertEquals(1, buf.writerIndex());
+            assertEquals(0, buf.writerOffset());
+            assertThat(buf.writerOffset(1)).isSameAs(buf);
+            assertEquals(1, buf.writerOffset());
             assertThat(buf.writeByte((byte) 7)).isSameAs(buf);
-            assertEquals(2, buf.writerIndex());
+            assertEquals(2, buf.writerOffset());
             assertThat(buf.writeShort((short) 3003)).isSameAs(buf);
-            assertEquals(4, buf.writerIndex());
+            assertEquals(4, buf.writerOffset());
             assertThat(buf.writeInt(0x5A55_BA55)).isSameAs(buf);
-            assertEquals(8, buf.writerIndex());
+            assertEquals(8, buf.writerOffset());
             assertThat(buf.writeLong(0x123456789ABCDEF0L)).isSameAs(buf);
-            assertEquals(16, buf.writerIndex());
+            assertEquals(16, buf.writerOffset());
             assertEquals(6, buf.writableBytes());
             assertEquals(16, buf.readableBytes());
 
-            assertEquals(0, buf.readerIndex());
-            assertThat(buf.readerIndex(1)).isSameAs(buf);
-            assertEquals(1, buf.readerIndex());
+            assertEquals(0, buf.readerOffset());
+            assertThat(buf.readerOffset(1)).isSameAs(buf);
+            assertEquals(1, buf.readerOffset());
             assertEquals((byte) 7, buf.readByte());
-            assertEquals(2, buf.readerIndex());
+            assertEquals(2, buf.readerOffset());
             assertEquals((short) 3003, buf.readShort());
-            assertEquals(4, buf.readerIndex());
+            assertEquals(4, buf.readerOffset());
             assertEquals(0x5A55_BA55, buf.readInt());
-            assertEquals(8, buf.readerIndex());
+            assertEquals(8, buf.readerOffset());
             assertEquals(0x123456789ABCDEF0L, buf.readLong());
-            assertEquals(16, buf.readerIndex());
+            assertEquals(16, buf.readerOffset());
             assertEquals(0, buf.readableBytes());
         }
     }
@@ -343,12 +368,12 @@ public class BufTest {
             buf.writeLong(0);
 
             buf.readLong(); // Fine.
-            buf.readerIndex(1);
+            buf.readerOffset(1);
             assertThrows(IndexOutOfBoundsException.class, buf::readLong);
 
-            buf.readerIndex(4);
+            buf.readerOffset(4);
             buf.readInt(); // Fine.
-            buf.readerIndex(5);
+            buf.readerOffset(5);
 
             assertThrows(IndexOutOfBoundsException.class, buf::readInt);
         }
@@ -361,8 +386,8 @@ public class BufTest {
              Buf buf = allocator.allocate(8)) {
             buf.writeInt(0).readShort();
             buf.reset();
-            assertEquals(0, buf.readerIndex());
-            assertEquals(0, buf.writerIndex());
+            assertEquals(0, buf.readerOffset());
+            assertEquals(0, buf.writerOffset());
         }
     }
 
@@ -375,12 +400,12 @@ public class BufTest {
                 buf.writeByte(b);
             }
             assertEquals(0x01, buf.readByte());
-            buf.writerIndex(buf.writerIndex() - 1);
+            buf.writerOffset(buf.writerOffset() - 1);
             try (Buf slice = buf.slice()) {
-                assertThat(slice.copy()).containsExactly(0x02, 0x03, 0x04, 0x05, 0x06, 0x07);
-                assertEquals(0, slice.readerIndex());
+                assertThat(toByteArray(slice)).containsExactly(0x02, 0x03, 0x04, 0x05, 0x06, 0x07);
+                assertEquals(0, slice.readerOffset());
                 assertEquals(6, slice.readableBytes());
-                assertEquals(6, slice.writerIndex());
+                assertEquals(6, slice.writerOffset());
                 assertEquals(6, slice.capacity());
                 assertEquals(0x02, slice.readByte());
                 assertEquals(0x03, slice.readByte());
@@ -401,13 +426,13 @@ public class BufTest {
             for (byte b : new byte[] { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08 }) {
                 buf.writeByte(b);
             }
-            buf.readerIndex(3); // Reader and writer offsets must be ignored.
-            buf.writerIndex(6);
+            buf.readerOffset(3); // Reader and writer offsets must be ignored.
+            buf.writerOffset(6);
             try (Buf slice = buf.slice(1, 6)) {
-                assertThat(slice.copy()).containsExactly(0x02, 0x03, 0x04, 0x05, 0x06, 0x07);
-                assertEquals(0, slice.readerIndex());
+                assertThat(toByteArray(slice)).containsExactly(0x02, 0x03, 0x04, 0x05, 0x06, 0x07);
+                assertEquals(0, slice.readerOffset());
                 assertEquals(6, slice.readableBytes());
-                assertEquals(6, slice.writerIndex());
+                assertEquals(6, slice.writerOffset());
                 assertEquals(6, slice.capacity());
                 assertEquals(0x02, slice.readByte());
                 assertEquals(0x03, slice.readByte());
@@ -552,7 +577,7 @@ public class BufTest {
             buf.copyInto(0, array, 0, array.length);
             assertThat(array).containsExactly(0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08);
 
-            buf.writerIndex(0).order(ByteOrder.LITTLE_ENDIAN).writeLong(0x0102030405060708L);
+            buf.writerOffset(0).order(ByteOrder.LITTLE_ENDIAN).writeLong(0x0102030405060708L);
             buf.copyInto(0, array, 0, array.length);
             assertThat(array).containsExactly(0x08, 0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01);
 
@@ -590,7 +615,7 @@ public class BufTest {
             assertEquals((byte) 0x08, buffer.get());
             buffer.clear();
 
-            buf.writerIndex(0).order(ByteOrder.LITTLE_ENDIAN).writeLong(0x0102030405060708L);
+            buf.writerOffset(0).order(ByteOrder.LITTLE_ENDIAN).writeLong(0x0102030405060708L);
             buf.copyInto(0, buffer, 0, buffer.capacity());
             assertEquals((byte) 0x08, buffer.get());
             assertEquals((byte) 0x07, buffer.get());
@@ -643,7 +668,7 @@ public class BufTest {
     @MethodSource("allocators")
     void copyIntoOnHeapBufSlice(Fixture fixture) {
         try (Scope scope = new Scope()) {
-            testCopyIntoBuf(fixture, size -> scope.add(Allocator.heap().allocate(size)).writerIndex(size).slice());
+            testCopyIntoBuf(fixture, size -> scope.add(Allocator.heap().allocate(size)).writerOffset(size).slice());
         }
     }
 
@@ -651,7 +676,7 @@ public class BufTest {
     @MethodSource("allocators")
     void copyIntoOffHeapBufSlice(Fixture fixture) {
         try (Scope scope = new Scope()) {
-            testCopyIntoBuf(fixture, size -> scope.add(Allocator.direct().allocate(size)).writerIndex(size).slice());
+            testCopyIntoBuf(fixture, size -> scope.add(Allocator.direct().allocate(size)).writerOffset(size).slice());
         }
     }
 
@@ -730,7 +755,7 @@ public class BufTest {
                 int second = size - first;
                 try (var bufFirst = a.allocate(first);
                      var bufSecond = b.allocate(second)) {
-                    return scope.add(Buf.compose(bufFirst, bufSecond)).writerIndex(size).slice();
+                    return scope.add(Buf.compose(bufFirst, bufSecond)).writerOffset(size).slice();
                 }
             });
         }
@@ -747,7 +772,7 @@ public class BufTest {
                 int second = size - first;
                 try (var bufFirst = a.allocate(first);
                      var bufSecond = b.allocate(second)) {
-                    return scope.add(Buf.compose(bufFirst, bufSecond)).writerIndex(size).slice();
+                    return scope.add(Buf.compose(bufFirst, bufSecond)).writerOffset(size).slice();
                 }
             });
         }
@@ -764,7 +789,7 @@ public class BufTest {
                 int second = size - first;
                 try (var bufFirst = a.allocate(first);
                      var bufSecond = b.allocate(second)) {
-                    return scope.add(Buf.compose(bufFirst, bufSecond)).writerIndex(size).slice();
+                    return scope.add(Buf.compose(bufFirst, bufSecond)).writerOffset(size).slice();
                 }
             });
         }
@@ -781,7 +806,7 @@ public class BufTest {
                 int second = size - first;
                 try (var bufFirst = a.allocate(first);
                      var bufSecond = b.allocate(second)) {
-                    return scope.add(Buf.compose(bufFirst, bufSecond)).writerIndex(size).slice();
+                    return scope.add(Buf.compose(bufFirst, bufSecond)).writerOffset(size).slice();
                 }
             });
         }
@@ -792,7 +817,7 @@ public class BufTest {
              Buf buf = allocator.allocate(8)) {
             buf.order(ByteOrder.BIG_ENDIAN).writeLong(0x0102030405060708L);
             Buf buffer = bbAlloc.apply(8);
-            buffer.writerIndex(8);
+            buffer.writerOffset(8);
             buf.copyInto(0, buffer, 0, buffer.capacity());
             assertEquals((byte) 0x01, buffer.readByte());
             assertEquals((byte) 0x02, buffer.readByte());
@@ -804,9 +829,9 @@ public class BufTest {
             assertEquals((byte) 0x08, buffer.readByte());
             buffer.reset();
 
-            buf.writerIndex(0).order(ByteOrder.LITTLE_ENDIAN).writeLong(0x0102030405060708L);
+            buf.writerOffset(0).order(ByteOrder.LITTLE_ENDIAN).writeLong(0x0102030405060708L);
             buf.copyInto(0, buffer, 0, buffer.capacity());
-            buffer.writerIndex(8);
+            buffer.writerOffset(8);
             assertEquals((byte) 0x08, buffer.readByte());
             assertEquals((byte) 0x07, buffer.readByte());
             assertEquals((byte) 0x06, buffer.readByte());
@@ -820,7 +845,7 @@ public class BufTest {
             buffer.close();
             buffer = bbAlloc.apply(6);
             buf.copyInto(1, buffer, 1, 3);
-            buffer.writerIndex(6);
+            buffer.writerOffset(6);
             assertEquals((byte) 0x00, buffer.readByte());
             assertEquals((byte) 0x07, buffer.readByte());
             assertEquals((byte) 0x06, buffer.readByte());
@@ -830,12 +855,12 @@ public class BufTest {
 
             buffer.close();
             buffer = bbAlloc.apply(6);
-            buffer.writerIndex(3).readerIndex(3);
+            buffer.writerOffset(3).readerOffset(3);
             buf.copyInto(1, buffer, 1, 3);
-            assertEquals(3, buffer.readerIndex());
-            assertEquals(3, buffer.writerIndex());
+            assertEquals(3, buffer.readerOffset());
+            assertEquals(3, buffer.writerOffset());
             buffer.reset();
-            buffer.writerIndex(6);
+            buffer.writerOffset(6);
             assertEquals((byte) 0x00, buffer.readByte());
             assertEquals((byte) 0x07, buffer.readByte());
             assertEquals((byte) 0x06, buffer.readByte());
@@ -854,7 +879,7 @@ public class BufTest {
             //                   ▼
             //          0x0102030102030405
             buf.copyInto(0, buf, 3, 5);
-            assertThat(buf.copy()).containsExactly(0x01, 0x02, 0x03, 0x01, 0x02, 0x03, 0x04, 0x05);
+            assertThat(toByteArray(buf)).containsExactly(0x01, 0x02, 0x03, 0x01, 0x02, 0x03, 0x04, 0x05);
         }
     }
 
@@ -905,8 +930,8 @@ public class BufTest {
         for (int i = 0; i < 0x27; i++) {
             buf.writeByte((byte) (i + 1));
         }
-        int roff = buf.readerIndex();
-        int woff = buf.writerIndex();
+        int roff = buf.readerOffset();
+        int woff = buf.writerOffset();
         itr = buf.iterate();
         assertEquals(0x27, itr.bytesLeft());
         assertTrue(itr.hasNextByte());
@@ -948,8 +973,8 @@ public class BufTest {
         assertEquals(0, itr.bytesLeft());
         assertThrows(NoSuchElementException.class, itr::nextLong);
         assertThrows(NoSuchElementException.class, itr::nextByte);
-        assertEquals(roff, buf.readerIndex());
-        assertEquals(woff, buf.writerIndex());
+        assertEquals(roff, buf.readerOffset());
+        assertEquals(woff, buf.writerOffset());
     }
 
     private static void checkByteIterationOfRegion(Buf buf) {
@@ -969,9 +994,9 @@ public class BufTest {
         for (int i = 0; i < 0x27; i++) {
             buf.writeByte((byte) (i + 1));
         }
-        int roff = buf.readerIndex();
-        int woff = buf.writerIndex();
-        itr = buf.iterate(buf.readerIndex() + 1, buf.readableBytes() - 2);
+        int roff = buf.readerOffset();
+        int woff = buf.writerOffset();
+        itr = buf.iterate(buf.readerOffset() + 1, buf.readableBytes() - 2);
         assertEquals(0x25, itr.bytesLeft());
         assertTrue(itr.hasNextByte());
         assertTrue(itr.hasNextLong());
@@ -1007,7 +1032,7 @@ public class BufTest {
         assertThrows(NoSuchElementException.class, itr::nextLong);
         assertThrows(NoSuchElementException.class, itr::nextByte);
 
-        itr = buf.iterate(buf.readerIndex() + 1, 2);
+        itr = buf.iterate(buf.readerOffset() + 1, 2);
         assertEquals(2, itr.bytesLeft());
         assertTrue(itr.hasNextByte());
         assertFalse(itr.hasNextLong());
@@ -1019,8 +1044,8 @@ public class BufTest {
         assertEquals(0, itr.bytesLeft());
         assertFalse(itr.hasNextByte());
         assertFalse(itr.hasNextLong());
-        assertEquals(roff, buf.readerIndex());
-        assertEquals(woff, buf.writerIndex());
+        assertEquals(roff, buf.readerOffset());
+        assertEquals(woff, buf.writerOffset());
     }
 
     @ParameterizedTest
@@ -1058,8 +1083,8 @@ public class BufTest {
         for (int i = 0; i < 0x27; i++) {
             buf.writeByte((byte) (i + 1));
         }
-        int roff = buf.readerIndex();
-        int woff = buf.writerIndex();
+        int roff = buf.readerOffset();
+        int woff = buf.writerOffset();
         itr = buf.iterateReverse();
         assertEquals(0x27, itr.bytesLeft());
         assertTrue(itr.hasNextByte());
@@ -1101,8 +1126,8 @@ public class BufTest {
         assertEquals(0, itr.bytesLeft());
         assertThrows(NoSuchElementException.class, itr::nextLong);
         assertThrows(NoSuchElementException.class, itr::nextByte);
-        assertEquals(roff, buf.readerIndex());
-        assertEquals(woff, buf.writerIndex());
+        assertEquals(roff, buf.readerOffset());
+        assertEquals(woff, buf.writerOffset());
     }
 
     private static void checkReverseByteIterationOfRegion(Buf buf) {
@@ -1122,9 +1147,9 @@ public class BufTest {
         for (int i = 0; i < 0x27; i++) {
             buf.writeByte((byte) (i + 1));
         }
-        int roff = buf.readerIndex();
-        int woff = buf.writerIndex();
-        itr = buf.iterateReverse(buf.writerIndex() - 2, buf.readableBytes() - 2);
+        int roff = buf.readerOffset();
+        int woff = buf.writerOffset();
+        itr = buf.iterateReverse(buf.writerOffset() - 2, buf.readableBytes() - 2);
         assertEquals(0x25, itr.bytesLeft());
         assertTrue(itr.hasNextByte());
         assertTrue(itr.hasNextLong());
@@ -1160,7 +1185,7 @@ public class BufTest {
         assertThrows(NoSuchElementException.class, itr::nextLong);
         assertThrows(NoSuchElementException.class, itr::nextByte);
 
-        itr = buf.iterateReverse(buf.readerIndex() + 2, 2);
+        itr = buf.iterateReverse(buf.readerOffset() + 2, 2);
         assertEquals(2, itr.bytesLeft());
         assertTrue(itr.hasNextByte());
         assertFalse(itr.hasNextLong());
@@ -1172,8 +1197,8 @@ public class BufTest {
         assertEquals(0, itr.bytesLeft());
         assertFalse(itr.hasNextByte());
         assertFalse(itr.hasNextLong());
-        assertEquals(roff, buf.readerIndex());
-        assertEquals(woff, buf.writerIndex());
+        assertEquals(roff, buf.readerOffset());
+        assertEquals(woff, buf.writerOffset());
     }
 
     @ParameterizedTest
@@ -1239,12 +1264,7 @@ public class BufTest {
         }
     }
 
-    // todo resize copying must preserve contents
-    // todo resize sharing must preserve contents
-
-    // ### CODEGEN START primitive accessors tests
-    // <editor-fold defaultstate="collapsed" desc="Generated primitive accessors tests.">
-
+    // <editor-fold defaultstate="collapsed" desc="Primitive accessors tests.">
     @ParameterizedTest
     @MethodSource("allocators")
     void relativeReadOfByteMustNotBoundsCheckWhenReadOffsetAndSizeIsEqualToWriteOffset(Fixture fixture) {
@@ -1271,7 +1291,7 @@ public class BufTest {
             assertEquals(Long.BYTES, buf.writableBytes());
             byte value = 0x01;
             buf.writeByte(value);
-            buf.writeByte(0, (byte) 0x10);
+            buf.setByte(0, (byte) 0x10);
             assertEquals(1, buf.readableBytes());
             assertEquals(7, buf.writableBytes());
             assertEquals(0x10, buf.readByte());
@@ -1288,7 +1308,7 @@ public class BufTest {
             assertEquals(Long.BYTES, buf.writableBytes());
             byte value = 0x01;
             buf.writeByte(value);
-            buf.readerIndex(1);
+            buf.readerOffset(1);
             assertEquals(0, buf.readableBytes());
             assertEquals(7, buf.writableBytes());
             assertThrows(IndexOutOfBoundsException.class, buf::readByte);
@@ -1298,54 +1318,54 @@ public class BufTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedReadOfByteMustBoundsCheckOnNegativeOffset(Fixture fixture) {
+    void offsettedGetOfByteMustBoundsCheckOnNegativeOffset(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readByte(-1));
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.getByte(-1));
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedReadOfByteMustNotBoundsCheckWhenReadOffsetAndSizeIsEqualToWriteOffset(Fixture fixture) {
+    void offsettedGetOfByteMustNotBoundsCheckWhenReadOffsetAndSizeIsEqualToWriteOffset(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             byte value = 0x01;
             buf.writeByte(value);
-            assertEquals(value, buf.readByte(0));
+            assertEquals(value, buf.getByte(0));
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedReadOfByteMustReadWithDefaultEndianByteOrder(Fixture fixture) {
+    void offsettedGetOfByteMustReadWithDefaultEndianByteOrder(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             buf.order(ByteOrder.BIG_ENDIAN);
             byte value = 0x01;
             buf.writeByte(value);
-            buf.writeByte(0, (byte) 0x10);
-            assertEquals(0x10, buf.readByte(0));
+            buf.setByte(0, (byte) 0x10);
+            assertEquals(0x10, buf.getByte(0));
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedReadOfByteMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanWriteOffset(Fixture fixture) {
+    void offsettedGetOfByteMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanWriteOffset(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             byte value = 0x01;
             buf.writeByte(value);
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readByte(-1));
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.getByte(-1));
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedReadOfByteMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
+    void offsettedGetOfByteMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readByte(0));
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.getByte(0));
         }
     }
 
@@ -1375,7 +1395,7 @@ public class BufTest {
             assertEquals(Long.BYTES, buf.writableBytes());
             int value = 0x01;
             buf.writeUnsignedByte(value);
-            buf.writeByte(0, (byte) 0x10);
+            buf.setByte(0, (byte) 0x10);
             assertEquals(1, buf.readableBytes());
             assertEquals(7, buf.writableBytes());
             assertEquals(0x10, buf.readUnsignedByte());
@@ -1392,7 +1412,7 @@ public class BufTest {
             assertEquals(Long.BYTES, buf.writableBytes());
             int value = 0x01;
             buf.writeUnsignedByte(value);
-            buf.readerIndex(1);
+            buf.readerOffset(1);
             assertEquals(0, buf.readableBytes());
             assertEquals(7, buf.writableBytes());
             assertThrows(IndexOutOfBoundsException.class, () -> buf.readUnsignedByte());
@@ -1402,54 +1422,54 @@ public class BufTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedReadOfUnsignedByteMustBoundsCheckOnNegativeOffset(Fixture fixture) {
+    void offsettedGetOfUnsignedByteMustBoundsCheckOnNegativeOffset(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readUnsignedByte(-1));
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.getUnsignedByte(-1));
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedReadOfUnsignedByteMustNotBoundsCheckWhenReadOffsetAndSizeIsEqualToWriteOffset(Fixture fixture) {
+    void offsettedGetOfUnsignedByteMustNotBoundsCheckWhenReadOffsetAndSizeIsEqualToWriteOffset(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             int value = 0x01;
             buf.writeUnsignedByte(value);
-            assertEquals(value, buf.readUnsignedByte(0));
+            assertEquals(value, buf.getUnsignedByte(0));
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedReadOfUnsignedByteMustReadWithDefaultEndianByteOrder(Fixture fixture) {
+    void offsettedGetOfUnsignedByteMustReadWithDefaultEndianByteOrder(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             buf.order(ByteOrder.BIG_ENDIAN);
             int value = 0x01;
             buf.writeUnsignedByte(value);
-            buf.writeByte(0, (byte) 0x10);
-            assertEquals(0x10, buf.readUnsignedByte(0));
+            buf.setByte(0, (byte) 0x10);
+            assertEquals(0x10, buf.getUnsignedByte(0));
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedReadOfUnsignedByteMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanWriteOffset(Fixture fixture) {
+    void offsettedGetOfUnsignedByteMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanWriteOffset(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             int value = 0x01;
             buf.writeUnsignedByte(value);
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readUnsignedByte(1));
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.getUnsignedByte(1));
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedReadOfUnsignedByteMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
+    void offsettedGetOfUnsignedByteMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readUnsignedByte(0));
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.getUnsignedByte(0));
         }
     }
 
@@ -1459,10 +1479,10 @@ public class BufTest {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             assertEquals(Long.BYTES, buf.capacity());
-            buf.writerIndex(8);
+            buf.writerOffset(8);
             byte value = 0x01;
             assertThrows(IndexOutOfBoundsException.class, () -> buf.writeByte(value));
-            buf.writerIndex(Long.BYTES);
+            buf.writerOffset(Long.BYTES);
             // Verify contents are unchanged.
             assertEquals(0, buf.readLong());
         }
@@ -1476,7 +1496,7 @@ public class BufTest {
             buf.order(ByteOrder.BIG_ENDIAN);
             byte value = 0x01;
             buf.writeByte(value);
-            buf.writerIndex(Long.BYTES);
+            buf.writerOffset(Long.BYTES);
             assertEquals((byte) 0x01, buf.readByte());
             assertEquals((byte) 0x00, buf.readByte());
             assertEquals((byte) 0x00, buf.readByte());
@@ -1490,13 +1510,13 @@ public class BufTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedWriteOfByteMustBoundsCheckWhenWriteOffsetIsNegative(Fixture fixture) {
+    void offsettedSetOfByteMustBoundsCheckWhenWriteOffsetIsNegative(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             assertEquals(Long.BYTES, buf.capacity());
             byte value = 0x01;
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.writeByte(-1, value));
-            buf.writerIndex(Long.BYTES);
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.setByte(-1, value));
+            buf.writerOffset(Long.BYTES);
             // Verify contents are unchanged.
             assertEquals(0, buf.readLong());
         }
@@ -1504,13 +1524,13 @@ public class BufTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedWriteOfByteMustBoundsCheckWhenWriteOffsetAndSizeIsBeyondCapacity(Fixture fixture) {
+    void offsettedSetOfByteMustBoundsCheckWhenWriteOffsetAndSizeIsBeyondCapacity(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             assertEquals(Long.BYTES, buf.capacity());
             byte value = 0x01;
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.writeByte(8, value));
-            buf.writerIndex(Long.BYTES);
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.setByte(8, value));
+            buf.writerOffset(Long.BYTES);
             // Verify contents are unchanged.
             assertEquals(0, buf.readLong());
         }
@@ -1518,13 +1538,13 @@ public class BufTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedWriteOfByteMustHaveDefaultEndianByteOrder(Fixture fixture) {
+    void offsettedSetOfByteMustHaveDefaultEndianByteOrder(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             buf.order(ByteOrder.BIG_ENDIAN);
             byte value = 0x01;
-            buf.writeByte(0, value);
-            buf.writerIndex(Long.BYTES);
+            buf.setByte(0, value);
+            buf.writerOffset(Long.BYTES);
             assertEquals((byte) 0x01, buf.readByte());
             assertEquals((byte) 0x00, buf.readByte());
             assertEquals((byte) 0x00, buf.readByte());
@@ -1542,10 +1562,10 @@ public class BufTest {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             assertEquals(Long.BYTES, buf.capacity());
-            buf.writerIndex(8);
+            buf.writerOffset(8);
             int value = 0x01;
             assertThrows(IndexOutOfBoundsException.class, () -> buf.writeUnsignedByte(value));
-            buf.writerIndex(Long.BYTES);
+            buf.writerOffset(Long.BYTES);
             // Verify contents are unchanged.
             assertEquals(0, buf.readLong());
         }
@@ -1559,7 +1579,7 @@ public class BufTest {
             buf.order(ByteOrder.BIG_ENDIAN);
             int value = 0x01;
             buf.writeUnsignedByte(value);
-            buf.writerIndex(Long.BYTES);
+            buf.writerOffset(Long.BYTES);
             assertEquals((byte) 0x01, buf.readByte());
             assertEquals((byte) 0x00, buf.readByte());
             assertEquals((byte) 0x00, buf.readByte());
@@ -1573,13 +1593,13 @@ public class BufTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedWriteOfUnsignedByteMustBoundsCheckWhenWriteOffsetIsNegative(Fixture fixture) {
+    void offsettedSetOfUnsignedByteMustBoundsCheckWhenWriteOffsetIsNegative(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             assertEquals(Long.BYTES, buf.capacity());
             int value = 0x01;
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.writeUnsignedByte(-1, value));
-            buf.writerIndex(Long.BYTES);
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.setUnsignedByte(-1, value));
+            buf.writerOffset(Long.BYTES);
             // Verify contents are unchanged.
             assertEquals(0, buf.readLong());
         }
@@ -1587,13 +1607,13 @@ public class BufTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedWriteOfUnsignedByteMustBoundsCheckWhenWriteOffsetAndSizeIsBeyondCapacity(Fixture fixture) {
+    void offsettedSetOfUnsignedByteMustBoundsCheckWhenWriteOffsetAndSizeIsBeyondCapacity(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             assertEquals(Long.BYTES, buf.capacity());
             int value = 0x01;
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.writeUnsignedByte(8, value));
-            buf.writerIndex(Long.BYTES);
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.setUnsignedByte(8, value));
+            buf.writerOffset(Long.BYTES);
             // Verify contents are unchanged.
             assertEquals(0, buf.readLong());
         }
@@ -1601,13 +1621,13 @@ public class BufTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedWriteOfUnsignedByteMustHaveDefaultEndianByteOrder(Fixture fixture) {
+    void offsettedSetOfUnsignedByteMustHaveDefaultEndianByteOrder(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             buf.order(ByteOrder.BIG_ENDIAN);
             int value = 0x01;
-            buf.writeUnsignedByte(0, value);
-            buf.writerIndex(Long.BYTES);
+            buf.setUnsignedByte(0, value);
+            buf.writerOffset(Long.BYTES);
             assertEquals((byte) 0x01, buf.readByte());
             assertEquals((byte) 0x00, buf.readByte());
             assertEquals((byte) 0x00, buf.readByte());
@@ -1645,7 +1665,7 @@ public class BufTest {
             assertEquals(Long.BYTES, buf.writableBytes());
             char value = 0x0102;
             buf.writeChar(value);
-            buf.writeByte(0, (byte) 0x10);
+            buf.setByte(0, (byte) 0x10);
             assertEquals(2, buf.readableBytes());
             assertEquals(6, buf.writableBytes());
             assertEquals(0x1002, buf.readChar());
@@ -1662,7 +1682,7 @@ public class BufTest {
             assertEquals(Long.BYTES, buf.writableBytes());
             char value = 0x0102;
             buf.writeChar(value);
-            buf.readerIndex(1);
+            buf.readerOffset(1);
             assertEquals(1, buf.readableBytes());
             assertEquals(6, buf.writableBytes());
             assertThrows(IndexOutOfBoundsException.class, buf::readChar);
@@ -1672,54 +1692,54 @@ public class BufTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedReadOfCharMustBoundsCheckOnNegativeOffset(Fixture fixture) {
+    void offsettedGetOfCharMustBoundsCheckOnNegativeOffset(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readChar(-1));
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.getChar(-1));
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedReadOfCharMustNotBoundsCheckWhenReadOffsetAndSizeIsEqualToWriteOffset(Fixture fixture) {
+    void offsettedGetOfCharMustNotBoundsCheckWhenReadOffsetAndSizeIsEqualToWriteOffset(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             char value = 0x0102;
             buf.writeChar(value);
-            assertEquals(value, buf.readChar(0));
+            assertEquals(value, buf.getChar(0));
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedReadOfCharMustReadWithDefaultEndianByteOrder(Fixture fixture) {
+    void offsettedGetOfCharMustReadWithDefaultEndianByteOrder(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             buf.order(ByteOrder.BIG_ENDIAN);
             char value = 0x0102;
             buf.writeChar(value);
-            buf.writeByte(0, (byte) 0x10);
-            assertEquals(0x1002, buf.readChar(0));
+            buf.setByte(0, (byte) 0x10);
+            assertEquals(0x1002, buf.getChar(0));
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedReadOfCharMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanWriteOffset(Fixture fixture) {
+    void offsettedGetOfCharMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanWriteOffset(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             char value = 0x0102;
             buf.writeChar(value);
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readChar(1));
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.getChar(1));
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedReadOfCharMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
+    void offsettedGetOfCharMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readChar(0));
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.getChar(0));
         }
     }
 
@@ -1729,10 +1749,10 @@ public class BufTest {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             assertEquals(Long.BYTES, buf.capacity());
-            buf.writerIndex(7);
+            buf.writerOffset(7);
             char value = 0x0102;
             assertThrows(IndexOutOfBoundsException.class, () -> buf.writeChar(value));
-            buf.writerIndex(Long.BYTES);
+            buf.writerOffset(Long.BYTES);
             // Verify contents are unchanged.
             assertEquals(0, buf.readLong());
         }
@@ -1746,7 +1766,7 @@ public class BufTest {
             buf.order(ByteOrder.BIG_ENDIAN);
             char value = 0x0102;
             buf.writeChar(value);
-            buf.writerIndex(Long.BYTES);
+            buf.writerOffset(Long.BYTES);
             assertEquals((byte) 0x01, buf.readByte());
             assertEquals((byte) 0x02, buf.readByte());
             assertEquals((byte) 0x00, buf.readByte());
@@ -1760,13 +1780,13 @@ public class BufTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedWriteOfCharMustBoundsCheckWhenWriteOffsetIsNegative(Fixture fixture) {
+    void offsettedSetOfCharMustBoundsCheckWhenWriteOffsetIsNegative(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             assertEquals(Long.BYTES, buf.capacity());
             char value = 0x0102;
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.writeChar(-1, value));
-            buf.writerIndex(Long.BYTES);
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.setChar(-1, value));
+            buf.writerOffset(Long.BYTES);
             // Verify contents are unchanged.
             assertEquals(0, buf.readLong());
         }
@@ -1774,13 +1794,13 @@ public class BufTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedWriteOfCharMustBoundsCheckWhenWriteOffsetAndSizeIsBeyondCapacity(Fixture fixture) {
+    void offsettedSetOfCharMustBoundsCheckWhenWriteOffsetAndSizeIsBeyondCapacity(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             assertEquals(Long.BYTES, buf.capacity());
             char value = 0x0102;
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.writeChar(7, value));
-            buf.writerIndex(Long.BYTES);
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.setChar(7, value));
+            buf.writerOffset(Long.BYTES);
             // Verify contents are unchanged.
             assertEquals(0, buf.readLong());
         }
@@ -1788,13 +1808,13 @@ public class BufTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedWriteOfCharMustHaveDefaultEndianByteOrder(Fixture fixture) {
+    void offsettedSetOfCharMustHaveDefaultEndianByteOrder(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             buf.order(ByteOrder.BIG_ENDIAN);
             char value = 0x0102;
-            buf.writeChar(0, value);
-            buf.writerIndex(Long.BYTES);
+            buf.setChar(0, value);
+            buf.writerOffset(Long.BYTES);
             assertEquals((byte) 0x01, buf.readByte());
             assertEquals((byte) 0x02, buf.readByte());
             assertEquals((byte) 0x00, buf.readByte());
@@ -1832,7 +1852,7 @@ public class BufTest {
             assertEquals(Long.BYTES, buf.writableBytes());
             short value = 0x0102;
             buf.writeShort(value);
-            buf.writeByte(0, (byte) 0x10);
+            buf.setByte(0, (byte) 0x10);
             assertEquals(2, buf.readableBytes());
             assertEquals(6, buf.writableBytes());
             assertEquals(0x1002, buf.readShort());
@@ -1849,7 +1869,7 @@ public class BufTest {
             assertEquals(Long.BYTES, buf.writableBytes());
             short value = 0x0102;
             buf.writeShort(value);
-            buf.readerIndex(1);
+            buf.readerOffset(1);
             assertEquals(1, buf.readableBytes());
             assertEquals(6, buf.writableBytes());
             assertThrows(IndexOutOfBoundsException.class, buf::readShort);
@@ -1859,54 +1879,54 @@ public class BufTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedReadOfShortMustBoundsCheckOnNegativeOffset(Fixture fixture) {
+    void offsettedGetOfShortMustBoundsCheckOnNegativeOffset(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readShort(-1));
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.getShort(-1));
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedReadOfShortMustNotBoundsCheckWhenReadOffsetAndSizeIsEqualToWriteOffset(Fixture fixture) {
+    void offsettedGetOfShortMustNotBoundsCheckWhenReadOffsetAndSizeIsEqualToWriteOffset(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             short value = 0x0102;
             buf.writeShort(value);
-            assertEquals(value, buf.readShort(0));
+            assertEquals(value, buf.getShort(0));
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedReadOfShortMustReadWithDefaultEndianByteOrder(Fixture fixture) {
+    void offsettedGetOfShortMustReadWithDefaultEndianByteOrder(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             buf.order(ByteOrder.BIG_ENDIAN);
             short value = 0x0102;
             buf.writeShort(value);
-            buf.writeByte(0, (byte) 0x10);
-            assertEquals(0x1002, buf.readShort(0));
+            buf.setByte(0, (byte) 0x10);
+            assertEquals(0x1002, buf.getShort(0));
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedReadOfShortMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanWriteOffset(Fixture fixture) {
+    void offsettedGetOfShortMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanWriteOffset(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             short value = 0x0102;
             buf.writeShort(value);
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readShort(1));
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.getShort(1));
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedReadOfShortMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
+    void offsettedGetOfShortMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readShort(0));
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.getShort(0));
         }
     }
 
@@ -1936,7 +1956,7 @@ public class BufTest {
             assertEquals(Long.BYTES, buf.writableBytes());
             int value = 0x0102;
             buf.writeUnsignedShort(value);
-            buf.writeByte(0, (byte) 0x10);
+            buf.setByte(0, (byte) 0x10);
             assertEquals(2, buf.readableBytes());
             assertEquals(6, buf.writableBytes());
             assertEquals(0x1002, buf.readUnsignedShort());
@@ -1953,7 +1973,7 @@ public class BufTest {
             assertEquals(Long.BYTES, buf.writableBytes());
             int value = 0x0102;
             buf.writeUnsignedShort(value);
-            buf.readerIndex(1);
+            buf.readerOffset(1);
             assertEquals(1, buf.readableBytes());
             assertEquals(6, buf.writableBytes());
             assertThrows(IndexOutOfBoundsException.class, buf::readUnsignedShort);
@@ -1963,54 +1983,54 @@ public class BufTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedReadOfUnsignedShortMustBoundsCheckOnNegativeOffset(Fixture fixture) {
+    void offsettedGetOfUnsignedShortMustBoundsCheckOnNegativeOffset(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readUnsignedShort(-1));
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.getUnsignedShort(-1));
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedReadOfUnsignedShortMustNotBoundsCheckWhenReadOffsetAndSizeIsEqualToWriteOffset(Fixture fixture) {
+    void offsettedGetOfUnsignedShortMustNotBoundsCheckWhenReadOffsetAndSizeIsEqualToWriteOffset(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             int value = 0x0102;
             buf.writeUnsignedShort(value);
-            assertEquals(value, buf.readUnsignedShort(0));
+            assertEquals(value, buf.getUnsignedShort(0));
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedReadOfUnsignedShortMustReadWithDefaultEndianByteOrder(Fixture fixture) {
+    void offsettedGetOfUnsignedShortMustReadWithDefaultEndianByteOrder(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             buf.order(ByteOrder.BIG_ENDIAN);
             int value = 0x0102;
             buf.writeUnsignedShort(value);
-            buf.writeByte(0, (byte) 0x10);
-            assertEquals(0x1002, buf.readUnsignedShort(0));
+            buf.setByte(0, (byte) 0x10);
+            assertEquals(0x1002, buf.getUnsignedShort(0));
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedReadOfUnsignedShortMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanWriteOffset(Fixture fixture) {
+    void offsettedGetOfUnsignedShortMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanWriteOffset(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             int value = 0x0102;
             buf.writeUnsignedShort(value);
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readUnsignedShort(1));
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.getUnsignedShort(1));
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedReadOfUnsignedShortMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
+    void offsettedGetOfUnsignedShortMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readUnsignedShort(0));
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.getUnsignedShort(0));
         }
     }
 
@@ -2020,10 +2040,10 @@ public class BufTest {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             assertEquals(Long.BYTES, buf.capacity());
-            buf.writerIndex(7);
+            buf.writerOffset(7);
             short value = 0x0102;
             assertThrows(IndexOutOfBoundsException.class, () -> buf.writeShort(value));
-            buf.writerIndex(Long.BYTES);
+            buf.writerOffset(Long.BYTES);
             // Verify contents are unchanged.
             assertEquals(0, buf.readLong());
         }
@@ -2037,7 +2057,7 @@ public class BufTest {
             buf.order(ByteOrder.BIG_ENDIAN);
             short value = 0x0102;
             buf.writeShort(value);
-            buf.writerIndex(Long.BYTES);
+            buf.writerOffset(Long.BYTES);
             assertEquals((byte) 0x01, buf.readByte());
             assertEquals((byte) 0x02, buf.readByte());
             assertEquals((byte) 0x00, buf.readByte());
@@ -2051,13 +2071,13 @@ public class BufTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedWriteOfShortMustBoundsCheckWhenWriteOffsetIsNegative(Fixture fixture) {
+    void offsettedSetOfShortMustBoundsCheckWhenWriteOffsetIsNegative(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             assertEquals(Long.BYTES, buf.capacity());
             short value = 0x0102;
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.writeShort(-1, value));
-            buf.writerIndex(Long.BYTES);
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.setShort(-1, value));
+            buf.writerOffset(Long.BYTES);
             // Verify contents are unchanged.
             assertEquals(0, buf.readLong());
         }
@@ -2065,13 +2085,13 @@ public class BufTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedWriteOfShortMustBoundsCheckWhenWriteOffsetAndSizeIsBeyondCapacity(Fixture fixture) {
+    void offsettedSetOfShortMustBoundsCheckWhenWriteOffsetAndSizeIsBeyondCapacity(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             assertEquals(Long.BYTES, buf.capacity());
             short value = 0x0102;
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.writeShort(7, value));
-            buf.writerIndex(Long.BYTES);
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.setShort(7, value));
+            buf.writerOffset(Long.BYTES);
             // Verify contents are unchanged.
             assertEquals(0, buf.readLong());
         }
@@ -2079,13 +2099,13 @@ public class BufTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedWriteOfShortMustHaveDefaultEndianByteOrder(Fixture fixture) {
+    void offsettedSetOfShortMustHaveDefaultEndianByteOrder(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             buf.order(ByteOrder.BIG_ENDIAN);
             short value = 0x0102;
-            buf.writeShort(0, value);
-            buf.writerIndex(Long.BYTES);
+            buf.setShort(0, value);
+            buf.writerOffset(Long.BYTES);
             assertEquals((byte) 0x01, buf.readByte());
             assertEquals((byte) 0x02, buf.readByte());
             assertEquals((byte) 0x00, buf.readByte());
@@ -2103,10 +2123,10 @@ public class BufTest {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             assertEquals(Long.BYTES, buf.capacity());
-            buf.writerIndex(7);
+            buf.writerOffset(7);
             int value = 0x0102;
             assertThrows(IndexOutOfBoundsException.class, () -> buf.writeUnsignedShort(value));
-            buf.writerIndex(Long.BYTES);
+            buf.writerOffset(Long.BYTES);
             // Verify contents are unchanged.
             assertEquals(0, buf.readLong());
         }
@@ -2120,7 +2140,7 @@ public class BufTest {
             buf.order(ByteOrder.BIG_ENDIAN);
             int value = 0x0102;
             buf.writeUnsignedShort(value);
-            buf.writerIndex(Long.BYTES);
+            buf.writerOffset(Long.BYTES);
             assertEquals((byte) 0x01, buf.readByte());
             assertEquals((byte) 0x02, buf.readByte());
             assertEquals((byte) 0x00, buf.readByte());
@@ -2134,13 +2154,13 @@ public class BufTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedWriteOfUnsignedShortMustBoundsCheckWhenWriteOffsetIsNegative(Fixture fixture) {
+    void offsettedSetOfUnsignedShortMustBoundsCheckWhenWriteOffsetIsNegative(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             assertEquals(Long.BYTES, buf.capacity());
             int value = 0x0102;
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.writeUnsignedShort(-1, value));
-            buf.writerIndex(Long.BYTES);
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.setUnsignedShort(-1, value));
+            buf.writerOffset(Long.BYTES);
             // Verify contents are unchanged.
             assertEquals(0, buf.readLong());
         }
@@ -2148,13 +2168,13 @@ public class BufTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedWriteOfUnsignedShortMustBoundsCheckWhenWriteOffsetAndSizeIsBeyondCapacity(Fixture fixture) {
+    void offsettedSetOfUnsignedShortMustBoundsCheckWhenWriteOffsetAndSizeIsBeyondCapacity(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             assertEquals(Long.BYTES, buf.capacity());
             int value = 0x0102;
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.writeUnsignedShort(7, value));
-            buf.writerIndex(Long.BYTES);
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.setUnsignedShort(7, value));
+            buf.writerOffset(Long.BYTES);
             // Verify contents are unchanged.
             assertEquals(0, buf.readLong());
         }
@@ -2162,13 +2182,13 @@ public class BufTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedWriteOfUnsignedShortMustHaveDefaultEndianByteOrder(Fixture fixture) {
+    void offsettedSetOfUnsignedShortMustHaveDefaultEndianByteOrder(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             buf.order(ByteOrder.BIG_ENDIAN);
             int value = 0x0102;
-            buf.writeUnsignedShort(0, value);
-            buf.writerIndex(Long.BYTES);
+            buf.setUnsignedShort(0, value);
+            buf.writerOffset(Long.BYTES);
             assertEquals((byte) 0x01, buf.readByte());
             assertEquals((byte) 0x02, buf.readByte());
             assertEquals((byte) 0x00, buf.readByte());
@@ -2206,7 +2226,7 @@ public class BufTest {
             assertEquals(Long.BYTES, buf.writableBytes());
             int value = 0x010203;
             buf.writeMedium(value);
-            buf.writeByte(0, (byte) 0x10);
+            buf.setByte(0, (byte) 0x10);
             assertEquals(3, buf.readableBytes());
             assertEquals(5, buf.writableBytes());
             assertEquals(0x100203, buf.readMedium());
@@ -2223,7 +2243,7 @@ public class BufTest {
             assertEquals(Long.BYTES, buf.writableBytes());
             int value = 0x010203;
             buf.writeMedium(value);
-            buf.readerIndex(1);
+            buf.readerOffset(1);
             assertEquals(2, buf.readableBytes());
             assertEquals(5, buf.writableBytes());
             assertThrows(IndexOutOfBoundsException.class, buf::readMedium);
@@ -2233,54 +2253,54 @@ public class BufTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedReadOfMediumMustBoundsCheckOnNegativeOffset(Fixture fixture) {
+    void offsettedGetOfMediumMustBoundsCheckOnNegativeOffset(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readMedium(-1));
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.getMedium(-1));
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedReadOfMediumMustNotBoundsCheckWhenReadOffsetAndSizeIsEqualToWriteOffset(Fixture fixture) {
+    void offsettedGetOfMediumMustNotBoundsCheckWhenReadOffsetAndSizeIsEqualToWriteOffset(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             int value = 0x010203;
             buf.writeMedium(value);
-            assertEquals(value, buf.readMedium(0));
+            assertEquals(value, buf.getMedium(0));
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedReadOfMediumMustReadWithDefaultEndianByteOrder(Fixture fixture) {
+    void offsettedGetOfMediumMustReadWithDefaultEndianByteOrder(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             buf.order(ByteOrder.BIG_ENDIAN);
             int value = 0x010203;
             buf.writeMedium(value);
-            buf.writeByte(0, (byte) 0x10);
-            assertEquals(0x100203, buf.readMedium(0));
+            buf.setByte(0, (byte) 0x10);
+            assertEquals(0x100203, buf.getMedium(0));
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedReadOfMediumMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanWriteOffset(Fixture fixture) {
+    void offsettedGetOfMediumMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanWriteOffset(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             int value = 0x010203;
             buf.writeMedium(value);
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readMedium(1));
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.getMedium(1));
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedReadOfMediumMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
+    void offsettedGetOfMediumMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readMedium(0));
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.getMedium(0));
         }
     }
 
@@ -2310,7 +2330,7 @@ public class BufTest {
             assertEquals(Long.BYTES, buf.writableBytes());
             int value = 0x010203;
             buf.writeUnsignedMedium(value);
-            buf.writeByte(0, (byte) 0x10);
+            buf.setByte(0, (byte) 0x10);
             assertEquals(3, buf.readableBytes());
             assertEquals(5, buf.writableBytes());
             assertEquals(0x100203, buf.readUnsignedMedium());
@@ -2327,7 +2347,7 @@ public class BufTest {
             assertEquals(Long.BYTES, buf.writableBytes());
             int value = 0x010203;
             buf.writeUnsignedMedium(value);
-            buf.readerIndex(1);
+            buf.readerOffset(1);
             assertEquals(2, buf.readableBytes());
             assertEquals(5, buf.writableBytes());
             assertThrows(IndexOutOfBoundsException.class, buf::readUnsignedMedium);
@@ -2337,54 +2357,54 @@ public class BufTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedReadOfUnsignedMediumMustBoundsCheckOnNegativeOffset(Fixture fixture) {
+    void offsettedGetOfUnsignedMediumMustBoundsCheckOnNegativeOffset(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readUnsignedMedium(-1));
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.getUnsignedMedium(-1));
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedReadOfUnsignedMediumMustNotBoundsCheckWhenReadOffsetAndSizeIsEqualToWriteOffset(Fixture fixture) {
+    void offsettedGetOfUnsignedMediumMustNotBoundsCheckWhenReadOffsetAndSizeIsEqualToWriteOffset(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             int value = 0x010203;
             buf.writeUnsignedMedium(value);
-            assertEquals(value, buf.readUnsignedMedium(0));
+            assertEquals(value, buf.getUnsignedMedium(0));
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedReadOfUnsignedMediumMustReadWithDefaultEndianByteOrder(Fixture fixture) {
+    void offsettedGetOfUnsignedMediumMustReadWithDefaultEndianByteOrder(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             buf.order(ByteOrder.BIG_ENDIAN);
             int value = 0x010203;
             buf.writeUnsignedMedium(value);
-            buf.writeByte(0, (byte) 0x10);
-            assertEquals(0x100203, buf.readUnsignedMedium(0));
+            buf.setByte(0, (byte) 0x10);
+            assertEquals(0x100203, buf.getUnsignedMedium(0));
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedReadOfUnsignedMediumMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanWriteOffset(Fixture fixture) {
+    void offsettedGetOfUnsignedMediumMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanWriteOffset(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             int value = 0x010203;
             buf.writeUnsignedMedium(value);
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readUnsignedMedium(1));
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.getUnsignedMedium(1));
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedReadOfUnsignedMediumMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
+    void offsettedGetOfUnsignedMediumMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readUnsignedMedium(0));
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.getUnsignedMedium(0));
         }
     }
 
@@ -2394,10 +2414,10 @@ public class BufTest {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             assertEquals(Long.BYTES, buf.capacity());
-            buf.writerIndex(6);
+            buf.writerOffset(6);
             int value = 0x010203;
             assertThrows(IndexOutOfBoundsException.class, () -> buf.writeMedium(value));
-            buf.writerIndex(Long.BYTES);
+            buf.writerOffset(Long.BYTES);
             // Verify contents are unchanged.
             assertEquals(0, buf.readLong());
         }
@@ -2411,7 +2431,7 @@ public class BufTest {
             buf.order(ByteOrder.BIG_ENDIAN);
             int value = 0x010203;
             buf.writeMedium(value);
-            buf.writerIndex(Long.BYTES);
+            buf.writerOffset(Long.BYTES);
             assertEquals((byte) 0x01, buf.readByte());
             assertEquals((byte) 0x02, buf.readByte());
             assertEquals((byte) 0x03, buf.readByte());
@@ -2425,13 +2445,13 @@ public class BufTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedWriteOfMediumMustBoundsCheckWhenWriteOffsetIsNegative(Fixture fixture) {
+    void offsettedSetOfMediumMustBoundsCheckWhenWriteOffsetIsNegative(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             assertEquals(Long.BYTES, buf.capacity());
             int value = 0x010203;
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.writeMedium(-1, value));
-            buf.writerIndex(Long.BYTES);
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.setMedium(-1, value));
+            buf.writerOffset(Long.BYTES);
             // Verify contents are unchanged.
             assertEquals(0, buf.readLong());
         }
@@ -2439,13 +2459,13 @@ public class BufTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedWriteOfMediumMustBoundsCheckWhenWriteOffsetAndSizeIsBeyondCapacity(Fixture fixture) {
+    void offsettedSetOfMediumMustBoundsCheckWhenWriteOffsetAndSizeIsBeyondCapacity(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             assertEquals(Long.BYTES, buf.capacity());
             int value = 0x010203;
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.writeMedium(6, value));
-            buf.writerIndex(Long.BYTES);
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.setMedium(6, value));
+            buf.writerOffset(Long.BYTES);
             // Verify contents are unchanged.
             assertEquals(0, buf.readLong());
         }
@@ -2453,13 +2473,13 @@ public class BufTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedWriteOfMediumMustHaveDefaultEndianByteOrder(Fixture fixture) {
+    void offsettedSetOfMediumMustHaveDefaultEndianByteOrder(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             buf.order(ByteOrder.BIG_ENDIAN);
             int value = 0x010203;
-            buf.writeMedium(0, value);
-            buf.writerIndex(Long.BYTES);
+            buf.setMedium(0, value);
+            buf.writerOffset(Long.BYTES);
             assertEquals((byte) 0x01, buf.readByte());
             assertEquals((byte) 0x02, buf.readByte());
             assertEquals((byte) 0x03, buf.readByte());
@@ -2477,10 +2497,10 @@ public class BufTest {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             assertEquals(Long.BYTES, buf.capacity());
-            buf.writerIndex(6);
+            buf.writerOffset(6);
             int value = 0x010203;
             assertThrows(IndexOutOfBoundsException.class, () -> buf.writeUnsignedMedium(value));
-            buf.writerIndex(Long.BYTES);
+            buf.writerOffset(Long.BYTES);
             // Verify contents are unchanged.
             assertEquals(0, buf.readLong());
         }
@@ -2494,7 +2514,7 @@ public class BufTest {
             buf.order(ByteOrder.BIG_ENDIAN);
             int value = 0x010203;
             buf.writeUnsignedMedium(value);
-            buf.writerIndex(Long.BYTES);
+            buf.writerOffset(Long.BYTES);
             assertEquals((byte) 0x01, buf.readByte());
             assertEquals((byte) 0x02, buf.readByte());
             assertEquals((byte) 0x03, buf.readByte());
@@ -2508,13 +2528,13 @@ public class BufTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedWriteOfUnsignedMediumMustBoundsCheckWhenWriteOffsetIsNegative(Fixture fixture) {
+    void offsettedSetOfUnsignedMediumMustBoundsCheckWhenWriteOffsetIsNegative(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             assertEquals(Long.BYTES, buf.capacity());
             int value = 0x010203;
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.writeUnsignedMedium(-1, value));
-            buf.writerIndex(Long.BYTES);
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.setUnsignedMedium(-1, value));
+            buf.writerOffset(Long.BYTES);
             // Verify contents are unchanged.
             assertEquals(0, buf.readLong());
         }
@@ -2522,13 +2542,13 @@ public class BufTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedWriteOfUnsignedMediumMustBoundsCheckWhenWriteOffsetAndSizeIsBeyondCapacity(Fixture fixture) {
+    void offsettedSetOfUnsignedMediumMustBoundsCheckWhenWriteOffsetAndSizeIsBeyondCapacity(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             assertEquals(Long.BYTES, buf.capacity());
             int value = 0x010203;
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.writeUnsignedMedium(6, value));
-            buf.writerIndex(Long.BYTES);
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.setUnsignedMedium(6, value));
+            buf.writerOffset(Long.BYTES);
             // Verify contents are unchanged.
             assertEquals(0, buf.readLong());
         }
@@ -2536,13 +2556,13 @@ public class BufTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedWriteOfUnsignedMediumMustHaveDefaultEndianByteOrder(Fixture fixture) {
+    void offsettedSetOfUnsignedMediumMustHaveDefaultEndianByteOrder(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             buf.order(ByteOrder.BIG_ENDIAN);
             int value = 0x010203;
-            buf.writeUnsignedMedium(0, value);
-            buf.writerIndex(Long.BYTES);
+            buf.setUnsignedMedium(0, value);
+            buf.writerOffset(Long.BYTES);
             assertEquals((byte) 0x01, buf.readByte());
             assertEquals((byte) 0x02, buf.readByte());
             assertEquals((byte) 0x03, buf.readByte());
@@ -2580,7 +2600,7 @@ public class BufTest {
             assertEquals(Long.BYTES, buf.writableBytes());
             int value = 0x01020304;
             buf.writeInt(value);
-            buf.writeByte(0, (byte) 0x10);
+            buf.setByte(0, (byte) 0x10);
             assertEquals(4, buf.readableBytes());
             assertEquals(4, buf.writableBytes());
             assertEquals(0x10020304, buf.readInt());
@@ -2597,7 +2617,7 @@ public class BufTest {
             assertEquals(Long.BYTES, buf.writableBytes());
             int value = 0x01020304;
             buf.writeInt(value);
-            buf.readerIndex(1);
+            buf.readerOffset(1);
             assertEquals(3, buf.readableBytes());
             assertEquals(4, buf.writableBytes());
             assertThrows(IndexOutOfBoundsException.class, buf::readInt);
@@ -2607,54 +2627,54 @@ public class BufTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedReadOfIntMustBoundsCheckOnNegativeOffset(Fixture fixture) {
+    void offsettedGetOfIntMustBoundsCheckOnNegativeOffset(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readInt(-1));
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.getInt(-1));
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedReadOfIntMustNotBoundsCheckWhenReadOffsetAndSizeIsEqualToWriteOffset(Fixture fixture) {
+    void offsettedGetOfIntMustNotBoundsCheckWhenReadOffsetAndSizeIsEqualToWriteOffset(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             int value = 0x01020304;
             buf.writeInt(value);
-            assertEquals(value, buf.readInt(0));
+            assertEquals(value, buf.getInt(0));
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedReadOfIntMustReadWithDefaultEndianByteOrder(Fixture fixture) {
+    void offsettedGetOfIntMustReadWithDefaultEndianByteOrder(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             buf.order(ByteOrder.BIG_ENDIAN);
             int value = 0x01020304;
             buf.writeInt(value);
-            buf.writeByte(0, (byte) 0x10);
-            assertEquals(0x10020304, buf.readInt(0));
+            buf.setByte(0, (byte) 0x10);
+            assertEquals(0x10020304, buf.getInt(0));
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedReadOfIntMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanWriteOffset(Fixture fixture) {
+    void offsettedGetOfIntMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanWriteOffset(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             int value = 0x01020304;
             buf.writeInt(value);
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readInt(-1));
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.getInt(-1));
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedReadOfIntMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
+    void offsettedGetOfIntMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readInt(0));
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.getInt(0));
         }
     }
 
@@ -2684,7 +2704,7 @@ public class BufTest {
             assertEquals(Long.BYTES, buf.writableBytes());
             long value = 0x01020304;
             buf.writeUnsignedInt(value);
-            buf.writeByte(0, (byte) 0x10);
+            buf.setByte(0, (byte) 0x10);
             assertEquals(4, buf.readableBytes());
             assertEquals(4, buf.writableBytes());
             assertEquals(0x10020304, buf.readUnsignedInt());
@@ -2701,7 +2721,7 @@ public class BufTest {
             assertEquals(Long.BYTES, buf.writableBytes());
             long value = 0x01020304;
             buf.writeUnsignedInt(value);
-            buf.readerIndex(1);
+            buf.readerOffset(1);
             assertEquals(3, buf.readableBytes());
             assertEquals(4, buf.writableBytes());
             assertThrows(IndexOutOfBoundsException.class, buf::readUnsignedInt);
@@ -2711,54 +2731,54 @@ public class BufTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedReadOfUnsignedIntMustBoundsCheckOnNegativeOffset(Fixture fixture) {
+    void offsettedGetOfUnsignedIntMustBoundsCheckOnNegativeOffset(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readUnsignedInt(-1));
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.getUnsignedInt(-1));
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedReadOfUnsignedIntMustNotBoundsCheckWhenReadOffsetAndSizeIsEqualToWriteOffset(Fixture fixture) {
+    void offsettedGetOfUnsignedIntMustNotBoundsCheckWhenReadOffsetAndSizeIsEqualToWriteOffset(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             long value = 0x01020304;
             buf.writeUnsignedInt(value);
-            assertEquals(value, buf.readUnsignedInt(0));
+            assertEquals(value, buf.getUnsignedInt(0));
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedReadOfUnsignedIntMustReadWithDefaultEndianByteOrder(Fixture fixture) {
+    void offsettedGetOfUnsignedIntMustReadWithDefaultEndianByteOrder(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             buf.order(ByteOrder.BIG_ENDIAN);
             long value = 0x01020304;
             buf.writeUnsignedInt(value);
-            buf.writeByte(0, (byte) 0x10);
-            assertEquals(0x10020304, buf.readUnsignedInt(0));
+            buf.setByte(0, (byte) 0x10);
+            assertEquals(0x10020304, buf.getUnsignedInt(0));
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedReadOfUnsignedIntMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanWriteOffset(Fixture fixture) {
+    void offsettedGetOfUnsignedIntMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanWriteOffset(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             long value = 0x01020304;
             buf.writeUnsignedInt(value);
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readUnsignedInt(1));
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.getUnsignedInt(1));
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedReadOfUnsignedIntMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
+    void offsettedGetOfUnsignedIntMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readUnsignedInt(0));
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.getUnsignedInt(0));
         }
     }
 
@@ -2768,10 +2788,10 @@ public class BufTest {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             assertEquals(Long.BYTES, buf.capacity());
-            buf.writerIndex(5);
+            buf.writerOffset(5);
             int value = 0x01020304;
             assertThrows(IndexOutOfBoundsException.class, () -> buf.writeInt(value));
-            buf.writerIndex(Long.BYTES);
+            buf.writerOffset(Long.BYTES);
             // Verify contents are unchanged.
             assertEquals(0, buf.readLong());
         }
@@ -2785,7 +2805,7 @@ public class BufTest {
             buf.order(ByteOrder.BIG_ENDIAN);
             int value = 0x01020304;
             buf.writeInt(value);
-            buf.writerIndex(Long.BYTES);
+            buf.writerOffset(Long.BYTES);
             assertEquals((byte) 0x01, buf.readByte());
             assertEquals((byte) 0x02, buf.readByte());
             assertEquals((byte) 0x03, buf.readByte());
@@ -2799,13 +2819,13 @@ public class BufTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedWriteOfIntMustBoundsCheckWhenWriteOffsetIsNegative(Fixture fixture) {
+    void offsettedSetOfIntMustBoundsCheckWhenWriteOffsetIsNegative(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             assertEquals(Long.BYTES, buf.capacity());
             int value = 0x01020304;
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.writeInt(-1, value));
-            buf.writerIndex(Long.BYTES);
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.setInt(-1, value));
+            buf.writerOffset(Long.BYTES);
             // Verify contents are unchanged.
             assertEquals(0, buf.readLong());
         }
@@ -2813,13 +2833,13 @@ public class BufTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedWriteOfIntMustBoundsCheckWhenWriteOffsetAndSizeIsBeyondCapacity(Fixture fixture) {
+    void offsettedSetOfIntMustBoundsCheckWhenWriteOffsetAndSizeIsBeyondCapacity(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             assertEquals(Long.BYTES, buf.capacity());
             int value = 0x01020304;
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.writeInt(5, value));
-            buf.writerIndex(Long.BYTES);
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.setInt(5, value));
+            buf.writerOffset(Long.BYTES);
             // Verify contents are unchanged.
             assertEquals(0, buf.readLong());
         }
@@ -2827,13 +2847,13 @@ public class BufTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedWriteOfIntMustHaveDefaultEndianByteOrder(Fixture fixture) {
+    void offsettedSetOfIntMustHaveDefaultEndianByteOrder(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             buf.order(ByteOrder.BIG_ENDIAN);
             int value = 0x01020304;
-            buf.writeInt(0, value);
-            buf.writerIndex(Long.BYTES);
+            buf.setInt(0, value);
+            buf.writerOffset(Long.BYTES);
             assertEquals((byte) 0x01, buf.readByte());
             assertEquals((byte) 0x02, buf.readByte());
             assertEquals((byte) 0x03, buf.readByte());
@@ -2851,10 +2871,10 @@ public class BufTest {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             assertEquals(Long.BYTES, buf.capacity());
-            buf.writerIndex(5);
+            buf.writerOffset(5);
             long value = 0x01020304;
             assertThrows(IndexOutOfBoundsException.class, () -> buf.writeUnsignedInt(value));
-            buf.writerIndex(Long.BYTES);
+            buf.writerOffset(Long.BYTES);
             // Verify contents are unchanged.
             assertEquals(0, buf.readLong());
         }
@@ -2868,7 +2888,7 @@ public class BufTest {
             buf.order(ByteOrder.BIG_ENDIAN);
             long value = 0x01020304;
             buf.writeUnsignedInt(value);
-            buf.writerIndex(Long.BYTES);
+            buf.writerOffset(Long.BYTES);
             assertEquals((byte) 0x01, buf.readByte());
             assertEquals((byte) 0x02, buf.readByte());
             assertEquals((byte) 0x03, buf.readByte());
@@ -2882,13 +2902,13 @@ public class BufTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedWriteOfUnsignedIntMustBoundsCheckWhenWriteOffsetIsNegative(Fixture fixture) {
+    void offsettedSetOfUnsignedIntMustBoundsCheckWhenWriteOffsetIsNegative(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             assertEquals(Long.BYTES, buf.capacity());
             long value = 0x01020304;
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.writeUnsignedInt(-1, value));
-            buf.writerIndex(Long.BYTES);
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.setUnsignedInt(-1, value));
+            buf.writerOffset(Long.BYTES);
             // Verify contents are unchanged.
             assertEquals(0, buf.readLong());
         }
@@ -2896,13 +2916,13 @@ public class BufTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedWriteOfUnsignedIntMustBoundsCheckWhenWriteOffsetAndSizeIsBeyondCapacity(Fixture fixture) {
+    void offsettedSetOfUnsignedIntMustBoundsCheckWhenWriteOffsetAndSizeIsBeyondCapacity(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             assertEquals(Long.BYTES, buf.capacity());
             long value = 0x01020304;
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.writeUnsignedInt(5, value));
-            buf.writerIndex(Long.BYTES);
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.setUnsignedInt(5, value));
+            buf.writerOffset(Long.BYTES);
             // Verify contents are unchanged.
             assertEquals(0, buf.readLong());
         }
@@ -2910,13 +2930,13 @@ public class BufTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedWriteOfUnsignedIntMustHaveDefaultEndianByteOrder(Fixture fixture) {
+    void offsettedSetOfUnsignedIntMustHaveDefaultEndianByteOrder(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             buf.order(ByteOrder.BIG_ENDIAN);
             long value = 0x01020304;
-            buf.writeUnsignedInt(0, value);
-            buf.writerIndex(Long.BYTES);
+            buf.setUnsignedInt(0, value);
+            buf.writerOffset(Long.BYTES);
             assertEquals((byte) 0x01, buf.readByte());
             assertEquals((byte) 0x02, buf.readByte());
             assertEquals((byte) 0x03, buf.readByte());
@@ -2954,7 +2974,7 @@ public class BufTest {
             assertEquals(Long.BYTES, buf.writableBytes());
             float value = Float.intBitsToFloat(0x01020304);
             buf.writeFloat(value);
-            buf.writeByte(0, (byte) 0x10);
+            buf.setByte(0, (byte) 0x10);
             assertEquals(4, buf.readableBytes());
             assertEquals(4, buf.writableBytes());
             assertEquals(Float.intBitsToFloat(0x10020304), buf.readFloat());
@@ -2971,7 +2991,7 @@ public class BufTest {
             assertEquals(Long.BYTES, buf.writableBytes());
             float value = Float.intBitsToFloat(0x01020304);
             buf.writeFloat(value);
-            buf.readerIndex(1);
+            buf.readerOffset(1);
             assertEquals(3, buf.readableBytes());
             assertEquals(4, buf.writableBytes());
             assertThrows(IndexOutOfBoundsException.class, buf::readFloat);
@@ -2981,54 +3001,54 @@ public class BufTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedReadOfFloatMustBoundsCheckOnNegativeOffset(Fixture fixture) {
+    void offsettedGetOfFloatMustBoundsCheckOnNegativeOffset(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readFloat(-1));
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.getFloat(-1));
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedReadOfFloatMustNotBoundsCheckWhenReadOffsetAndSizeIsEqualToWriteOffset(Fixture fixture) {
+    void offsettedGetOfFloatMustNotBoundsCheckWhenReadOffsetAndSizeIsEqualToWriteOffset(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             float value = Float.intBitsToFloat(0x01020304);
             buf.writeFloat(value);
-            assertEquals(value, buf.readFloat(0));
+            assertEquals(value, buf.getFloat(0));
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedReadOfFloatMustReadWithDefaultEndianByteOrder(Fixture fixture) {
+    void offsettedGetOfFloatMustReadWithDefaultEndianByteOrder(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             buf.order(ByteOrder.BIG_ENDIAN);
             float value = Float.intBitsToFloat(0x01020304);
             buf.writeFloat(value);
-            buf.writeByte(0, (byte) 0x10);
-            assertEquals(Float.intBitsToFloat(0x10020304), buf.readFloat(0));
+            buf.setByte(0, (byte) 0x10);
+            assertEquals(Float.intBitsToFloat(0x10020304), buf.getFloat(0));
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedReadOfFloatMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanWriteOffset(Fixture fixture) {
+    void offsettedGetOfFloatMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanWriteOffset(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             float value = Float.intBitsToFloat(0x01020304);
             buf.writeFloat(value);
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readFloat(1));
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.getFloat(1));
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedReadOfFloatMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
+    void offsettedGetOfFloatMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readFloat(0));
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.getFloat(0));
         }
     }
 
@@ -3038,10 +3058,10 @@ public class BufTest {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             assertEquals(Long.BYTES, buf.capacity());
-            buf.writerIndex(5);
+            buf.writerOffset(5);
             float value = Float.intBitsToFloat(0x01020304);
             assertThrows(IndexOutOfBoundsException.class, () -> buf.writeFloat(value));
-            buf.writerIndex(Long.BYTES);
+            buf.writerOffset(Long.BYTES);
             // Verify contents are unchanged.
             assertEquals(0, buf.readLong());
         }
@@ -3055,7 +3075,7 @@ public class BufTest {
             buf.order(ByteOrder.BIG_ENDIAN);
             float value = Float.intBitsToFloat(0x01020304);
             buf.writeFloat(value);
-            buf.writerIndex(Long.BYTES);
+            buf.writerOffset(Long.BYTES);
             assertEquals((byte) 0x01, buf.readByte());
             assertEquals((byte) 0x02, buf.readByte());
             assertEquals((byte) 0x03, buf.readByte());
@@ -3069,13 +3089,13 @@ public class BufTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedWriteOfFloatMustBoundsCheckWhenWriteOffsetIsNegative(Fixture fixture) {
+    void offsettedSetOfFloatMustBoundsCheckWhenWriteOffsetIsNegative(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             assertEquals(Long.BYTES, buf.capacity());
             float value = Float.intBitsToFloat(0x01020304);
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.writeFloat(-1, value));
-            buf.writerIndex(Long.BYTES);
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.setFloat(-1, value));
+            buf.writerOffset(Long.BYTES);
             // Verify contents are unchanged.
             assertEquals(0, buf.readLong());
         }
@@ -3083,13 +3103,13 @@ public class BufTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedWriteOfFloatMustBoundsCheckWhenWriteOffsetAndSizeIsBeyondCapacity(Fixture fixture) {
+    void offsettedSetOfFloatMustBoundsCheckWhenWriteOffsetAndSizeIsBeyondCapacity(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             assertEquals(Long.BYTES, buf.capacity());
             float value = Float.intBitsToFloat(0x01020304);
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.writeFloat(5, value));
-            buf.writerIndex(Long.BYTES);
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.setFloat(5, value));
+            buf.writerOffset(Long.BYTES);
             // Verify contents are unchanged.
             assertEquals(0, buf.readLong());
         }
@@ -3097,13 +3117,13 @@ public class BufTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedWriteOfFloatMustHaveDefaultEndianByteOrder(Fixture fixture) {
+    void offsettedSetOfFloatMustHaveDefaultEndianByteOrder(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             buf.order(ByteOrder.BIG_ENDIAN);
             float value = Float.intBitsToFloat(0x01020304);
-            buf.writeFloat(0, value);
-            buf.writerIndex(Long.BYTES);
+            buf.setFloat(0, value);
+            buf.writerOffset(Long.BYTES);
             assertEquals((byte) 0x01, buf.readByte());
             assertEquals((byte) 0x02, buf.readByte());
             assertEquals((byte) 0x03, buf.readByte());
@@ -3141,7 +3161,7 @@ public class BufTest {
             assertEquals(Long.BYTES, buf.writableBytes());
             long value = 0x0102030405060708L;
             buf.writeLong(value);
-            buf.writeByte(0, (byte) 0x10);
+            buf.setByte(0, (byte) 0x10);
             assertEquals(8, buf.readableBytes());
             assertEquals(0, buf.writableBytes());
             assertEquals(0x1002030405060708L, buf.readLong());
@@ -3158,7 +3178,7 @@ public class BufTest {
             assertEquals(Long.BYTES, buf.writableBytes());
             long value = 0x0102030405060708L;
             buf.writeLong(value);
-            buf.readerIndex(1);
+            buf.readerOffset(1);
             assertEquals(7, buf.readableBytes());
             assertEquals(0, buf.writableBytes());
             assertThrows(IndexOutOfBoundsException.class, buf::readLong);
@@ -3168,54 +3188,54 @@ public class BufTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedReadOfLongMustBoundsCheckOnNegativeOffset(Fixture fixture) {
+    void offsettedGetOfLongMustBoundsCheckOnNegativeOffset(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readLong(-1));
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.getLong(-1));
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedReadOfLongMustNotBoundsCheckWhenReadOffsetAndSizeIsEqualToWriteOffset(Fixture fixture) {
+    void offsettedGetOfLongMustNotBoundsCheckWhenReadOffsetAndSizeIsEqualToWriteOffset(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             long value = 0x0102030405060708L;
             buf.writeLong(value);
-            assertEquals(value, buf.readLong(0));
+            assertEquals(value, buf.getLong(0));
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedReadOfLongMustReadWithDefaultEndianByteOrder(Fixture fixture) {
+    void offsettedGetOfLongMustReadWithDefaultEndianByteOrder(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             buf.order(ByteOrder.BIG_ENDIAN);
             long value = 0x0102030405060708L;
             buf.writeLong(value);
-            buf.writeByte(0, (byte) 0x10);
-            assertEquals(0x1002030405060708L, buf.readLong(0));
+            buf.setByte(0, (byte) 0x10);
+            assertEquals(0x1002030405060708L, buf.getLong(0));
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedReadOfLongMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanWriteOffset(Fixture fixture) {
+    void offsettedGetOfLongMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanWriteOffset(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             long value = 0x0102030405060708L;
             buf.writeLong(value);
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readLong(1));
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.getLong(1));
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedReadOfLongMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
+    void offsettedGetOfLongMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readLong(0));
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.getLong(0));
         }
     }
 
@@ -3225,10 +3245,10 @@ public class BufTest {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             assertEquals(Long.BYTES, buf.capacity());
-            buf.writerIndex(1);
+            buf.writerOffset(1);
             long value = 0x0102030405060708L;
             assertThrows(IndexOutOfBoundsException.class, () -> buf.writeLong(value));
-            buf.writerIndex(Long.BYTES);
+            buf.writerOffset(Long.BYTES);
             // Verify contents are unchanged.
             assertEquals(0, buf.readLong());
         }
@@ -3242,7 +3262,7 @@ public class BufTest {
             buf.order(ByteOrder.BIG_ENDIAN);
             long value = 0x0102030405060708L;
             buf.writeLong(value);
-            buf.writerIndex(Long.BYTES);
+            buf.writerOffset(Long.BYTES);
             assertEquals((byte) 0x01, buf.readByte());
             assertEquals((byte) 0x02, buf.readByte());
             assertEquals((byte) 0x03, buf.readByte());
@@ -3256,13 +3276,13 @@ public class BufTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedWriteOfLongMustBoundsCheckWhenWriteOffsetIsNegative(Fixture fixture) {
+    void offsettedSetOfLongMustBoundsCheckWhenWriteOffsetIsNegative(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             assertEquals(Long.BYTES, buf.capacity());
             long value = 0x0102030405060708L;
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.writeLong(-1, value));
-            buf.writerIndex(Long.BYTES);
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.setLong(-1, value));
+            buf.writerOffset(Long.BYTES);
             // Verify contents are unchanged.
             assertEquals(0, buf.readLong());
         }
@@ -3270,13 +3290,13 @@ public class BufTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedWriteOfLongMustBoundsCheckWhenWriteOffsetAndSizeIsBeyondCapacity(Fixture fixture) {
+    void offsettedSetOfLongMustBoundsCheckWhenWriteOffsetAndSizeIsBeyondCapacity(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             assertEquals(Long.BYTES, buf.capacity());
             long value = 0x0102030405060708L;
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.writeLong(1, value));
-            buf.writerIndex(Long.BYTES);
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.setLong(1, value));
+            buf.writerOffset(Long.BYTES);
             // Verify contents are unchanged.
             assertEquals(0, buf.readLong());
         }
@@ -3284,13 +3304,13 @@ public class BufTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedWriteOfLongMustHaveDefaultEndianByteOrder(Fixture fixture) {
+    void offsettedSetOfLongMustHaveDefaultEndianByteOrder(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             buf.order(ByteOrder.BIG_ENDIAN);
             long value = 0x0102030405060708L;
-            buf.writeLong(0, value);
-            buf.writerIndex(Long.BYTES);
+            buf.setLong(0, value);
+            buf.writerOffset(Long.BYTES);
             assertEquals((byte) 0x01, buf.readByte());
             assertEquals((byte) 0x02, buf.readByte());
             assertEquals((byte) 0x03, buf.readByte());
@@ -3328,7 +3348,7 @@ public class BufTest {
             assertEquals(Long.BYTES, buf.writableBytes());
             double value = Double.longBitsToDouble(0x0102030405060708L);
             buf.writeDouble(value);
-            buf.writeByte(0, (byte) 0x10);
+            buf.setByte(0, (byte) 0x10);
             assertEquals(8, buf.readableBytes());
             assertEquals(0, buf.writableBytes());
             assertEquals(Double.longBitsToDouble(0x1002030405060708L), buf.readDouble());
@@ -3345,7 +3365,7 @@ public class BufTest {
             assertEquals(Long.BYTES, buf.writableBytes());
             double value = Double.longBitsToDouble(0x0102030405060708L);
             buf.writeDouble(value);
-            buf.readerIndex(1);
+            buf.readerOffset(1);
             assertEquals(7, buf.readableBytes());
             assertEquals(0, buf.writableBytes());
             assertThrows(IndexOutOfBoundsException.class, buf::readDouble);
@@ -3355,54 +3375,54 @@ public class BufTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedReadOfDoubleMustBoundsCheckOnNegativeOffset(Fixture fixture) {
+    void offsettedGetOfDoubleMustBoundsCheckOnNegativeOffset(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readDouble(-1));
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.getDouble(-1));
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedReadOfDoubleMustNotBoundsCheckWhenReadOffsetAndSizeIsEqualToWriteOffset(Fixture fixture) {
+    void offsettedGetOfDoubleMustNotBoundsCheckWhenReadOffsetAndSizeIsEqualToWriteOffset(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             double value = Double.longBitsToDouble(0x0102030405060708L);
             buf.writeDouble(value);
-            assertEquals(value, buf.readDouble(0));
+            assertEquals(value, buf.getDouble(0));
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedReadOfDoubleMustReadWithDefaultEndianByteOrder(Fixture fixture) {
+    void offsettedGetOfDoubleMustReadWithDefaultEndianByteOrder(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             buf.order(ByteOrder.BIG_ENDIAN);
             double value = Double.longBitsToDouble(0x0102030405060708L);
             buf.writeDouble(value);
-            buf.writeByte(0, (byte) 0x10);
-            assertEquals(Double.longBitsToDouble(0x1002030405060708L), buf.readDouble(0));
+            buf.setByte(0, (byte) 0x10);
+            assertEquals(Double.longBitsToDouble(0x1002030405060708L), buf.getDouble(0));
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedReadOfDoubleMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanWriteOffset(Fixture fixture) {
+    void offsettedGetOfDoubleMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanWriteOffset(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             double value = Double.longBitsToDouble(0x0102030405060708L);
             buf.writeDouble(value);
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readDouble(1));
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.getDouble(1));
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedReadOfDoubleMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
+    void offsettedGetOfDoubleMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readDouble(0));
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.getDouble(0));
         }
     }
 
@@ -3412,10 +3432,10 @@ public class BufTest {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             assertEquals(Long.BYTES, buf.capacity());
-            buf.writerIndex(1);
+            buf.writerOffset(1);
             double value = Double.longBitsToDouble(0x0102030405060708L);
             assertThrows(IndexOutOfBoundsException.class, () -> buf.writeDouble(value));
-            buf.writerIndex(Long.BYTES);
+            buf.writerOffset(Long.BYTES);
             // Verify contents are unchanged.
             assertEquals(0, buf.readLong());
         }
@@ -3429,7 +3449,7 @@ public class BufTest {
             buf.order(ByteOrder.BIG_ENDIAN);
             double value = Double.longBitsToDouble(0x0102030405060708L);
             buf.writeDouble(value);
-            buf.writerIndex(Long.BYTES);
+            buf.writerOffset(Long.BYTES);
             assertEquals((byte) 0x01, buf.readByte());
             assertEquals((byte) 0x02, buf.readByte());
             assertEquals((byte) 0x03, buf.readByte());
@@ -3443,13 +3463,13 @@ public class BufTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedWriteOfDoubleMustBoundsCheckWhenWriteOffsetIsNegative(Fixture fixture) {
+    void offsettedSetOfDoubleMustBoundsCheckWhenWriteOffsetIsNegative(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             assertEquals(Long.BYTES, buf.capacity());
             double value = Double.longBitsToDouble(0x0102030405060708L);
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.writeDouble(-1, value));
-            buf.writerIndex(Long.BYTES);
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.setDouble(-1, value));
+            buf.writerOffset(Long.BYTES);
             // Verify contents are unchanged.
             assertEquals(0, buf.readLong());
         }
@@ -3457,13 +3477,13 @@ public class BufTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedWriteOfDoubleMustBoundsCheckWhenWriteOffsetAndSizeIsBeyondCapacity(Fixture fixture) {
+    void offsettedSetOfDoubleMustBoundsCheckWhenWriteOffsetAndSizeIsBeyondCapacity(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             assertEquals(Long.BYTES, buf.capacity());
             double value = Double.longBitsToDouble(0x0102030405060708L);
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.writeDouble(1, value));
-            buf.writerIndex(Long.BYTES);
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.setDouble(1, value));
+            buf.writerOffset(Long.BYTES);
             // Verify contents are unchanged.
             assertEquals(0, buf.readLong());
         }
@@ -3471,13 +3491,13 @@ public class BufTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedWriteOfDoubleMustHaveDefaultEndianByteOrder(Fixture fixture) {
+    void offsettedSetOfDoubleMustHaveDefaultEndianByteOrder(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             buf.order(ByteOrder.BIG_ENDIAN);
             double value = Double.longBitsToDouble(0x0102030405060708L);
-            buf.writeDouble(0, value);
-            buf.writerIndex(Long.BYTES);
+            buf.setDouble(0, value);
+            buf.writerOffset(Long.BYTES);
             assertEquals((byte) 0x01, buf.readByte());
             assertEquals((byte) 0x02, buf.readByte());
             assertEquals((byte) 0x03, buf.readByte());
@@ -3489,7 +3509,12 @@ public class BufTest {
         }
     }
     // </editor-fold>
-    // ### CODEGEN END primitive accessors tests
+
+    private static byte[] toByteArray(Buf buf) {
+        byte[] bs = new byte[buf.capacity()];
+        buf.copyInto(0, bs, 0, bs.length);
+        return bs;
+    }
 
     private static void assertEquals(byte expected, byte actual) {
         if (expected != actual) {

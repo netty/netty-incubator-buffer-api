@@ -69,9 +69,9 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
                 if (buf.writableBytes() == 0) {
                     woff += buf.capacity();
                 } else if (!woffMidpoint) {
-                    woff += buf.writerIndex();
+                    woff += buf.writerOffset();
                     woffMidpoint = true;
-                } else if (buf.writerIndex() != 0) {
+                } else if (buf.writerOffset() != 0) {
                     throw new IllegalArgumentException(
                             "The given buffers cannot be composed because they have an unwritten gap: " +
                             Arrays.toString(bufs) + '.');
@@ -82,9 +82,9 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
                 if (buf.readableBytes() == 0 && buf.writableBytes() == 0) {
                     roff += buf.capacity();
                 } else if (!roffMidpoint) {
-                    roff += buf.readerIndex();
+                    roff += buf.readerOffset();
                     roffMidpoint = true;
-                } else if (buf.readerIndex() != 0) {
+                } else if (buf.readerOffset() != 0) {
                     throw new IllegalArgumentException(
                             "The given buffers cannot be composed because they have an unread gap: " +
                             Arrays.toString(bufs) + '.');
@@ -129,16 +129,16 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
     }
 
     @Override
-    public int readerIndex() {
+    public int readerOffset() {
         return roff;
     }
 
     @Override
-    public Buf readerIndex(int index) {
+    public Buf readerOffset(int index) {
         prepRead(index, 0);
         int indexLeft = index;
         for (Buf buf : bufs) {
-            buf.readerIndex(Math.min(indexLeft, buf.capacity()));
+            buf.readerOffset(Math.min(indexLeft, buf.capacity()));
             indexLeft = Math.max(0, indexLeft - buf.capacity());
         }
         roff = index;
@@ -146,16 +146,16 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
     }
 
     @Override
-    public int writerIndex() {
+    public int writerOffset() {
         return woff;
     }
 
     @Override
-    public Buf writerIndex(int index) {
+    public Buf writerOffset(int index) {
         checkWriteBounds(index, 0);
         int indexLeft = index;
         for (Buf buf : bufs) {
-            buf.writerIndex(Math.min(indexLeft, buf.capacity()));
+            buf.writerOffset(Math.min(indexLeft, buf.capacity()));
             indexLeft = Math.max(0, indexLeft - buf.capacity());
         }
         woff = index;
@@ -168,18 +168,6 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
             buf.fill(value);
         }
         return this;
-    }
-
-    @Override
-    public byte[] copy() {
-        var bytes = new byte[capacity];
-        int base = 0;
-        for (Buf buf : bufs) {
-            var src = buf.copy();
-            System.arraycopy(src, 0, bytes, base, src.length);
-            base += src.length;
-        }
-        return bytes;
     }
 
     @Override
@@ -222,7 +210,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
                 slices = new Buf[] { choice.slice(subOffset, 0) };
             }
 
-            return new CompositeBuf(false, slices, drop).writerIndex(length);
+            return new CompositeBuf(false, slices, drop).writerOffset(length);
         } catch (Throwable throwable) {
             // We called acquire prior to the try-clause. We need to undo that if we're not creating a composite buffer:
             close();
@@ -295,10 +283,10 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
             while (itr.hasNextLong()) {
                 long val = itr.nextLong();
                 length -= Long.BYTES;
-                dest.writeLong(destPos + length, val);
+                dest.setLong(destPos + length, val);
             }
             while (itr.hasNextByte()) {
-                dest.writeByte(destPos + --length, itr.nextByte());
+                dest.setByte(destPos + --length, itr.nextByte());
             }
         } finally {
             dest.order(prevOrder);
@@ -479,8 +467,8 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
     }
 
     @Override
-    public byte readByte(int roff) {
-        return prepRead(roff, Byte.BYTES).readByte(subOffset);
+    public byte getByte(int roff) {
+        return prepRead(roff, Byte.BYTES).getByte(subOffset);
     }
 
     @Override
@@ -489,8 +477,8 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
     }
 
     @Override
-    public int readUnsignedByte(int roff) {
-        return prepRead(roff, Byte.BYTES).readUnsignedByte(subOffset);
+    public int getUnsignedByte(int roff) {
+        return prepRead(roff, Byte.BYTES).getUnsignedByte(subOffset);
     }
 
     @Override
@@ -500,8 +488,8 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
     }
 
     @Override
-    public Buf writeByte(int woff, byte value) {
-        prepWrite(woff, Byte.BYTES).writeByte(subOffset, value);
+    public Buf setByte(int woff, byte value) {
+        prepWrite(woff, Byte.BYTES).setByte(subOffset, value);
         return this;
     }
 
@@ -512,8 +500,8 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
     }
 
     @Override
-    public Buf writeUnsignedByte(int woff, int value) {
-        prepWrite(woff, Byte.BYTES).writeUnsignedByte(subOffset, value);
+    public Buf setUnsignedByte(int woff, int value) {
+        prepWrite(woff, Byte.BYTES).setUnsignedByte(subOffset, value);
         return this;
     }
 
@@ -523,8 +511,8 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
     }
 
     @Override
-    public char readChar(int roff) {
-        return prepRead(roff, 2).readChar(subOffset);
+    public char getChar(int roff) {
+        return prepRead(roff, 2).getChar(subOffset);
     }
 
     @Override
@@ -534,8 +522,8 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
     }
 
     @Override
-    public Buf writeChar(int woff, char value) {
-        prepWrite(woff, 2).writeChar(subOffset, value);
+    public Buf setChar(int woff, char value) {
+        prepWrite(woff, 2).setChar(subOffset, value);
         return this;
     }
 
@@ -545,8 +533,8 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
     }
 
     @Override
-    public short readShort(int roff) {
-        return prepRead(roff, Short.BYTES).readShort(subOffset);
+    public short getShort(int roff) {
+        return prepRead(roff, Short.BYTES).getShort(subOffset);
     }
 
     @Override
@@ -555,8 +543,8 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
     }
 
     @Override
-    public int readUnsignedShort(int roff) {
-        return prepRead(roff, Short.BYTES).readUnsignedShort(subOffset);
+    public int getUnsignedShort(int roff) {
+        return prepRead(roff, Short.BYTES).getUnsignedShort(subOffset);
     }
 
     @Override
@@ -566,8 +554,8 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
     }
 
     @Override
-    public Buf writeShort(int woff, short value) {
-        prepWrite(woff, Short.BYTES).writeShort(subOffset, value);
+    public Buf setShort(int woff, short value) {
+        prepWrite(woff, Short.BYTES).setShort(subOffset, value);
         return this;
     }
 
@@ -578,8 +566,8 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
     }
 
     @Override
-    public Buf writeUnsignedShort(int woff, int value) {
-        prepWrite(woff, Short.BYTES).writeUnsignedShort(subOffset, value);
+    public Buf setUnsignedShort(int woff, int value) {
+        prepWrite(woff, Short.BYTES).setUnsignedShort(subOffset, value);
         return this;
     }
 
@@ -589,8 +577,8 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
     }
 
     @Override
-    public int readMedium(int roff) {
-        return prepRead(roff, 3).readMedium(subOffset);
+    public int getMedium(int roff) {
+        return prepRead(roff, 3).getMedium(subOffset);
     }
 
     @Override
@@ -599,8 +587,8 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
     }
 
     @Override
-    public int readUnsignedMedium(int roff) {
-        return prepRead(roff, 3).readMedium(subOffset);
+    public int getUnsignedMedium(int roff) {
+        return prepRead(roff, 3).getMedium(subOffset);
     }
 
     @Override
@@ -610,8 +598,8 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
     }
 
     @Override
-    public Buf writeMedium(int woff, int value) {
-        prepWrite(woff, 3).writeMedium(subOffset, value);
+    public Buf setMedium(int woff, int value) {
+        prepWrite(woff, 3).setMedium(subOffset, value);
         return this;
     }
 
@@ -622,8 +610,8 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
     }
 
     @Override
-    public Buf writeUnsignedMedium(int woff, int value) {
-        prepWrite(woff, 3).writeUnsignedMedium(subOffset, value);
+    public Buf setUnsignedMedium(int woff, int value) {
+        prepWrite(woff, 3).setUnsignedMedium(subOffset, value);
         return this;
     }
 
@@ -633,8 +621,8 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
     }
 
     @Override
-    public int readInt(int roff) {
-        return prepRead(roff, Integer.BYTES).readInt(subOffset);
+    public int getInt(int roff) {
+        return prepRead(roff, Integer.BYTES).getInt(subOffset);
     }
 
     @Override
@@ -643,8 +631,8 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
     }
 
     @Override
-    public long readUnsignedInt(int roff) {
-        return prepRead(roff, Integer.BYTES).readUnsignedInt(subOffset);
+    public long getUnsignedInt(int roff) {
+        return prepRead(roff, Integer.BYTES).getUnsignedInt(subOffset);
     }
 
     @Override
@@ -654,8 +642,8 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
     }
 
     @Override
-    public Buf writeInt(int woff, int value) {
-        prepWrite(woff, Integer.BYTES).writeInt(subOffset, value);
+    public Buf setInt(int woff, int value) {
+        prepWrite(woff, Integer.BYTES).setInt(subOffset, value);
         return this;
     }
 
@@ -666,8 +654,8 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
     }
 
     @Override
-    public Buf writeUnsignedInt(int woff, long value) {
-        prepWrite(woff, Integer.BYTES).writeUnsignedInt(subOffset, value);
+    public Buf setUnsignedInt(int woff, long value) {
+        prepWrite(woff, Integer.BYTES).setUnsignedInt(subOffset, value);
         return this;
     }
 
@@ -677,8 +665,8 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
     }
 
     @Override
-    public float readFloat(int roff) {
-        return prepRead(roff, Float.BYTES).readFloat(subOffset);
+    public float getFloat(int roff) {
+        return prepRead(roff, Float.BYTES).getFloat(subOffset);
     }
 
     @Override
@@ -688,8 +676,8 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
     }
 
     @Override
-    public Buf writeFloat(int woff, float value) {
-        prepWrite(woff, Float.BYTES).writeFloat(subOffset, value);
+    public Buf setFloat(int woff, float value) {
+        prepWrite(woff, Float.BYTES).setFloat(subOffset, value);
         return this;
     }
 
@@ -699,8 +687,8 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
     }
 
     @Override
-    public long readLong(int roff) {
-        return prepRead(roff, Long.BYTES).readLong(subOffset);
+    public long getLong(int roff) {
+        return prepRead(roff, Long.BYTES).getLong(subOffset);
     }
 
     @Override
@@ -710,8 +698,8 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
     }
 
     @Override
-    public Buf writeLong(int woff, long value) {
-        prepWrite(woff, Long.BYTES).writeLong(subOffset, value);
+    public Buf setLong(int woff, long value) {
+        prepWrite(woff, Long.BYTES).setLong(subOffset, value);
         return this;
     }
 
@@ -721,8 +709,8 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
     }
 
     @Override
-    public double readDouble(int roff) {
-        return prepRead(roff, Double.BYTES).readDouble(subOffset);
+    public double getDouble(int roff) {
+        return prepRead(roff, Double.BYTES).getDouble(subOffset);
     }
 
     @Override
@@ -732,8 +720,8 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
     }
 
     @Override
-    public Buf writeDouble(int woff, double value) {
-        prepWrite(woff, Double.BYTES).writeDouble(subOffset, value);
+    public Buf setDouble(int woff, double value) {
+        prepWrite(woff, Double.BYTES).setDouble(subOffset, value);
         return this;
     }
     // </editor-fold>
@@ -799,16 +787,16 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
         buf.writeUnsignedByte(value);
     }
 
-    long readPassThrough(int roff) {
+    long getPassThrough(int roff) {
         var buf = chooseBuffer(roff, 1);
         assert buf != tornBufAccessors: "Recursive call to torn buffer.";
-        return buf.readUnsignedByte(subOffset);
+        return buf.getUnsignedByte(subOffset);
     }
 
-    void writePassThrough(int woff, int value) {
+    void setPassThrough(int woff, int value) {
         var buf = chooseBuffer(woff, 1);
         assert buf != tornBufAccessors: "Recursive call to torn buffer.";
-        buf.writeUnsignedByte(subOffset, value);
+        buf.setUnsignedByte(subOffset, value);
     }
 
     private BufAccessors prepRead(int size) {
@@ -892,7 +880,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
         }
 
         @Override
-        public byte readByte(int roff) {
+        public byte getByte(int roff) {
             throw new AssertionError("Method should not be used.");
         }
 
@@ -902,7 +890,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
         }
 
         @Override
-        public int readUnsignedByte(int roff) {
+        public int getUnsignedByte(int roff) {
             throw new AssertionError("Method should not be used.");
         }
 
@@ -912,7 +900,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
         }
 
         @Override
-        public Buf writeByte(int woff, byte value) {
+        public Buf setByte(int woff, byte value) {
             throw new AssertionError("Method should not be used.");
         }
 
@@ -922,7 +910,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
         }
 
         @Override
-        public Buf writeUnsignedByte(int woff, int value) {
+        public Buf setUnsignedByte(int woff, int value) {
             throw new AssertionError("Method should not be used.");
         }
 
@@ -936,7 +924,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
         }
 
         @Override
-        public char readChar(int roff) {
+        public char getChar(int roff) {
             if (bigEndian()) {
                 return (char) (read(roff) << 8 | read(roff + 1));
             } else {
@@ -957,7 +945,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
         }
 
         @Override
-        public Buf writeChar(int woff, char value) {
+        public Buf setChar(int woff, char value) {
             if (bigEndian()) {
                 write(woff, value >>> 8);
                 write(woff + 1, value & 0xFF);
@@ -978,7 +966,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
         }
 
         @Override
-        public short readShort(int roff) {
+        public short getShort(int roff) {
             if (bigEndian()) {
                 return (short) (read(roff) << 8 | read(roff + 1));
             } else {
@@ -996,7 +984,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
         }
 
         @Override
-        public int readUnsignedShort(int roff) {
+        public int getUnsignedShort(int roff) {
             if (bigEndian()) {
                 return (int) (read(roff) << 8 | read(roff + 1)) & 0xFFFF;
             } else {
@@ -1017,7 +1005,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
         }
 
         @Override
-        public Buf writeShort(int woff, short value) {
+        public Buf setShort(int woff, short value) {
             if (bigEndian()) {
                 write(woff, value >>> 8);
                 write(woff + 1, value & 0xFF);
@@ -1041,7 +1029,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
         }
 
         @Override
-        public Buf writeUnsignedShort(int woff, int value) {
+        public Buf setUnsignedShort(int woff, int value) {
             if (bigEndian()) {
                 write(woff, value >>> 8);
                 write(woff + 1, value & 0xFF);
@@ -1062,7 +1050,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
         }
 
         @Override
-        public int readMedium(int roff) {
+        public int getMedium(int roff) {
             if (bigEndian()) {
                 return (int) (read(roff) << 16 | read(roff + 1) << 8 | read(roff + 2));
             } else {
@@ -1080,7 +1068,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
         }
 
         @Override
-        public int readUnsignedMedium(int roff) {
+        public int getUnsignedMedium(int roff) {
             if (bigEndian()) {
                 return (int) (read(roff) << 16 | read(roff + 1) << 8 | read(roff + 2)) & 0xFFFFFF;
             } else {
@@ -1103,7 +1091,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
         }
 
         @Override
-        public Buf writeMedium(int woff, int value) {
+        public Buf setMedium(int woff, int value) {
             if (bigEndian()) {
                 write(woff, value >>> 16);
                 write(woff + 1, value >>> 8 & 0xFF);
@@ -1131,7 +1119,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
         }
 
         @Override
-        public Buf writeUnsignedMedium(int woff, int value) {
+        public Buf setUnsignedMedium(int woff, int value) {
             if (bigEndian()) {
                 write(woff, value >>> 16);
                 write(woff + 1, value >>> 8 & 0xFF);
@@ -1154,7 +1142,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
         }
 
         @Override
-        public int readInt(int roff) {
+        public int getInt(int roff) {
             if (bigEndian()) {
                 return (int) (read(roff) << 24 | read(roff + 1) << 16 | read(roff + 2) << 8 | read(roff + 3));
             } else {
@@ -1172,7 +1160,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
         }
 
         @Override
-        public long readUnsignedInt(int roff) {
+        public long getUnsignedInt(int roff) {
             if (bigEndian()) {
                 return (read(roff) << 24 | read(roff + 1) << 16 | read(roff + 2) << 8 | read(roff + 3)) & 0xFFFFFFFFL;
             } else {
@@ -1197,7 +1185,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
         }
 
         @Override
-        public Buf writeInt(int woff, int value) {
+        public Buf setInt(int woff, int value) {
             if (bigEndian()) {
                 write(woff, value >>> 24);
                 write(woff + 1, value >>> 16 & 0xFF);
@@ -1229,7 +1217,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
         }
 
         @Override
-        public Buf writeUnsignedInt(int woff, long value) {
+        public Buf setUnsignedInt(int woff, long value) {
             if (bigEndian()) {
                 write(woff, (int) (value >>> 24));
                 write(woff + 1, (int) (value >>> 16 & 0xFF));
@@ -1250,8 +1238,8 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
         }
 
         @Override
-        public float readFloat(int roff) {
-            return Float.intBitsToFloat(readInt(roff));
+        public float getFloat(int roff) {
+            return Float.intBitsToFloat(getInt(roff));
         }
 
         @Override
@@ -1260,8 +1248,8 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
         }
 
         @Override
-        public Buf writeFloat(int woff, float value) {
-            return writeUnsignedInt(woff, Float.floatToRawIntBits(value));
+        public Buf setFloat(int woff, float value) {
+            return setUnsignedInt(woff, Float.floatToRawIntBits(value));
         }
 
         @Override
@@ -1276,7 +1264,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
         }
 
         @Override
-        public long readLong(int roff) {
+        public long getLong(int roff) {
             if (bigEndian()) {
                 return read(roff) << 56 | read(roff + 1) << 48 | read(roff + 2) << 40 | read(roff + 3) << 32 |
                        read(roff + 4) << 24 | read(roff + 5) << 16 | read(roff + 6) << 8 | read(roff + 7);
@@ -1311,7 +1299,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
         }
 
         @Override
-        public Buf writeLong(int woff, long value) {
+        public Buf setLong(int woff, long value) {
             if (bigEndian()) {
                 write(woff, (int) (value >>> 56));
                 write(woff + 1, (int) (value >>> 48 & 0xFF));
@@ -1340,8 +1328,8 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
         }
 
         @Override
-        public double readDouble(int roff) {
-            return Double.longBitsToDouble(readLong(roff));
+        public double getDouble(int roff) {
+            return Double.longBitsToDouble(getLong(roff));
         }
 
         @Override
@@ -1350,8 +1338,8 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
         }
 
         @Override
-        public Buf writeDouble(int woff, double value) {
-            return writeLong(woff, Double.doubleToRawLongBits(value));
+        public Buf setDouble(int woff, double value) {
+            return setLong(woff, Double.doubleToRawLongBits(value));
         }
 
         private boolean bigEndian() {
@@ -1367,11 +1355,11 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
         }
 
         private long read(int roff) {
-            return buf.readPassThrough(roff);
+            return buf.getPassThrough(roff);
         }
 
         private void write(int woff, int value) {
-            buf.writePassThrough(woff, value);
+            buf.setPassThrough(woff, value);
         }
     }
     // </editor-fold>

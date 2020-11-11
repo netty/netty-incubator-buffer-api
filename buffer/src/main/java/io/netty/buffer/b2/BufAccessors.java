@@ -21,11 +21,9 @@ package io.netty.buffer.b2;
  * Usually, you'd use the {@link Buf} interface directly, since this lets you properly control the buffer reference count.
  */
 public interface BufAccessors {
-    // ### CODEGEN START primitive accessors interface
-    // <editor-fold defaultstate="collapsed" desc="Generated primitive accessors interface.">
-
+    // <editor-fold defaultstate="collapsed" desc="Primitive accessors interface.">
     /**
-     * Get the byte value at the current {@link Buf#readerIndex()},
+     * Get the byte value at the current {@link Buf#readerOffset()},
      * and increases the reader offset by {@link Byte#BYTES}.
      * The value is read using a two's complement 8-bit encoding,
      * with the {@link Buf#order() configured} default byte order.
@@ -37,19 +35,19 @@ public interface BufAccessors {
 
     /**
      * Get the byte value at the given reader offset.
-     * The {@link Buf#readerIndex()} is not modified.
+     * The {@link Buf#readerOffset()} is not modified.
      * The value is read using a two's complement 8-bit encoding,
      * with the {@link Buf#order() configured} default byte order.
      *
-     * @param roff The read offset, an absolute index into this buffer, to read from.
+     * @param roff The read offset, an absolute offset into this buffer, to read from.
      * @return The byte value at the given offset.
-     * @throws IndexOutOfBoundsException if the given index is out of bounds of the buffer, that is, less than 0 or
+     * @throws IndexOutOfBoundsException if the given offset is out of bounds of the buffer, that is, less than 0 or
      *                                   greater than or equal to {@link Buf#capacity()} minus {@link Byte#BYTES}.
      */
-    byte readByte(int roff);
+    byte getByte(int roff);
 
     /**
-     * Get the unsigned byte value at the current {@link Buf#readerIndex()},
+     * Get the unsigned byte value at the current {@link Buf#readerOffset()},
      * and increases the reader offset by {@link Byte#BYTES}.
      * The value is read using an unsigned two's complement 8-bit encoding,
      * with the {@link Buf#order() configured} default byte order.
@@ -61,19 +59,19 @@ public interface BufAccessors {
 
     /**
      * Get the unsigned byte value at the given reader offset.
-     * The {@link Buf#readerIndex()} is not modified.
+     * The {@link Buf#readerOffset()} is not modified.
      * The value is read using an unsigned two's complement 8-bit encoding,
      * with the {@link Buf#order() configured} default byte order.
      *
-     * @param roff The read offset, an absolute index into this buffer, to read from.
+     * @param roff The read offset, an absolute offset into this buffer, to read from.
      * @return The unsigned byte value at the given offset.
-     * @throws IndexOutOfBoundsException if the given index is out of bounds of the buffer, that is, less than 0 or
+     * @throws IndexOutOfBoundsException if the given offset is out of bounds of the buffer, that is, less than 0 or
      *                                   greater than or equal to {@link Buf#capacity()} minus {@link Byte#BYTES}.
      */
-    int readUnsignedByte(int roff);
+    int getUnsignedByte(int roff);
 
     /**
-     * Set the given byte value at the current {@link Buf#writerIndex()},
+     * Set the given byte value at the current {@link Buf#writerOffset()},
      * and increase the writer offset by {@link Byte#BYTES}.
      * The value is written using a two's complement 8-bit encoding,
      * with the {@link Buf#order() configured} default byte order.
@@ -85,20 +83,20 @@ public interface BufAccessors {
     Buf writeByte(byte value);
 
     /**
-     * Set the given byte value at the given write offset. The {@link Buf#writerIndex()} is not modified.
+     * Set the given byte value at the given write offset. The {@link Buf#writerOffset()} is not modified.
      * The value is written using a two's complement 8-bit encoding,
      * with the {@link Buf#order() configured} default byte order.
      *
-     * @param woff The write offset, an absolute index into this buffer to write to.
+     * @param woff The write offset, an absolute offset into this buffer to write to.
      * @param value The byte value to write.
      * @return This Buf.
      * @throws IndexOutOfBoundsException if the given offset is out of bounds of the buffer, that is, less than 0 or
      *                                   greater than or equal to {@link Buf#capacity()} minus {@link Byte#BYTES}.
      */
-    Buf writeByte(int woff, byte value);
+    Buf setByte(int woff, byte value);
 
     /**
-     * Set the given unsigned byte value at the current {@link Buf#writerIndex()},
+     * Set the given unsigned byte value at the current {@link Buf#writerOffset()},
      * and increase the writer offset by {@link Byte#BYTES}.
      * The value is written using an unsigned two's complement 8-bit encoding,
      * with the {@link Buf#order() configured} default byte order.
@@ -110,20 +108,20 @@ public interface BufAccessors {
     Buf writeUnsignedByte(int value);
 
     /**
-     * Set the given unsigned byte value at the given write offset. The {@link Buf#writerIndex()} is not modified.
+     * Set the given unsigned byte value at the given write offset. The {@link Buf#writerOffset()} is not modified.
      * The value is written using an unsigned two's complement 8-bit encoding,
      * with the {@link Buf#order() configured} default byte order.
      *
-     * @param woff The write offset, an absolute index into this buffer to write to.
+     * @param woff The write offset, an absolute offset into this buffer to write to.
      * @param value The int value to write.
      * @return This Buf.
      * @throws IndexOutOfBoundsException if the given offset is out of bounds of the buffer, that is, less than 0 or
      *                                   greater than or equal to {@link Buf#capacity()} minus {@link Byte#BYTES}.
      */
-    Buf writeUnsignedByte(int woff, int value);
+    Buf setUnsignedByte(int woff, int value);
 
     /**
-     * Get the char value at the current {@link Buf#readerIndex()},
+     * Get the char value at the current {@link Buf#readerOffset()},
      * and increases the reader offset by 2.
      * The value is read using a 2-byte UTF-16 encoding,
      * with the {@link Buf#order() configured} default byte order.
@@ -135,19 +133,19 @@ public interface BufAccessors {
 
     /**
      * Get the char value at the given reader offset.
-     * The {@link Buf#readerIndex()} is not modified.
+     * The {@link Buf#readerOffset()} is not modified.
      * The value is read using a 2-byte UTF-16 encoding,
      * with the {@link Buf#order() configured} default byte order.
      *
-     * @param roff The read offset, an absolute index into this buffer, to read from.
+     * @param roff The read offset, an absolute offset into this buffer, to read from.
      * @return The char value at the given offset.
-     * @throws IndexOutOfBoundsException if the given index is out of bounds of the buffer, that is, less than 0 or
+     * @throws IndexOutOfBoundsException if the given offset is out of bounds of the buffer, that is, less than 0 or
      *                                   greater than or equal to {@link Buf#capacity()} minus 2.
      */
-    char readChar(int roff);
+    char getChar(int roff);
 
     /**
-     * Set the given char value at the current {@link Buf#writerIndex()},
+     * Set the given char value at the current {@link Buf#writerOffset()},
      * and increase the writer offset by 2.
      * The value is written using a 2-byte UTF-16 encoding,
      * with the {@link Buf#order() configured} default byte order.
@@ -159,20 +157,20 @@ public interface BufAccessors {
     Buf writeChar(char value);
 
     /**
-     * Set the given char value at the given write offset. The {@link Buf#writerIndex()} is not modified.
+     * Set the given char value at the given write offset. The {@link Buf#writerOffset()} is not modified.
      * The value is written using a 2-byte UTF-16 encoding,
      * with the {@link Buf#order() configured} default byte order.
      *
-     * @param woff The write offset, an absolute index into this buffer to write to.
+     * @param woff The write offset, an absolute offset into this buffer to write to.
      * @param value The char value to write.
      * @return This Buf.
      * @throws IndexOutOfBoundsException if the given offset is out of bounds of the buffer, that is, less than 0 or
      *                                   greater than or equal to {@link Buf#capacity()} minus 2.
      */
-    Buf writeChar(int woff, char value);
+    Buf setChar(int woff, char value);
 
     /**
-     * Get the short value at the current {@link Buf#readerIndex()},
+     * Get the short value at the current {@link Buf#readerOffset()},
      * and increases the reader offset by {@link Short#BYTES}.
      * The value is read using a two's complement 16-bit encoding,
      * with the {@link Buf#order() configured} default byte order.
@@ -184,19 +182,19 @@ public interface BufAccessors {
 
     /**
      * Get the short value at the given reader offset.
-     * The {@link Buf#readerIndex()} is not modified.
+     * The {@link Buf#readerOffset()} is not modified.
      * The value is read using a two's complement 16-bit encoding,
      * with the {@link Buf#order() configured} default byte order.
      *
-     * @param roff The read offset, an absolute index into this buffer, to read from.
+     * @param roff The read offset, an absolute offset into this buffer, to read from.
      * @return The short value at the given offset.
-     * @throws IndexOutOfBoundsException if the given index is out of bounds of the buffer, that is, less than 0 or
+     * @throws IndexOutOfBoundsException if the given offset is out of bounds of the buffer, that is, less than 0 or
      *                                   greater than or equal to {@link Buf#capacity()} minus {@link Short#BYTES}.
      */
-    short readShort(int roff);
+    short getShort(int roff);
 
     /**
-     * Get the unsigned short value at the current {@link Buf#readerIndex()},
+     * Get the unsigned short value at the current {@link Buf#readerOffset()},
      * and increases the reader offset by {@link Short#BYTES}.
      * The value is read using an unsigned two's complement 16-bit encoding,
      * with the {@link Buf#order() configured} default byte order.
@@ -208,19 +206,19 @@ public interface BufAccessors {
 
     /**
      * Get the unsigned short value at the given reader offset.
-     * The {@link Buf#readerIndex()} is not modified.
+     * The {@link Buf#readerOffset()} is not modified.
      * The value is read using an unsigned two's complement 16-bit encoding,
      * with the {@link Buf#order() configured} default byte order.
      *
-     * @param roff The read offset, an absolute index into this buffer, to read from.
+     * @param roff The read offset, an absolute offset into this buffer, to read from.
      * @return The unsigned short value at the given offset.
-     * @throws IndexOutOfBoundsException if the given index is out of bounds of the buffer, that is, less than 0 or
+     * @throws IndexOutOfBoundsException if the given offset is out of bounds of the buffer, that is, less than 0 or
      *                                   greater than or equal to {@link Buf#capacity()} minus {@link Short#BYTES}.
      */
-    int readUnsignedShort(int roff);
+    int getUnsignedShort(int roff);
 
     /**
-     * Set the given short value at the current {@link Buf#writerIndex()},
+     * Set the given short value at the current {@link Buf#writerOffset()},
      * and increase the writer offset by {@link Short#BYTES}.
      * The value is written using a two's complement 16-bit encoding,
      * with the {@link Buf#order() configured} default byte order.
@@ -232,20 +230,20 @@ public interface BufAccessors {
     Buf writeShort(short value);
 
     /**
-     * Set the given short value at the given write offset. The {@link Buf#writerIndex()} is not modified.
+     * Set the given short value at the given write offset. The {@link Buf#writerOffset()} is not modified.
      * The value is written using a two's complement 16-bit encoding,
      * with the {@link Buf#order() configured} default byte order.
      *
-     * @param woff The write offset, an absolute index into this buffer to write to.
+     * @param woff The write offset, an absolute offset into this buffer to write to.
      * @param value The short value to write.
      * @return This Buf.
      * @throws IndexOutOfBoundsException if the given offset is out of bounds of the buffer, that is, less than 0 or
      *                                   greater than or equal to {@link Buf#capacity()} minus {@link Short#BYTES}.
      */
-    Buf writeShort(int woff, short value);
+    Buf setShort(int woff, short value);
 
     /**
-     * Set the given unsigned short value at the current {@link Buf#writerIndex()},
+     * Set the given unsigned short value at the current {@link Buf#writerOffset()},
      * and increase the writer offset by {@link Short#BYTES}.
      * The value is written using an unsigned two's complement 16-bit encoding,
      * with the {@link Buf#order() configured} default byte order.
@@ -257,20 +255,20 @@ public interface BufAccessors {
     Buf writeUnsignedShort(int value);
 
     /**
-     * Set the given unsigned short value at the given write offset. The {@link Buf#writerIndex()} is not modified.
+     * Set the given unsigned short value at the given write offset. The {@link Buf#writerOffset()} is not modified.
      * The value is written using an unsigned two's complement 16-bit encoding,
      * with the {@link Buf#order() configured} default byte order.
      *
-     * @param woff The write offset, an absolute index into this buffer to write to.
+     * @param woff The write offset, an absolute offset into this buffer to write to.
      * @param value The int value to write.
      * @return This Buf.
      * @throws IndexOutOfBoundsException if the given offset is out of bounds of the buffer, that is, less than 0 or
      *                                   greater than or equal to {@link Buf#capacity()} minus {@link Short#BYTES}.
      */
-    Buf writeUnsignedShort(int woff, int value);
+    Buf setUnsignedShort(int woff, int value);
 
     /**
-     * Get the int value at the current {@link Buf#readerIndex()},
+     * Get the int value at the current {@link Buf#readerOffset()},
      * and increases the reader offset by 3.
      * The value is read using a two's complement 24-bit encoding,
      * with the {@link Buf#order() configured} default byte order.
@@ -282,19 +280,19 @@ public interface BufAccessors {
 
     /**
      * Get the int value at the given reader offset.
-     * The {@link Buf#readerIndex()} is not modified.
+     * The {@link Buf#readerOffset()} is not modified.
      * The value is read using a two's complement 24-bit encoding,
      * with the {@link Buf#order() configured} default byte order.
      *
-     * @param roff The read offset, an absolute index into this buffer, to read from.
+     * @param roff The read offset, an absolute offset into this buffer, to read from.
      * @return The int value at the given offset.
-     * @throws IndexOutOfBoundsException if the given index is out of bounds of the buffer, that is, less than 0 or
+     * @throws IndexOutOfBoundsException if the given offset is out of bounds of the buffer, that is, less than 0 or
      *                                   greater than or equal to {@link Buf#capacity()} minus 3.
      */
-    int readMedium(int roff);
+    int getMedium(int roff);
 
     /**
-     * Get the unsigned int value at the current {@link Buf#readerIndex()},
+     * Get the unsigned int value at the current {@link Buf#readerOffset()},
      * and increases the reader offset by 3.
      * The value is read using an unsigned two's complement 24-bit encoding,
      * with the {@link Buf#order() configured} default byte order.
@@ -306,19 +304,19 @@ public interface BufAccessors {
 
     /**
      * Get the unsigned int value at the given reader offset.
-     * The {@link Buf#readerIndex()} is not modified.
+     * The {@link Buf#readerOffset()} is not modified.
      * The value is read using an unsigned two's complement 24-bit encoding,
      * with the {@link Buf#order() configured} default byte order.
      *
-     * @param roff The read offset, an absolute index into this buffer, to read from.
+     * @param roff The read offset, an absolute offset into this buffer, to read from.
      * @return The unsigned int value at the given offset.
-     * @throws IndexOutOfBoundsException if the given index is out of bounds of the buffer, that is, less than 0 or
+     * @throws IndexOutOfBoundsException if the given offset is out of bounds of the buffer, that is, less than 0 or
      *                                   greater than or equal to {@link Buf#capacity()} minus 3.
      */
-    int readUnsignedMedium(int roff);
+    int getUnsignedMedium(int roff);
 
     /**
-     * Set the given int value at the current {@link Buf#writerIndex()},
+     * Set the given int value at the current {@link Buf#writerOffset()},
      * and increase the writer offset by 3.
      * The value is written using a two's complement 24-bit encoding,
      * with the {@link Buf#order() configured} default byte order.
@@ -330,20 +328,20 @@ public interface BufAccessors {
     Buf writeMedium(int value);
 
     /**
-     * Set the given int value at the given write offset. The {@link Buf#writerIndex()} is not modified.
+     * Set the given int value at the given write offset. The {@link Buf#writerOffset()} is not modified.
      * The value is written using a two's complement 24-bit encoding,
      * with the {@link Buf#order() configured} default byte order.
      *
-     * @param woff The write offset, an absolute index into this buffer to write to.
+     * @param woff The write offset, an absolute offset into this buffer to write to.
      * @param value The int value to write.
      * @return This Buf.
      * @throws IndexOutOfBoundsException if the given offset is out of bounds of the buffer, that is, less than 0 or
      *                                   greater than or equal to {@link Buf#capacity()} minus 3.
      */
-    Buf writeMedium(int woff, int value);
+    Buf setMedium(int woff, int value);
 
     /**
-     * Set the given unsigned int value at the current {@link Buf#writerIndex()},
+     * Set the given unsigned int value at the current {@link Buf#writerOffset()},
      * and increase the writer offset by 3.
      * The value is written using an unsigned two's complement 24-bit encoding,
      * with the {@link Buf#order() configured} default byte order.
@@ -355,20 +353,20 @@ public interface BufAccessors {
     Buf writeUnsignedMedium(int value);
 
     /**
-     * Set the given unsigned int value at the given write offset. The {@link Buf#writerIndex()} is not modified.
+     * Set the given unsigned int value at the given write offset. The {@link Buf#writerOffset()} is not modified.
      * The value is written using an unsigned two's complement 24-bit encoding,
      * with the {@link Buf#order() configured} default byte order.
      *
-     * @param woff The write offset, an absolute index into this buffer to write to.
+     * @param woff The write offset, an absolute offset into this buffer to write to.
      * @param value The int value to write.
      * @return This Buf.
      * @throws IndexOutOfBoundsException if the given offset is out of bounds of the buffer, that is, less than 0 or
      *                                   greater than or equal to {@link Buf#capacity()} minus 3.
      */
-    Buf writeUnsignedMedium(int woff, int value);
+    Buf setUnsignedMedium(int woff, int value);
 
     /**
-     * Get the int value at the current {@link Buf#readerIndex()},
+     * Get the int value at the current {@link Buf#readerOffset()},
      * and increases the reader offset by {@link Integer#BYTES}.
      * The value is read using a two's complement 32-bit encoding,
      * with the {@link Buf#order() configured} default byte order.
@@ -380,19 +378,19 @@ public interface BufAccessors {
 
     /**
      * Get the int value at the given reader offset.
-     * The {@link Buf#readerIndex()} is not modified.
+     * The {@link Buf#readerOffset()} is not modified.
      * The value is read using a two's complement 32-bit encoding,
      * with the {@link Buf#order() configured} default byte order.
      *
-     * @param roff The read offset, an absolute index into this buffer, to read from.
+     * @param roff The read offset, an absolute offset into this buffer, to read from.
      * @return The int value at the given offset.
-     * @throws IndexOutOfBoundsException if the given index is out of bounds of the buffer, that is, less than 0 or
+     * @throws IndexOutOfBoundsException if the given offset is out of bounds of the buffer, that is, less than 0 or
      *                                   greater than or equal to {@link Buf#capacity()} minus {@link Integer#BYTES}.
      */
-    int readInt(int roff);
+    int getInt(int roff);
 
     /**
-     * Get the unsigned int value at the current {@link Buf#readerIndex()},
+     * Get the unsigned int value at the current {@link Buf#readerOffset()},
      * and increases the reader offset by {@link Integer#BYTES}.
      * The value is read using an unsigned two's complement 32-bit encoding,
      * with the {@link Buf#order() configured} default byte order.
@@ -404,19 +402,19 @@ public interface BufAccessors {
 
     /**
      * Get the unsigned int value at the given reader offset.
-     * The {@link Buf#readerIndex()} is not modified.
+     * The {@link Buf#readerOffset()} is not modified.
      * The value is read using an unsigned two's complement 32-bit encoding,
      * with the {@link Buf#order() configured} default byte order.
      *
-     * @param roff The read offset, an absolute index into this buffer, to read from.
+     * @param roff The read offset, an absolute offset into this buffer, to read from.
      * @return The unsigned int value at the given offset.
-     * @throws IndexOutOfBoundsException if the given index is out of bounds of the buffer, that is, less than 0 or
+     * @throws IndexOutOfBoundsException if the given offset is out of bounds of the buffer, that is, less than 0 or
      *                                   greater than or equal to {@link Buf#capacity()} minus {@link Integer#BYTES}.
      */
-    long readUnsignedInt(int roff);
+    long getUnsignedInt(int roff);
 
     /**
-     * Set the given int value at the current {@link Buf#writerIndex()},
+     * Set the given int value at the current {@link Buf#writerOffset()},
      * and increase the writer offset by {@link Integer#BYTES}.
      * The value is written using a two's complement 32-bit encoding,
      * with the {@link Buf#order() configured} default byte order.
@@ -428,20 +426,20 @@ public interface BufAccessors {
     Buf writeInt(int value);
 
     /**
-     * Set the given int value at the given write offset. The {@link Buf#writerIndex()} is not modified.
+     * Set the given int value at the given write offset. The {@link Buf#writerOffset()} is not modified.
      * The value is written using a two's complement 32-bit encoding,
      * with the {@link Buf#order() configured} default byte order.
      *
-     * @param woff The write offset, an absolute index into this buffer to write to.
+     * @param woff The write offset, an absolute offset into this buffer to write to.
      * @param value The int value to write.
      * @return This Buf.
      * @throws IndexOutOfBoundsException if the given offset is out of bounds of the buffer, that is, less than 0 or
      *                                   greater than or equal to {@link Buf#capacity()} minus {@link Integer#BYTES}.
      */
-    Buf writeInt(int woff, int value);
+    Buf setInt(int woff, int value);
 
     /**
-     * Set the given unsigned int value at the current {@link Buf#writerIndex()},
+     * Set the given unsigned int value at the current {@link Buf#writerOffset()},
      * and increase the writer offset by {@link Integer#BYTES}.
      * The value is written using an unsigned two's complement 32-bit encoding,
      * with the {@link Buf#order() configured} default byte order.
@@ -453,20 +451,20 @@ public interface BufAccessors {
     Buf writeUnsignedInt(long value);
 
     /**
-     * Set the given unsigned int value at the given write offset. The {@link Buf#writerIndex()} is not modified.
+     * Set the given unsigned int value at the given write offset. The {@link Buf#writerOffset()} is not modified.
      * The value is written using an unsigned two's complement 32-bit encoding,
      * with the {@link Buf#order() configured} default byte order.
      *
-     * @param woff The write offset, an absolute index into this buffer to write to.
+     * @param woff The write offset, an absolute offset into this buffer to write to.
      * @param value The long value to write.
      * @return This Buf.
      * @throws IndexOutOfBoundsException if the given offset is out of bounds of the buffer, that is, less than 0 or
      *                                   greater than or equal to {@link Buf#capacity()} minus {@link Integer#BYTES}.
      */
-    Buf writeUnsignedInt(int woff, long value);
+    Buf setUnsignedInt(int woff, long value);
 
     /**
-     * Get the float value at the current {@link Buf#readerIndex()},
+     * Get the float value at the current {@link Buf#readerOffset()},
      * and increases the reader offset by {@link Float#BYTES}.
      * The value is read using a 32-bit IEEE floating point encoding,
      * with the {@link Buf#order() configured} default byte order.
@@ -478,19 +476,19 @@ public interface BufAccessors {
 
     /**
      * Get the float value at the given reader offset.
-     * The {@link Buf#readerIndex()} is not modified.
+     * The {@link Buf#readerOffset()} is not modified.
      * The value is read using a 32-bit IEEE floating point encoding,
      * with the {@link Buf#order() configured} default byte order.
      *
-     * @param roff The read offset, an absolute index into this buffer, to read from.
+     * @param roff The read offset, an absolute offset into this buffer, to read from.
      * @return The float value at the given offset.
-     * @throws IndexOutOfBoundsException if the given index is out of bounds of the buffer, that is, less than 0 or
+     * @throws IndexOutOfBoundsException if the given offset is out of bounds of the buffer, that is, less than 0 or
      *                                   greater than or equal to {@link Buf#capacity()} minus {@link Float#BYTES}.
      */
-    float readFloat(int roff);
+    float getFloat(int roff);
 
     /**
-     * Set the given float value at the current {@link Buf#writerIndex()},
+     * Set the given float value at the current {@link Buf#writerOffset()},
      * and increase the writer offset by {@link Float#BYTES}.
      * The value is written using a 32-bit IEEE floating point encoding,
      * with the {@link Buf#order() configured} default byte order.
@@ -502,20 +500,20 @@ public interface BufAccessors {
     Buf writeFloat(float value);
 
     /**
-     * Set the given float value at the given write offset. The {@link Buf#writerIndex()} is not modified.
+     * Set the given float value at the given write offset. The {@link Buf#writerOffset()} is not modified.
      * The value is written using a 32-bit IEEE floating point encoding,
      * with the {@link Buf#order() configured} default byte order.
      *
-     * @param woff The write offset, an absolute index into this buffer to write to.
+     * @param woff The write offset, an absolute offset into this buffer to write to.
      * @param value The float value to write.
      * @return This Buf.
      * @throws IndexOutOfBoundsException if the given offset is out of bounds of the buffer, that is, less than 0 or
      *                                   greater than or equal to {@link Buf#capacity()} minus {@link Float#BYTES}.
      */
-    Buf writeFloat(int woff, float value);
+    Buf setFloat(int woff, float value);
 
     /**
-     * Get the long value at the current {@link Buf#readerIndex()},
+     * Get the long value at the current {@link Buf#readerOffset()},
      * and increases the reader offset by {@link Long#BYTES}.
      * The value is read using a two's complement 64-bit encoding,
      * with the {@link Buf#order() configured} default byte order.
@@ -527,19 +525,19 @@ public interface BufAccessors {
 
     /**
      * Get the long value at the given reader offset.
-     * The {@link Buf#readerIndex()} is not modified.
+     * The {@link Buf#readerOffset()} is not modified.
      * The value is read using a two's complement 64-bit encoding,
      * with the {@link Buf#order() configured} default byte order.
      *
-     * @param roff The read offset, an absolute index into this buffer, to read from.
+     * @param roff The read offset, an absolute offset into this buffer, to read from.
      * @return The long value at the given offset.
-     * @throws IndexOutOfBoundsException if the given index is out of bounds of the buffer, that is, less than 0 or
+     * @throws IndexOutOfBoundsException if the given offset is out of bounds of the buffer, that is, less than 0 or
      *                                   greater than or equal to {@link Buf#capacity()} minus {@link Long#BYTES}.
      */
-    long readLong(int roff);
+    long getLong(int roff);
 
     /**
-     * Set the given long value at the current {@link Buf#writerIndex()},
+     * Set the given long value at the current {@link Buf#writerOffset()},
      * and increase the writer offset by {@link Long#BYTES}.
      * The value is written using a two's complement 64-bit encoding,
      * with the {@link Buf#order() configured} default byte order.
@@ -551,20 +549,20 @@ public interface BufAccessors {
     Buf writeLong(long value);
 
     /**
-     * Set the given long value at the given write offset. The {@link Buf#writerIndex()} is not modified.
+     * Set the given long value at the given write offset. The {@link Buf#writerOffset()} is not modified.
      * The value is written using a two's complement 64-bit encoding,
      * with the {@link Buf#order() configured} default byte order.
      *
-     * @param woff The write offset, an absolute index into this buffer to write to.
+     * @param woff The write offset, an absolute offset into this buffer to write to.
      * @param value The long value to write.
      * @return This Buf.
      * @throws IndexOutOfBoundsException if the given offset is out of bounds of the buffer, that is, less than 0 or
      *                                   greater than or equal to {@link Buf#capacity()} minus {@link Long#BYTES}.
      */
-    Buf writeLong(int woff, long value);
+    Buf setLong(int woff, long value);
 
     /**
-     * Get the double value at the current {@link Buf#readerIndex()},
+     * Get the double value at the current {@link Buf#readerOffset()},
      * and increases the reader offset by {@link Double#BYTES}.
      * The value is read using a 64-bit IEEE floating point encoding,
      * with the {@link Buf#order() configured} default byte order.
@@ -576,19 +574,19 @@ public interface BufAccessors {
 
     /**
      * Get the double value at the given reader offset.
-     * The {@link Buf#readerIndex()} is not modified.
+     * The {@link Buf#readerOffset()} is not modified.
      * The value is read using a 64-bit IEEE floating point encoding,
      * with the {@link Buf#order() configured} default byte order.
      *
-     * @param roff The read offset, an absolute index into this buffer, to read from.
+     * @param roff The read offset, an absolute offset into this buffer, to read from.
      * @return The double value at the given offset.
-     * @throws IndexOutOfBoundsException if the given index is out of bounds of the buffer, that is, less than 0 or
+     * @throws IndexOutOfBoundsException if the given offset is out of bounds of the buffer, that is, less than 0 or
      *                                   greater than or equal to {@link Buf#capacity()} minus {@link Double#BYTES}.
      */
-    double readDouble(int roff);
+    double getDouble(int roff);
 
     /**
-     * Set the given double value at the current {@link Buf#writerIndex()},
+     * Set the given double value at the current {@link Buf#writerOffset()},
      * and increase the writer offset by {@link Double#BYTES}.
      * The value is written using a 64-bit IEEE floating point encoding,
      * with the {@link Buf#order() configured} default byte order.
@@ -600,17 +598,16 @@ public interface BufAccessors {
     Buf writeDouble(double value);
 
     /**
-     * Set the given double value at the given write offset. The {@link Buf#writerIndex()} is not modified.
+     * Set the given double value at the given write offset. The {@link Buf#writerOffset()} is not modified.
      * The value is written using a 64-bit IEEE floating point encoding,
      * with the {@link Buf#order() configured} default byte order.
      *
-     * @param woff The write offset, an absolute index into this buffer to write to.
+     * @param woff The write offset, an absolute offset into this buffer to write to.
      * @param value The double value to write.
      * @return This Buf.
      * @throws IndexOutOfBoundsException if the given offset is out of bounds of the buffer, that is, less than 0 or
      *                                   greater than or equal to {@link Buf#capacity()} minus {@link Double#BYTES}.
      */
-    Buf writeDouble(int woff, double value);
+    Buf setDouble(int woff, double value);
     // </editor-fold>
-    // ### CODEGEN END primitive accessors interface
 }
