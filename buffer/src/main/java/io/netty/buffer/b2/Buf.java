@@ -243,6 +243,9 @@ public interface Buf extends Rc<Buf>, BufAccessors {
      * <p>
      * This method increments the reference count of this buffer.
      * The reference count is decremented again when the slice is deallocated.
+     * <p>
+     * The slice is created with a {@linkplain #writerOffset() write offset} equal to the length of the slice,
+     * so that the entire contents of the slice is ready to be read.
      *
      * @return A new buffer instance, with independent {@link #readerOffset()} and {@link #writerOffset()},
      * that is a view of the readable region of this buffer.
@@ -259,6 +262,9 @@ public interface Buf extends Rc<Buf>, BufAccessors {
      * <p>
      * This method increments the reference count of this buffer.
      * The reference count is decremented again when the slice is deallocated.
+     * <p>
+     * The slice is created with a {@linkplain #writerOffset() write offset} equal to the length of the slice,
+     * so that the entire contents of the slice is ready to be read.
      *
      * @return A new buffer instance, with independent {@link #readerOffset()} and {@link #writerOffset()},
      * that is a view of the given region of this buffer.

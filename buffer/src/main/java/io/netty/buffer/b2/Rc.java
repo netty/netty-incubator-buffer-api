@@ -68,4 +68,14 @@ public interface Rc<I extends Rc<I>> extends AutoCloseable {
      * or {@code false} if calling {@link #send()} would throw an exception.
      */
     boolean isSendable();
+
+    /**
+     * Count the number of borrows of this object.
+     * If the number of borrows is {@code 0}, then the object is in an "owned" state.
+     * If the number of borrows is greater than {@code 0}, then the object is in a "borrowed" state.
+     * If this returns a negative number, then this object has been deallocated.
+     *
+     * @return The number of borrows, if any, of this object, or a negative number if this object has been deallocated.
+     */
+    int countBorrows();
 }

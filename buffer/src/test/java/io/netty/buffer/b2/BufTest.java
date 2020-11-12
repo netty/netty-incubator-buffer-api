@@ -44,6 +44,7 @@ import static io.netty.buffer.b2.Fixture.Properties.COMPOSITE;
 import static io.netty.buffer.b2.Fixture.Properties.DIRECT;
 import static io.netty.buffer.b2.Fixture.Properties.HEAP;
 import static io.netty.buffer.b2.Fixture.Properties.POOLED;
+import static io.netty.buffer.b2.Fixture.Properties.SLICE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -60,6 +61,10 @@ public class BufTest {
             return fxs;
         }
         return fixtures = fixtureCombinations().toArray(Fixture[]::new);
+    }
+
+    static Stream<Fixture> nonSliceAllocators() {
+        return fixtureCombinations().filter(f -> !f.isSlice());
     }
 
     static Stream<Fixture> heapAllocators() {
@@ -139,7 +144,44 @@ public class BufTest {
                 }
             };
         }, COMPOSITE));
-        return builder.build();
+        return builder.build().flatMap(f -> {
+            // Inject slice versions of everything
+            Builder<Fixture> andSlices = Stream.builder();
+            andSlices.add(f);
+            andSlices.add(new Fixture(f + ".slice(0, capacity())", () -> {
+                var allocatorBase = f.get();
+                return new Allocator() {
+                    @Override
+                    public Buf allocate(int size) {
+                        try (Buf base = allocatorBase.allocate(size)) {
+                            return base.slice(0, base.capacity()).writerOffset(0);
+                        }
+                    }
+
+                    @Override
+                    public void close() {
+                        allocatorBase.close();
+                    }
+                };
+            }, SLICE));
+            andSlices.add(new Fixture(f + ".slice(1, capacity() - 2)", () -> {
+                var allocatorBase = f.get();
+                return new Allocator() {
+                    @Override
+                    public Buf allocate(int size) {
+                        try (Buf base = allocatorBase.allocate(size + 2)) {
+                            return base.slice(1, size).writerOffset(0);
+                        }
+                    }
+
+                    @Override
+                    public void close() {
+                        allocatorBase.close();
+                    }
+                };
+            }, SLICE));
+            return andSlices.build();
+        });
     }
 
     @BeforeAll
@@ -198,7 +240,7 @@ public class BufTest {
     }
 
     @ParameterizedTest
-    @MethodSource("allocators")
+    @MethodSource("nonSliceAllocators")
     void allocateAndSendToThread(Fixture fixture) throws Exception {
         try (Allocator allocator = fixture.createAllocator()) {
             ArrayBlockingQueue<Send<Buf>> queue = new ArrayBlockingQueue<>(10);
@@ -218,7 +260,7 @@ public class BufTest {
     }
 
     @ParameterizedTest
-    @MethodSource("allocators")
+    @MethodSource("nonSliceAllocators")
     void allocateAndSendToThreadViaSyncQueue(Fixture fixture) throws Exception {
         SynchronousQueue<Send<Buf>> queue = new SynchronousQueue<>();
         Future<Byte> future = executor.submit(() -> {
@@ -237,7 +279,7 @@ public class BufTest {
     }
 
     @ParameterizedTest
-    @MethodSource("allocators")
+    @MethodSource("nonSliceAllocators")
     void sendMustThrowWhenBufIsAcquired(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
@@ -252,7 +294,7 @@ public class BufTest {
     }
 
     @ParameterizedTest
-    @MethodSource("allocators")
+    @MethodSource("nonSliceAllocators")
     void mustThrowWhenAllocatingZeroSizedBuffer(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator()) {
             assertThrows(IllegalArgumentException.class, () -> allocator.allocate(0));
@@ -450,10 +492,12 @@ public class BufTest {
     void sliceWithoutOffsetAndSizeWillIncreaseReferenceCount(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
+            int borrows = buf.countBorrows();
             try (Buf ignored = buf.slice()) {
                 assertFalse(buf.isSendable());
                 assertThrows(IllegalStateException.class, buf::send);
             }
+            assertEquals(borrows, buf.countBorrows());
         }
     }
 
@@ -462,10 +506,12 @@ public class BufTest {
     void sliceWithOffsetAndSizeWillIncreaseReferenceCount(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
+            int borrows = buf.countBorrows();
             try (Buf ignored = buf.slice(0, 8)) {
                 assertFalse(buf.isSendable());
                 assertThrows(IllegalStateException.class, buf::send);
             }
+            assertEquals(borrows, buf.countBorrows());
         }
     }
 
@@ -504,7 +550,7 @@ public class BufTest {
     }
 
     @ParameterizedTest
-    @MethodSource("allocators")
+    @MethodSource("nonSliceAllocators")
     void sendOnSliceWithoutOffsetAndSizeMustThrow(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
@@ -519,7 +565,7 @@ public class BufTest {
     }
 
     @ParameterizedTest
-    @MethodSource("allocators")
+    @MethodSource("nonSliceAllocators")
     void sendOnSliceWithOffsetAndSizeMustThrow(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
@@ -537,9 +583,10 @@ public class BufTest {
     void sliceWithNegativeOffsetMustThrow(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
+            int borrows = buf.countBorrows();
             assertThrows(IndexOutOfBoundsException.class, () -> buf.slice(-1, 1));
             // Verify that the slice is closed properly afterwards.
-            assertTrue(buf.isSendable());
+            assertEquals(borrows, buf.countBorrows());
         }
     }
 
@@ -548,9 +595,10 @@ public class BufTest {
     void sliceWithNegativeSizeMustThrow(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.slice(0, -1));
+            int borrows = buf.countBorrows();
+            assertThrows(IllegalArgumentException.class, () -> buf.slice(0, -1));
             // Verify that the slice is closed properly afterwards.
-            assertTrue(buf.isSendable());
+            assertEquals(borrows, buf.countBorrows());
         }
     }
 
@@ -559,11 +607,45 @@ public class BufTest {
     void sliceWithSizeGreaterThanCapacityMustThrow(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
+            int borrows = buf.countBorrows();
             assertThrows(IndexOutOfBoundsException.class, () -> buf.slice(0, 9));
             buf.slice(0, 8).close(); // This is still fine.
             assertThrows(IndexOutOfBoundsException.class, () -> buf.slice(1, 8));
             // Verify that the slice is closed properly afterwards.
-            assertTrue(buf.isSendable());
+            assertEquals(borrows, buf.countBorrows());
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    void sliceWithZeroSizeMustBeAllowed(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(8)) {
+            int borrows = buf.countBorrows();
+            buf.slice(0, 0).close(); // This is fine.
+            // Verify that the slice is closed properly afterwards.
+            assertEquals(borrows, buf.countBorrows());
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    public void acquireComposingAndSlicingMustIncrementBorrows(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(8)) {
+            int borrows = buf.countBorrows();
+            try (Buf ignored = buf.acquire()) {
+                assertEquals(borrows + 1, buf.countBorrows());
+                try (Buf slice = buf.slice()) {
+                    assertEquals(borrows + 2, buf.countBorrows());
+                    try (Buf ignored1 = Buf.compose(buf, slice)) {
+                        assertEquals(borrows + 3, buf.countBorrows());
+                    }
+                    assertEquals(borrows + 2, buf.countBorrows());
+                }
+                assertEquals(borrows + 1, buf.countBorrows());
+            }
+            assertEquals(borrows, buf.countBorrows());
         }
     }
 

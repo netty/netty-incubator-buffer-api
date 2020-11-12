@@ -64,11 +64,16 @@ public final class Fixture implements Supplier<Allocator> {
         return properties.contains(Properties.CLEANER);
     }
 
+    public boolean isSlice() {
+        return properties.contains(Properties.SLICE);
+    }
+
     public enum Properties {
         HEAP,
         DIRECT,
         COMPOSITE,
         CLEANER,
-        POOLED
+        POOLED,
+        SLICE
     }
 }

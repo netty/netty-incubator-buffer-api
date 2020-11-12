@@ -127,6 +127,9 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
 
     @Override
     public Buf slice(int offset, int length) {
+        if (length < 0) {
+            throw new IllegalArgumentException("Length cannot be negative: " + length + '.');
+        }
         var slice = seg.asSlice(offset, length);
         acquire();
         Drop<MemSegBuf> drop = b -> close();

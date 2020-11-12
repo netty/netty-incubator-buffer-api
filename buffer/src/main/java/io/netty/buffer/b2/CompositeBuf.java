@@ -179,7 +179,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
     public Buf slice(int offset, int length) {
         checkWriteBounds(offset, length);
         if (offset < 0 || length < 0) {
-            throw new IndexOutOfBoundsException(
+            throw new IllegalArgumentException(
                     "Offset and length cannot be negative, but offset was " +
                     offset + ", and length was " + length + '.');
         }
@@ -248,7 +248,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
         }
         while (length > 0) {
             var buf = (Buf) chooseBuffer(srcPos, 0);
-            int toCopy = buf.capacity() - subOffset;
+            int toCopy = Math.min(buf.capacity() - subOffset, length);
             dest.copyInto(buf, subOffset, destPos, toCopy);
             srcPos += toCopy;
             destPos += toCopy;
