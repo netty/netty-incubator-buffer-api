@@ -145,6 +145,48 @@ public class BufTest {
                 }
             };
         }, COMPOSITE));
+
+        for (Fixture fixture : initFixtures) {
+            builder.add(new Fixture(fixture + ".ensureWritable", () -> {
+                var allocator = fixture.createAllocator();
+                return new Allocator() {
+                    @Override
+                    public Buf allocate(int size) {
+                        if (size < 2) {
+                            return allocator.allocate(size);
+                        }
+                        var buf = allocator.allocate(size - 1);
+                        buf.ensureWritable(size);
+                        return buf;
+                    }
+
+                    @Override
+                    public void close() {
+                        allocator.close();
+                    }
+                };
+            }, fixture.getProperties()));
+            builder.add(new Fixture(fixture + ".compose.ensureWritable", () -> {
+                var allocator = fixture.createAllocator();
+                return new Allocator() {
+                    @Override
+                    public Buf allocate(int size) {
+                        if (size < 2) {
+                            return allocator.allocate(size);
+                        }
+                        var buf = allocator.compose();
+                        buf.ensureWritable(size);
+                        return buf;
+                    }
+
+                    @Override
+                    public void close() {
+                        allocator.close();
+                    }
+                };
+            }, COMPOSITE));
+        }
+
         return builder.build().flatMap(f -> {
             // Inject slice versions of everything
             Builder<Fixture> andSlices = Stream.builder();
@@ -1447,6 +1489,20 @@ public class BufTest {
             assertThat(buf.readLong()).isEqualTo(0xA1A2A3A4A5A6A7A8L);
             assertThrows(IndexOutOfBoundsException.class, buf::readByte);
             // Is it implementation dependent if the capacity increased by *exactly* the requested size, or more.
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("nonSliceAllocators")
+    public void mustBeAbleToSliceAfterEnsureWritable(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(4)) {
+            buf.ensureWritable(8);
+            assertThat(buf.writableBytes()).isGreaterThanOrEqualTo(8);
+            buf.writeLong(0x0102030405060708L);
+            try (Buf slice = buf.slice()) {
+                assertEquals(0x0102030405060708L, slice.readLong());
+            }
         }
     }
 

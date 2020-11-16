@@ -44,6 +44,10 @@ public final class Fixture implements Supplier<Allocator> {
         return name;
     }
 
+    public Properties[] getProperties() {
+        return properties.toArray(Properties[]::new);
+    }
+
     public boolean isHeap() {
         return properties.contains(Properties.HEAP);
     }

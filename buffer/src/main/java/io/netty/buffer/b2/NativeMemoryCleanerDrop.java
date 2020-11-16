@@ -66,7 +66,7 @@ class NativeMemoryCleanerDrop implements Drop<Buf> {
             if (gate.compareAndSet(false, true)) {
                 Buf b = ref.get();
                 if (b == null) {
-                    pool.recoverLostMemory(mem);
+                    pool.recoverMemory(mem);
                 } else {
                     delegate.drop(b);
                 }

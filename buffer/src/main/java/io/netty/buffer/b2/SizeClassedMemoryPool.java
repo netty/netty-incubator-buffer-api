@@ -110,7 +110,8 @@ class SizeClassedMemoryPool implements Allocator, AllocatorControl, Drop<Buf> {
         return manager.unwrapRecoverableMemory(untetheredBuf);
     }
 
-    void recoverLostMemory(Object memory) {
+    @Override
+    public void recoverMemory(Object memory) {
         var drop = getDrop();
         var buf = manager.recoverMemory(memory, drop);
         drop.accept(buf);

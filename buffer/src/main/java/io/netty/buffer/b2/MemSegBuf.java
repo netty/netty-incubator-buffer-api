@@ -310,12 +310,12 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
             throw new IllegalArgumentException("Cannot ensure writable for a negative size: " + size + '.');
         }
         if (writableBytes() < size) {
-            long newSize = capacity() + (long) size;
+            long newSize = capacity() + size - (long) writableBytes();
             Allocator.checkSize(newSize);
             RecoverableMemory recoverableMemory = (RecoverableMemory) alloc.allocateUntethered(this, (int) newSize);
             var newSegment = recoverableMemory.segment;
             newSegment.copyFrom(seg);
-            unsafeGetDrop().drop(this); // Release old memory segment.
+            alloc.recoverMemory(recoverableMemory()); // Release old memory segment.
             seg = newSegment;
             unsafeGetDrop().accept(this);
         }

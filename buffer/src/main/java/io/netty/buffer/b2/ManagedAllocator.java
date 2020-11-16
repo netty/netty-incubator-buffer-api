@@ -40,4 +40,10 @@ class ManagedAllocator implements Allocator, AllocatorControl {
         var buf = manager.allocateConfined(this, size, NO_OP_DROP, null);
         return manager.unwrapRecoverableMemory(buf);
     }
+
+    @Override
+    public void recoverMemory(Object memory) {
+        // Free the recovered memory.
+        manager.recoverMemory(memory, manager.drop()).close();
+    }
 }

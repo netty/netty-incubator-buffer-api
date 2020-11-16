@@ -477,12 +477,11 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
         if (writableBytes() < size) {
             long newSize = capacity() + (long) size;
             Allocator.checkSize(newSize);
-            int minBumpSize = 256;
-            int growth = Math.min(Integer.MAX_VALUE - 8, Math.min(size - writableBytes(), minBumpSize));
+            int growth = size - writableBytes();
             if (bufs.length == 0) {
                 bufs = new Buf[] { allocator.allocate(growth) };
-            } else if (bufs[bufs.length - 1].capacity() < minBumpSize) {
-                bufs[bufs.length - 1].ensureWritable(growth);
+//            } else if (bufs[bufs.length - 1].capacity() + growth < minBumpSize) {
+//                bufs[bufs.length - 1].ensureWritable(growth);
             } else {
                 bufs = Arrays.copyOf(bufs, bufs.length + 1);
                 bufs[bufs.length - 1] = allocator.allocate(growth);

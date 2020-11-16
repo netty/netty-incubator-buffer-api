@@ -33,4 +33,13 @@ public interface AllocatorControl {
      * @return A "recoverable memory" object that is the requested allocation.
      */
     Object allocateUntethered(Buf originator, int size);
+
+    /**
+     * Return memory to the allocator, after it has been untethered from it's lifetime.
+     * This either happens if the memory has leaked and been re-captured, or if it is no longer in use by a buffer
+     * through {@link Buf#ensureWritable(int)}.
+     *
+     * @param memory The untethered memory to return to the allocator.
+     */
+    void recoverMemory(Object memory);
 }
