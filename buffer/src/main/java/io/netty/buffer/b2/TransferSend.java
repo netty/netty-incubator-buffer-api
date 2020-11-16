@@ -35,11 +35,20 @@ class TransferSend<I extends Rc<I>, T extends Rc<I>> implements Send<I> {
     @SuppressWarnings("unchecked")
     @Override
     public I receive() {
-        if (!RECEIVED.compareAndSet(this, false, true)) {
-            throw new IllegalStateException("This object has already been received.");
-        }
+        gateReception();
         var copy = outgoing.transferOwnership(drop);
         drop.accept(copy);
         return (I) copy;
+    }
+
+    Owned<T> unsafeUnwrapOwned() {
+        gateReception();
+        return outgoing;
+    }
+
+    private void gateReception() {
+        if (!RECEIVED.compareAndSet(this, false, true)) {
+            throw new IllegalStateException("This object has already been received.");
+        }
     }
 }

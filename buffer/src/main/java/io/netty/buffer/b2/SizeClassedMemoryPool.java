@@ -20,13 +20,14 @@ import java.util.ArrayList;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
+import static io.netty.buffer.b2.Statics.NO_OP_DROP;
 import static java.lang.invoke.MethodHandles.lookup;
 
-class SizeClassedMemoryPool implements Allocator, Drop<Buf> {
+class SizeClassedMemoryPool implements Allocator, AllocatorControl, Drop<Buf> {
     private static final VarHandle CLOSE = Statics.findVarHandle(
             lookup(), SizeClassedMemoryPool.class, "closed", boolean.class);
     private final MemoryManager manager;
-    private final ConcurrentHashMap<Long, ConcurrentLinkedQueue<Send<Buf>>> pool;
+    private final ConcurrentHashMap<Integer, ConcurrentLinkedQueue<Send<Buf>>> pool;
     @SuppressWarnings("unused")
     private volatile boolean closed;
 
@@ -50,8 +51,8 @@ class SizeClassedMemoryPool implements Allocator, Drop<Buf> {
         return manager;
     }
 
-    protected Buf createBuf(long size, Drop<Buf> drop) {
-        var buf = manager.allocateShared(size, drop, null);
+    protected Buf createBuf(int size, Drop<Buf> drop) {
+        var buf = manager.allocateShared(this, size, drop, null);
         drop.accept(buf);
         return buf;
     }
@@ -94,6 +95,21 @@ class SizeClassedMemoryPool implements Allocator, Drop<Buf> {
         }
     }
 
+    @Override
+    public Object allocateUntethered(Buf originator, int size) {
+        var sizeClassPool = getSizeClassPool(size);
+        Send<Buf> send = sizeClassPool.poll();
+        Buf untetheredBuf;
+        if (send != null) {
+            var transfer = (TransferSend<Buf, Buf>) send;
+            var owned = transfer.unsafeUnwrapOwned();
+            untetheredBuf = owned.transferOwnership(NO_OP_DROP);
+        } else {
+            untetheredBuf = createBuf(size, NO_OP_DROP);
+        }
+        return manager.unwrapRecoverableMemory(untetheredBuf);
+    }
+
     void recoverLostMemory(Object memory) {
         var drop = getDrop();
         var buf = manager.recoverMemory(memory, drop);
@@ -101,7 +117,7 @@ class SizeClassedMemoryPool implements Allocator, Drop<Buf> {
         buf.close();
     }
 
-    private ConcurrentLinkedQueue<Send<Buf>> getSizeClassPool(long size) {
+    private ConcurrentLinkedQueue<Send<Buf>> getSizeClassPool(int size) {
         return pool.computeIfAbsent(size, k -> new ConcurrentLinkedQueue<>());
     }
 

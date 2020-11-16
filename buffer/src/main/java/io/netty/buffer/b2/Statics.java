@@ -25,6 +25,8 @@ interface Statics {
     Cleaner CLEANER = Cleaner.create();
     LongAdder MEM_USAGE_NATIVE = new LongAdder();
     ConcurrentHashMap<Long,Runnable> CLEANUP_ACTIONS = new ConcurrentHashMap<>();
+    Drop<Buf> NO_OP_DROP = buf -> {
+    };
 
     static VarHandle findVarHandle(Lookup lookup, Class<?> recv, String name, Class<?> type) {
         try {

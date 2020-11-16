@@ -19,6 +19,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Isolated;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -110,7 +111,7 @@ public class BufTest {
                             int half = size / 2;
                             try (Buf firstHalf = a.allocate(half);
                                  Buf secondHalf = b.allocate(size - half)) {
-                                return Buf.compose(firstHalf, secondHalf);
+                                return a.compose(firstHalf, secondHalf);
                             }
                         }
 
@@ -134,7 +135,7 @@ public class BufTest {
                     try (Buf a = alloc.allocate(part);
                          Buf b = alloc.allocate(part);
                          Buf c = alloc.allocate(size - part * 2)) {
-                        return Buf.compose(a, b, c);
+                        return alloc.compose(a, b, c);
                     }
                 }
 
@@ -284,11 +285,11 @@ public class BufTest {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             try (Buf ignored = buf.acquire()) {
-                assertFalse(buf.isSendable());
+                assertFalse(buf.isOwned());
                 assertThrows(IllegalStateException.class, buf::send);
             }
             // Now send() should work again.
-            assertTrue(buf.isSendable());
+            assertTrue(buf.isOwned());
             buf.send().receive().close();
         }
     }
@@ -494,7 +495,7 @@ public class BufTest {
              Buf buf = allocator.allocate(8)) {
             int borrows = buf.countBorrows();
             try (Buf ignored = buf.slice()) {
-                assertFalse(buf.isSendable());
+                assertFalse(buf.isOwned());
                 assertThrows(IllegalStateException.class, buf::send);
             }
             assertEquals(borrows, buf.countBorrows());
@@ -508,7 +509,7 @@ public class BufTest {
              Buf buf = allocator.allocate(8)) {
             int borrows = buf.countBorrows();
             try (Buf ignored = buf.slice(0, 8)) {
-                assertFalse(buf.isSendable());
+                assertFalse(buf.isOwned());
                 assertThrows(IllegalStateException.class, buf::send);
             }
             assertEquals(borrows, buf.countBorrows());
@@ -555,11 +556,11 @@ public class BufTest {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             try (Buf slice = buf.slice()) {
-                assertFalse(buf.isSendable());
+                assertFalse(buf.isOwned());
                 assertThrows(IllegalStateException.class, slice::send);
             }
             // Verify that the slice is closed properly afterwards.
-            assertTrue(buf.isSendable());
+            assertTrue(buf.isOwned());
             buf.send().receive().close();
         }
     }
@@ -570,11 +571,11 @@ public class BufTest {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             try (Buf slice = buf.slice(0, 8)) {
-                assertFalse(buf.isSendable());
+                assertFalse(buf.isOwned());
                 assertThrows(IllegalStateException.class, slice::send);
             }
             // Verify that the slice is closed properly afterwards.
-            assertTrue(buf.isSendable());
+            assertTrue(buf.isOwned());
         }
     }
 
@@ -638,7 +639,7 @@ public class BufTest {
                 assertEquals(borrows + 1, buf.countBorrows());
                 try (Buf slice = buf.slice()) {
                     assertEquals(borrows + 2, buf.countBorrows());
-                    try (Buf ignored1 = Buf.compose(buf, slice)) {
+                    try (Buf ignored1 = allocator.compose(buf, slice)) {
                         assertEquals(borrows + 3, buf.countBorrows());
                     }
                     assertEquals(borrows + 2, buf.countBorrows());
@@ -772,7 +773,7 @@ public class BufTest {
                 int second = size - first;
                 try (var bufFirst = a.allocate(first);
                      var bufSecond = b.allocate(second)) {
-                    return Buf.compose(bufFirst, bufSecond);
+                    return a.compose(bufFirst, bufSecond);
                 }
             });
         }
@@ -788,7 +789,7 @@ public class BufTest {
                 int second = size - first;
                 try (var bufFirst = a.allocate(first);
                      var bufSecond = b.allocate(second)) {
-                    return Buf.compose(bufFirst, bufSecond);
+                    return a.compose(bufFirst, bufSecond);
                 }
             });
         }
@@ -804,7 +805,7 @@ public class BufTest {
                 int second = size - first;
                 try (var bufFirst = a.allocate(first);
                      var bufSecond = b.allocate(second)) {
-                    return Buf.compose(bufFirst, bufSecond);
+                    return a.compose(bufFirst, bufSecond);
                 }
             });
         }
@@ -820,7 +821,7 @@ public class BufTest {
                 int second = size - first;
                 try (var bufFirst = a.allocate(first);
                      var bufSecond = b.allocate(second)) {
-                    return Buf.compose(bufFirst, bufSecond);
+                    return a.compose(bufFirst, bufSecond);
                 }
             });
         }
@@ -837,7 +838,7 @@ public class BufTest {
                 int second = size - first;
                 try (var bufFirst = a.allocate(first);
                      var bufSecond = b.allocate(second)) {
-                    return scope.add(Buf.compose(bufFirst, bufSecond)).writerOffset(size).slice();
+                    return scope.add(a.compose(bufFirst, bufSecond)).writerOffset(size).slice();
                 }
             });
         }
@@ -854,7 +855,7 @@ public class BufTest {
                 int second = size - first;
                 try (var bufFirst = a.allocate(first);
                      var bufSecond = b.allocate(second)) {
-                    return scope.add(Buf.compose(bufFirst, bufSecond)).writerOffset(size).slice();
+                    return scope.add(a.compose(bufFirst, bufSecond)).writerOffset(size).slice();
                 }
             });
         }
@@ -871,7 +872,7 @@ public class BufTest {
                 int second = size - first;
                 try (var bufFirst = a.allocate(first);
                      var bufSecond = b.allocate(second)) {
-                    return scope.add(Buf.compose(bufFirst, bufSecond)).writerOffset(size).slice();
+                    return scope.add(a.compose(bufFirst, bufSecond)).writerOffset(size).slice();
                 }
             });
         }
@@ -888,7 +889,7 @@ public class BufTest {
                 int second = size - first;
                 try (var bufFirst = a.allocate(first);
                      var bufSecond = b.allocate(second)) {
-                    return scope.add(Buf.compose(bufFirst, bufSecond)).writerOffset(size).slice();
+                    return scope.add(a.compose(bufFirst, bufSecond)).writerOffset(size).slice();
                 }
             });
         }
@@ -1343,6 +1344,109 @@ public class BufTest {
                 var totalAllocated = (long) allocationSize * iterations;
                 assertThat(sum).isLessThan(totalAllocated);
             }
+        }
+    }
+
+    @Test
+    public void compositeBufferCanOnlyBeOwnedWhenAllConstituentBuffersAreOwned() {
+        try (Allocator allocator = Allocator.heap()) {
+            Buf composite;
+            try (Buf a = allocator.allocate(8)) {
+                assertTrue(a.isOwned());
+                Buf leakB;
+                try (Buf b = allocator.allocate(8)) {
+                    assertTrue(a.isOwned());
+                    assertTrue(b.isOwned());
+                    composite = allocator.compose(a, b);
+                    assertFalse(composite.isOwned());
+                    assertFalse(a.isOwned());
+                    assertFalse(b.isOwned());
+                    leakB = b;
+                }
+                assertFalse(composite.isOwned());
+                assertFalse(a.isOwned());
+                assertTrue(leakB.isOwned());
+            }
+            assertTrue(composite.isOwned());
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    public void ensureWritableMustThrowForBorrowedBuffers(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(8)) {
+            try (Buf slice = buf.slice()) {
+                assertThrows(IllegalStateException.class, () -> slice.ensureWritable(1));
+                assertThrows(IllegalStateException.class, () -> buf.ensureWritable(1));
+            }
+            try (Buf compose = allocator.compose(buf)) {
+                assertThrows(IllegalStateException.class, () -> compose.ensureWritable(1));
+                assertThrows(IllegalStateException.class, () -> buf.ensureWritable(1));
+            }
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("nonSliceAllocators")
+    public void ensureWritableMustThrowForNegativeSize(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(8)) {
+            assertThrows(IllegalArgumentException.class, () -> buf.ensureWritable(-1));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("nonSliceAllocators")
+    public void ensureWritableMustThrowIfRequestedSizeWouldGrowBeyondMaxAllowed(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(512)) {
+            assertThrows(IllegalArgumentException.class, () -> buf.ensureWritable(Integer.MAX_VALUE - 8));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("nonSliceAllocators")
+    public void ensureWritableMustNotThrowWhenSpaceIsAlreadyAvailable(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(8)) {
+            buf.ensureWritable(8);
+            buf.writeLong(1);
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.writeByte((byte) 1));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("nonSliceAllocators")
+    public void ensureWritableMustExpandBufferCapacity(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(8)) {
+            assertThat(buf.writableBytes()).isEqualTo(8);
+            buf.writeLong(0x0102030405060708L);
+            assertThat(buf.writableBytes()).isEqualTo(0);
+            buf.ensureWritable(8);
+            assertThat(buf.writableBytes()).isGreaterThanOrEqualTo(8);
+            buf.writeLong(0xA1A2A3A4A5A6A7A8L);
+            assertThat(buf.readableBytes()).isEqualTo(16);
+            assertThat(buf.readLong()).isEqualTo(0x0102030405060708L);
+            assertThat(buf.readLong()).isEqualTo(0xA1A2A3A4A5A6A7A8L);
+            assertThrows(IndexOutOfBoundsException.class, buf::readByte);
+            // Is it implementation dependent if the capacity increased by *exactly* the requested size, or more.
+        }
+    }
+
+    @Test
+    public void ensureWritableMustExpandCapacityOfEmptyCompositeBuffer() {
+        try (Allocator allocator = Allocator.heap();
+             Buf buf = allocator.compose()) {
+            assertThat(buf.writableBytes()).isEqualTo(0);
+            buf.ensureWritable(8);
+            assertThat(buf.writableBytes()).isGreaterThanOrEqualTo(8);
+            buf.writeLong(0xA1A2A3A4A5A6A7A8L);
+            assertThat(buf.readableBytes()).isEqualTo(8);
+            assertThat(buf.readLong()).isEqualTo(0xA1A2A3A4A5A6A7A8L);
+            assertThrows(IndexOutOfBoundsException.class, buf::readByte);
+            // Is it implementation dependent if the capacity increased by *exactly* the requested size, or more.
         }
     }
 

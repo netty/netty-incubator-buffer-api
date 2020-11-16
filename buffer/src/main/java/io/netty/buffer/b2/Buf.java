@@ -36,7 +36,7 @@ import java.nio.ByteOrder;
  * The reference count controls this life cycle.
  * <p>
  * When the buffer is initially allocated, a pairing {@link #close()} call will deallocate it.
- * In this state, the buffer is "owned".
+ * In this state, the buffer {@linkplain #isOwned() is "owned"}.
  * <p>
  * The buffer can also be {@linkplain #acquire() acquired} when it's about to be involved in a complicated life time.
  * The {@link #acquire()} call increments the reference count of the buffer,
@@ -67,10 +67,10 @@ import java.nio.ByteOrder;
  * To send a buffer to another thread, the buffer must not have any outstanding borrows.
  * That is to say, all {@linkplain #acquire() acquires} must have been paired with a {@link #close()};
  * all {@linkplain #slice() slices} must have been closed.
- * And if this buffer is a constituent of a {@linkplain #compose(Buf...) composite buffer},
+ * And if this buffer is a constituent of a {@linkplain Allocator#compose(Buf...) composite buffer},
  * then that composite buffer must be closed.
  * And if this buffer is itself a composite buffer, then it must own all of its constituent buffers.
- * The {@link #isSendable()} method can be used on any buffer to check if it can be sent or not.
+ * The {@link #isOwned()} method can be used on any buffer to check if it can be sent or not.
  *
  * <h3>Accessing data</h3>
  *
@@ -104,51 +104,6 @@ import java.nio.ByteOrder;
  *
  */
 public interface Buf extends Rc<Buf>, BufAccessors {
-    /**
-     * Compose the given sequence of buffers and present them as a single buffer.
-     * <p>
-     * <strong>Note:</strong> The composite buffer increments the reference count on all the constituent buffers,
-     * and holds a reference to them until the composite buffer is deallocated.
-     * This means the constituent buffers must still have their outside-reference count decremented as normal.
-     * If the buffers are allocated for the purpose of participating in the composite buffer,
-     * then they should be closed as soon as the composite buffer has been created, like in this example:
-     * <pre>{@code
-     *     try (Buf a = allocator.allocate(size);
-     *          Buf b = allocator.allocate(size)) {
-     *         return Buf.compose(a, b); // Reference counts for 'a' and 'b' incremented here.
-     *     } // Reference count for 'a' and 'b' decremented here; composite buffer now holds the last references.
-     * }</pre>
-     * <p>
-     * {@linkplain #send() Sending} a composite buffer implies sending all of its constituent buffers.
-     * <p>
-     * All of the constituent buffers must have the same {@linkplain #order() byte order}.
-     * An exception will be thrown if you attempt to compose buffers that have different byte orders,
-     * and changing the byte order of the constituent buffers so they become inconsistent after construction,
-     * will result in unspecified behaviour.
-     * <p>
-     * The read and write offsets of the constituent buffers must be arranged such that there are no "gaps" when viewed
-     * as a single connected chunk of memory.
-     * Specifically, there can be at most one buffer whose write offset is neither zero nor at capacity,
-     * and all buffers prior to it must have their write offsets at capacity, and all buffers after it must have a write
-     * offset of zero.
-     * Likewise, there can be at most one buffer whose read offset is neither zero nor at capacity,
-     * and all buffers prior to it must have their read offsets at capacity, and all buffers after it must have a read
-     * offset of zero.
-     * Furthermore, the sum of the read offsets must be less than or equal to the sum of the write offsets.
-     * <p>
-     * Reads and writes to the composite buffer that modifies the read or write offsets, will also modify the relevant
-     * offsets in the constituent buffers.
-     * <p>
-     * It is not a requirement that the buffers have the same size.
-     *
-     * @param bufs The buffers to compose into a single buffer view.
-     * @return A buffer composed of, and backed by, the given buffers.
-     * @throws IllegalArgumentException if the given buffers have an inconsistent {@linkplain #order() byte order}.
-     */
-    static Buf compose(Buf... bufs) {
-        return new CompositeBuf(bufs);
-    }
-
     /**
      * Change the default byte order of this buffer, and return this buffer.
      *
@@ -404,4 +359,18 @@ public interface Buf extends Rc<Buf>, BufAccessors {
      * the {@code length} reaches outside of the bounds of this buffer.
      */
     ByteIterator iterateReverse(int fromOffset, int length);
+
+    /**
+     * Ensure that this buffer has {@linkplain #writableBytes() available space for writing} the given number of
+     * bytes.
+     * The buffer must be in {@linkplain #isOwned() an owned state}, or an exception will be thrown.
+     * If this buffer already has the necessary space, then this method returns immediately.
+     * If this buffer does not already have the necessary space, then it will be expanded using the {@link Allocator}
+     * the buffer was created with.
+     *
+     * @param size The requested number of bytes of space that should be available for writing.
+     * @throws IllegalStateException if this buffer is not in an owned state.
+     * That is, if {@link #countBorrows()} is not {@code 0}.
+     */
+    void ensureWritable(int size);
 }

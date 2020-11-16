@@ -38,21 +38,23 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
         }
     };
 
+    private final Allocator allocator;
     private final TornBufAccessors tornBufAccessors;
     private final boolean isSendable;
-    private final Buf[] bufs;
-    private final int[] offsets; // The offset, for the composite buffer, where each constituent buffer starts.
-    private final int capacity;
+    private Buf[] bufs;
+    private int[] offsets; // The offset, for the composite buffer, where each constituent buffer starts.
+    private int capacity;
     private int roff;
     private int woff;
     private int subOffset; // The next offset *within* a consituent buffer to read from or write to.
 
-    CompositeBuf(Buf[] bufs) {
-        this(true, bufs.clone(), COMPOSITE_DROP); // Clone prevents external modification of array.
+    CompositeBuf(Allocator allocator, Buf[] bufs) {
+        this(allocator, true, bufs.clone(), COMPOSITE_DROP); // Clone prevents external modification of array.
     }
 
-    private CompositeBuf(boolean isSendable, Buf[] bufs, Drop<CompositeBuf> drop) {
+    private CompositeBuf(Allocator allocator, boolean isSendable, Buf[] bufs, Drop<CompositeBuf> drop) {
         super(drop);
+        this.allocator = allocator;
         this.isSendable = isSendable;
         for (Buf buf : bufs) {
             buf.acquire();
@@ -93,6 +95,12 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
             assert roff <= woff:
                     "The given buffers place the read offset ahead of the write offset: " + Arrays.toString(bufs) + '.';
         }
+        this.bufs = bufs;
+        computeBufferOffsets();
+        tornBufAccessors = new TornBufAccessors(this);
+    }
+
+    private void computeBufferOffsets() {
         offsets = new int[bufs.length];
         long cap = 0;
         for (int i = 0; i < bufs.length; i++) {
@@ -106,8 +114,6 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
                     "but the sum of the constituent buffer capacities was " + cap + '.');
         }
         capacity = (int) cap;
-        this.bufs = bufs;
-        tornBufAccessors = new TornBufAccessors(this);
     }
 
     @Override
@@ -210,7 +216,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
                 slices = new Buf[] { choice.slice(subOffset, 0) };
             }
 
-            return new CompositeBuf(false, slices, drop).writerOffset(length);
+            return new CompositeBuf(allocator, false, slices, drop).writerOffset(length);
         } catch (Throwable throwable) {
             // We called acquire prior to the try-clause. We need to undo that if we're not creating a composite buffer:
             close();
@@ -458,6 +464,31 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
                 return index - end;
             }
         };
+    }
+
+    @Override
+    public void ensureWritable(int size) {
+        if (!isOwned()) {
+            throw new IllegalStateException("Buffer is not owned. Only owned buffers can call ensureWritable.");
+        }
+        if (size < 0) {
+            throw new IllegalArgumentException("Cannot ensure writable for a negative size: " + size + '.');
+        }
+        if (writableBytes() < size) {
+            long newSize = capacity() + (long) size;
+            Allocator.checkSize(newSize);
+            int minBumpSize = 256;
+            int growth = Math.min(Integer.MAX_VALUE - 8, Math.min(size - writableBytes(), minBumpSize));
+            if (bufs.length == 0) {
+                bufs = new Buf[] { allocator.allocate(growth) };
+            } else if (bufs[bufs.length - 1].capacity() < minBumpSize) {
+                bufs[bufs.length - 1].ensureWritable(growth);
+            } else {
+                bufs = Arrays.copyOf(bufs, bufs.length + 1);
+                bufs[bufs.length - 1] = allocator.allocate(growth);
+            }
+            computeBufferOffsets();
+        }
     }
 
     // <editor-fold defaultstate="collapsed" desc="Primitive accessors.">
@@ -754,7 +785,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
                 for (int i = 0; i < sends.length; i++) {
                     received[i] = sends[i].receive();
                 }
-                var composite = new CompositeBuf(true, received, drop);
+                var composite = new CompositeBuf(allocator, true, received, drop);
                 drop.accept(composite);
                 return composite;
             }
@@ -771,8 +802,16 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
     }
 
     @Override
-    public boolean isSendable() {
-        return isSendable && super.isSendable();
+    public boolean isOwned() {
+        return isSendable && super.isOwned() && allConstituentsAreOwned();
+    }
+
+    private boolean allConstituentsAreOwned() {
+        boolean result = true;
+        for (Buf buf : bufs) {
+            result &= buf.isOwned();
+        }
+        return result;
     }
 
     long readPassThrough() {

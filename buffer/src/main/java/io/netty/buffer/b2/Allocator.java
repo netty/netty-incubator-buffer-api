@@ -60,6 +60,58 @@ public interface Allocator extends AutoCloseable {
     }
 
     /**
+     * Compose the given sequence of buffers and present them as a single buffer.
+     * <p>
+     * <strong>Note:</strong> The composite buffer increments the reference count on all the constituent buffers,
+     * and holds a reference to them until the composite buffer is deallocated.
+     * This means the constituent buffers must still have their outside-reference count decremented as normal.
+     * If the buffers are allocated for the purpose of participating in the composite buffer,
+     * then they should be closed as soon as the composite buffer has been created, like in this example:
+     * <pre>{@code
+     *     try (Buf a = allocator.allocate(size);
+     *          Buf b = allocator.allocate(size)) {
+     *         return Buf.compose(a, b); // Reference counts for 'a' and 'b' incremented here.
+     *     } // Reference count for 'a' and 'b' decremented here; composite buffer now holds the last references.
+     * }</pre>
+     * <p>
+     * {@linkplain Buf#send() Sending} a composite buffer implies sending all of its constituent buffers.
+     * For sending to be possible, both the composite buffer itself, and all of its constituent buffers, must be in an
+     * {@linkplain Rc#isOwned() owned state}.
+     * This means that the composite buffer must be the only reference to the constituent buffers.
+     * <p>
+     * All of the constituent buffers must have the same {@linkplain Buf#order() byte order}.
+     * An exception will be thrown if you attempt to compose buffers that have different byte orders,
+     * and changing the byte order of the constituent buffers so they become inconsistent after construction,
+     * will result in unspecified behaviour.
+     * <p>
+     * The read and write offsets of the constituent buffers must be arranged such that there are no "gaps" when viewed
+     * as a single connected chunk of memory.
+     * Specifically, there can be at most one buffer whose write offset is neither zero nor at capacity,
+     * and all buffers prior to it must have their write offsets at capacity, and all buffers after it must have a write
+     * offset of zero.
+     * Likewise, there can be at most one buffer whose read offset is neither zero nor at capacity,
+     * and all buffers prior to it must have their read offsets at capacity, and all buffers after it must have a read
+     * offset of zero.
+     * Furthermore, the sum of the read offsets must be less than or equal to the sum of the write offsets.
+     * <p>
+     * Reads and writes to the composite buffer that modifies the read or write offsets, will also modify the relevant
+     * offsets in the constituent buffers.
+     * <p>
+     * It is not a requirement that the buffers have the same size.
+     * <p>
+     * It is not a requirement that the buffers are allocated by this allocator, but if {@link Buf#ensureWritable(int)}
+     * is called on the composed buffer, and the composed buffer needs to be expanded, then this allocator instance
+     * will be used for allocation the extra memory.
+     *
+     * @param bufs The buffers to compose into a single buffer view.
+     * @return A buffer composed of, and backed by, the given buffers.
+     * @throws IllegalArgumentException if the given buffers have an inconsistent {@linkplain Buf#order() byte order}.
+     */
+    default Buf compose(Buf... bufs) {
+        return new CompositeBuf(this, bufs);
+    }
+
+    /**
      * Close this allocator, freeing all of its internal resources. It is not specified if the allocator can still be
      * used after this method has been called on it.
      */
@@ -68,36 +120,15 @@ public interface Allocator extends AutoCloseable {
     }
 
     static Allocator heap() {
-        var man = MemoryManager.getHeapMemoryManager();
-        return new Allocator() {
-            @Override
-            public Buf allocate(int size) {
-                checkSize(size);
-                return man.allocateConfined(size, man.drop(), null);
-            }
-        };
+        return new ManagedAllocator(MemoryManager.getHeapMemoryManager(), null);
     }
 
     static Allocator direct() {
-        var man = MemoryManager.getNativeMemoryManager();
-        return new Allocator() {
-            @Override
-            public Buf allocate(int size) {
-                checkSize(size);
-                return man.allocateConfined(size, man.drop(), null);
-            }
-        };
+        return new ManagedAllocator(MemoryManager.getNativeMemoryManager(), null);
     }
 
     static Allocator directWithCleaner() {
-        var man = MemoryManager.getNativeMemoryManager();
-        return new Allocator() {
-            @Override
-            public Buf allocate(int size) {
-                checkSize(size);
-                return man.allocateConfined(size, man.drop(), Statics.CLEANER);
-            }
-        };
+        return new ManagedAllocator(MemoryManager.getNativeMemoryManager(), Statics.CLEANER);
     }
 
     static Allocator pooledHeap() {

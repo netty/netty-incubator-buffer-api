@@ -53,18 +53,20 @@ import static jdk.incubator.foreign.MemoryAccess.setShortAtOffset_LE;
 
 class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
     static final Drop<MemSegBuf> SEGMENT_CLOSE = buf -> buf.seg.close();
-    final MemorySegment seg;
+    private final AllocatorControl alloc;
     private final boolean isSendable;
+    private MemorySegment seg;
     private boolean isBigEndian;
     private int roff;
     private int woff;
 
-    MemSegBuf(MemorySegment segmet, Drop<MemSegBuf> drop) {
-        this(segmet, drop, true);
+    MemSegBuf(MemorySegment segmet, Drop<MemSegBuf> drop, AllocatorControl alloc) {
+        this(segmet, drop, alloc, true);
     }
 
-    private MemSegBuf(MemorySegment segment, Drop<MemSegBuf> drop, boolean isSendable) {
+    private MemSegBuf(MemorySegment segment, Drop<MemSegBuf> drop, AllocatorControl alloc, boolean isSendable) {
         super(drop);
+        this.alloc = alloc;
         seg = segment;
         this.isSendable = isSendable;
         isBigEndian = ByteOrder.nativeOrder() == ByteOrder.BIG_ENDIAN;
@@ -134,7 +136,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
         acquire();
         Drop<MemSegBuf> drop = b -> close();
         var sendable = false; // Sending implies ownership change, which we can't do for slices.
-        return new MemSegBuf(slice, drop, sendable).writerOffset(length).order(order());
+        return new MemSegBuf(slice, drop, alloc, sendable).writerOffset(length).order(order());
     }
 
     @Override
@@ -297,6 +299,26 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
                 return index - end;
             }
         };
+    }
+
+    @Override
+    public void ensureWritable(int size) {
+        if (!isOwned()) {
+            throw new IllegalStateException("Buffer is not owned. Only owned buffers can call ensureWritable.");
+        }
+        if (size < 0) {
+            throw new IllegalArgumentException("Cannot ensure writable for a negative size: " + size + '.');
+        }
+        if (writableBytes() < size) {
+            long newSize = capacity() + (long) size;
+            Allocator.checkSize(newSize);
+            RecoverableMemory recoverableMemory = (RecoverableMemory) alloc.allocateUntethered(this, (int) newSize);
+            var newSegment = recoverableMemory.segment;
+            newSegment.copyFrom(seg);
+            unsafeGetDrop().drop(this); // Release old memory segment.
+            seg = newSegment;
+            unsafeGetDrop().accept(this);
+        }
     }
 
     // <editor-fold defaultstate="collapsed" desc="Primitive accessors implementation.">
@@ -774,7 +796,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
             @Override
             public MemSegBuf transferOwnership(Drop<MemSegBuf> drop) {
                 var newSegment = isConfined? transferSegment.handoff(Thread.currentThread()) : transferSegment;
-                MemSegBuf copy = new MemSegBuf(newSegment, drop);
+                MemSegBuf copy = new MemSegBuf(newSegment, drop, alloc);
                 copy.isBigEndian = outer.isBigEndian;
                 copy.roff = outer.roff;
                 copy.woff = outer.woff;
@@ -793,8 +815,8 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
     }
 
     @Override
-    public boolean isSendable() {
-        return isSendable && super.isSendable();
+    public boolean isOwned() {
+        return isSendable && super.isOwned();
     }
 
     private void checkRead(int index, int size) {
@@ -813,5 +835,23 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
         return new IndexOutOfBoundsException(
                 "Index " + index + " is out of bounds: [read 0 to " + woff + ", write 0 to " +
                 (seg.byteSize() - 1) + "].");
+    }
+
+    Object recoverableMemory() {
+        return new RecoverableMemory(seg, alloc);
+    }
+
+    static final class RecoverableMemory {
+        private final MemorySegment segment;
+        private final AllocatorControl alloc;
+
+        RecoverableMemory(MemorySegment segment, AllocatorControl alloc) {
+            this.segment = segment;
+            this.alloc = alloc;
+        }
+
+        Buf recover(Drop<MemSegBuf> drop) {
+            return new MemSegBuf(segment, drop, alloc);
+        }
     }
 }

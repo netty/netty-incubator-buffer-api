@@ -29,8 +29,8 @@ public interface MemoryManager {
     }
 
     boolean isNative();
-    Buf allocateConfined(long size, Drop<Buf> drop, Cleaner cleaner);
-    Buf allocateShared(long size, Drop<Buf> drop, Cleaner cleaner);
+    Buf allocateConfined(AllocatorControl alloc, long size, Drop<Buf> drop, Cleaner cleaner);
+    Buf allocateShared(AllocatorControl allo, long size, Drop<Buf> drop, Cleaner cleaner);
     Drop<Buf> drop();
     Object unwrapRecoverableMemory(Buf buf);
     Buf recoverMemory(Object recoverableMemory, Drop<Buf> drop);
@@ -40,21 +40,21 @@ public interface MemoryManager {
         public abstract boolean isNative();
 
         @Override
-        public Buf allocateConfined(long size, Drop<Buf> drop, Cleaner cleaner) {
+        public Buf allocateConfined(AllocatorControl alloc, long size, Drop<Buf> drop, Cleaner cleaner) {
             var segment = createSegment(size);
             if (cleaner != null) {
                 segment = segment.registerCleaner(cleaner);
             }
-            return new MemSegBuf(segment, convert(drop));
+            return new MemSegBuf(segment, convert(drop), alloc);
         }
 
         @Override
-        public Buf allocateShared(long size, Drop<Buf> drop, Cleaner cleaner) {
+        public Buf allocateShared(AllocatorControl alloc, long size, Drop<Buf> drop, Cleaner cleaner) {
             var segment = createSegment(size).share();
             if (cleaner != null) {
                 segment = segment.registerCleaner(cleaner);
             }
-            return new MemSegBuf(segment, convert(drop));
+            return new MemSegBuf(segment, convert(drop), alloc);
         }
 
         protected abstract MemorySegment createSegment(long size);
@@ -67,13 +67,13 @@ public interface MemoryManager {
         @Override
         public Object unwrapRecoverableMemory(Buf buf) {
             var b = (MemSegBuf) buf;
-            return b.seg;
+            return b.recoverableMemory();
         }
 
         @Override
         public Buf recoverMemory(Object recoverableMemory, Drop<Buf> drop) {
-            var segment = (MemorySegment) recoverableMemory;
-            return new MemSegBuf(segment, convert(drop));
+            var recovery = (MemSegBuf.RecoverableMemory) recoverableMemory;
+            return recovery.recover(convert(drop));
         }
 
         @SuppressWarnings("unchecked")

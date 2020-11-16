@@ -72,7 +72,7 @@ public abstract class RcSupport<I extends Rc<I>, T extends RcSupport<I, T>> impl
      */
     @Override
     public final Send<I> send() {
-        if (!isSendable()) {
+        if (!isOwned()) {
             throw notSendableException();
         }
         var owned = prepareSend();
@@ -86,13 +86,13 @@ public abstract class RcSupport<I extends Rc<I>, T extends RcSupport<I, T>> impl
     }
 
     @Override
-    public boolean isSendable() {
+    public boolean isOwned() {
         return acquires == 0;
     }
 
     @Override
     public int countBorrows() {
-        return acquires;
+        return Math.max(acquires, 0);
     }
 
     /**
@@ -104,6 +104,15 @@ public abstract class RcSupport<I extends Rc<I>, T extends RcSupport<I, T>> impl
      * @return This Rc instance in a deactivated state.
      */
     protected abstract Owned<T> prepareSend();
+
+    /**
+     * Get access to the underlying {@link Drop} object.
+     * This method is unsafe because it open the possibility of bypassing and overriding resource lifetimes.
+     * @return The {@link Drop} object used by this reference counted object.
+     */
+    protected Drop<T> unsafeGetDrop() {
+        return drop;
+    }
 
     @SuppressWarnings("unchecked")
     private I self() {
