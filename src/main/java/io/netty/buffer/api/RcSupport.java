@@ -19,7 +19,7 @@ public abstract class RcSupport<I extends Rc<I>, T extends RcSupport<I, T>> impl
     private int acquires; // Closed if negative.
     private final Drop<T> drop;
 
-    RcSupport(Drop<T> drop) {
+    protected RcSupport(Drop<T> drop) {
         this.drop = drop;
     }
 

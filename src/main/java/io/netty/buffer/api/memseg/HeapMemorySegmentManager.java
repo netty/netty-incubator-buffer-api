@@ -13,22 +13,18 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package io.netty.buffer.api;
+package io.netty.buffer.api.memseg;
 
-import java.lang.invoke.MethodHandles.Lookup;
-import java.lang.invoke.VarHandle;
-import java.lang.ref.Cleaner;
+import jdk.incubator.foreign.MemorySegment;
 
-interface Statics {
-    Cleaner CLEANER = Cleaner.create();
-    Drop<Buf> NO_OP_DROP = buf -> {
-    };
+public class HeapMemorySegmentManager extends AbstractMemorySegmentManager {
+    @Override
+    public boolean isNative() {
+        return false;
+    }
 
-    static VarHandle findVarHandle(Lookup lookup, Class<?> recv, String name, Class<?> type) {
-        try {
-            return lookup.findVarHandle(recv, name, type);
-        } catch (Exception e) {
-            throw new ExceptionInInitializerError(e);
-        }
+    @Override
+    protected MemorySegment createSegment(long size) {
+        return MemorySegment.ofArray(new byte[Math.toIntExact(size)]);
     }
 }

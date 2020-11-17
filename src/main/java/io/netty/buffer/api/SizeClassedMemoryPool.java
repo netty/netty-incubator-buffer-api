@@ -122,7 +122,7 @@ class SizeClassedMemoryPool implements Allocator, AllocatorControl, Drop<Buf> {
         return pool.computeIfAbsent(size, k -> new ConcurrentLinkedQueue<>());
     }
 
-    private static void dispose(Buf buf) {
-        MemSegBuf.SEGMENT_CLOSE.drop((MemSegBuf) buf);
+    private void dispose(Buf buf) {
+        manager.drop().drop(buf);
     }
 }

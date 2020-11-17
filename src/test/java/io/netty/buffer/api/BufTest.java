@@ -16,6 +16,7 @@
 package io.netty.buffer.api;
 
 import io.netty.buffer.api.Fixture.Properties;
+import io.netty.buffer.api.memseg.NativeMemorySegmentManager;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Disabled;
@@ -1344,7 +1345,7 @@ public class BufTest {
     class CleanerTests {
         @Disabled("Precise native memory accounting does not work since recent panama-foreign changes.")
         @ParameterizedTest
-        @MethodSource("io.netty.buffer.b2.BufTest#directWithCleanerAllocators")
+        @MethodSource("io.netty.buffer.api.BufTest#directWithCleanerAllocators")
         public void bufferMustBeClosedByCleaner(Fixture fixture) throws InterruptedException {
             var allocator = fixture.createAllocator();
             allocator.close();
@@ -1355,7 +1356,7 @@ public class BufTest {
                 System.gc();
                 System.runFinalization();
             }
-            var sum = Statics.MEM_USAGE_NATIVE.sum();
+            var sum = NativeMemorySegmentManager.MEM_USAGE_NATIVE.sum();
             var totalAllocated = (long) allocationSize * iterations;
             assertThat(sum).isLessThan(totalAllocated);
         }
@@ -1366,7 +1367,7 @@ public class BufTest {
 
         @Disabled("Precise native memory accounting does not work since recent panama-foreign changes.")
         @ParameterizedTest
-        @MethodSource("io.netty.buffer.b2.BufTest#directPooledWithCleanerAllocators")
+        @MethodSource("io.netty.buffer.api.BufTest#directPooledWithCleanerAllocators")
         public void buffersMustBeReusedByPoolingAllocatorEvenWhenDroppedByCleanerInsteadOfExplicitly(Fixture fixture)
                 throws InterruptedException {
             try (var allocator = fixture.createAllocator()) {
@@ -1377,7 +1378,7 @@ public class BufTest {
                     System.gc();
                     System.runFinalization();
                 }
-                var sum = Statics.MEM_USAGE_NATIVE.sum();
+                var sum = NativeMemorySegmentManager.MEM_USAGE_NATIVE.sum();
                 var totalAllocated = (long) allocationSize * iterations;
                 assertThat(sum).isLessThan(totalAllocated);
             }

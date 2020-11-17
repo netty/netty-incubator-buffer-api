@@ -13,8 +13,15 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package io.netty.buffer.api;
+package io.netty.buffer.api.memseg;
 
+import io.netty.buffer.api.Allocator;
+import io.netty.buffer.api.AllocatorControl;
+import io.netty.buffer.api.Buf;
+import io.netty.buffer.api.ByteIterator;
+import io.netty.buffer.api.Drop;
+import io.netty.buffer.api.Owned;
+import io.netty.buffer.api.RcSupport;
 import jdk.incubator.foreign.MemorySegment;
 
 import java.nio.ByteBuffer;
