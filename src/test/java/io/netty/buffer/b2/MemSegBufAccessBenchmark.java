@@ -13,11 +13,8 @@
 * License for the specific language governing permissions and limitations
 * under the License.
 */
-package io.netty.buffer;
+package io.netty.buffer.b2;
 
-import io.netty.buffer.b2.Allocator;
-import io.netty.buffer.b2.Buf;
-import io.netty.microbench.util.AbstractMicrobenchmark;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
@@ -25,7 +22,9 @@ import org.openjdk.jmh.annotations.Measurement;
 import org.openjdk.jmh.annotations.Mode;
 import org.openjdk.jmh.annotations.OutputTimeUnit;
 import org.openjdk.jmh.annotations.Param;
+import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
+import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Warmup;
 
@@ -36,20 +35,15 @@ import java.util.concurrent.TimeUnit;
 @Fork(1)
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
-public class MemSegBufAccessBenchmark extends AbstractMicrobenchmark {
+@State(Scope.Benchmark)
+public class MemSegBufAccessBenchmark {
     public enum BBufType {
-        UNSAFE {
+        DIRECT {
             @Override
             Buf newBuffer() {
                 return Allocator.direct().allocate(64);
             }
         },
-//        UNSAFE_SLICE {
-//            @Override
-//            Buf newBuffer() {
-//                return UNSAFE.newBuffer().slice(16, 48);
-//            }
-//        },
         HEAP {
             @Override
             Buf newBuffer() {
@@ -75,7 +69,7 @@ public class MemSegBufAccessBenchmark extends AbstractMicrobenchmark {
     @Param
     public BBufType bufferType;
 
-    @Param({ "8" })
+    @Param("8")
     public int batchSize; // applies only to readBatch benchmark
 
     @Setup
@@ -92,17 +86,17 @@ public class MemSegBufAccessBenchmark extends AbstractMicrobenchmark {
 
     @Benchmark
     public long setGetLong() {
-        return buffer.writeLong(0, 1).readLong(0);
+        return buffer.setLong(0, 1).getLong(0);
     }
 
     @Benchmark
     public Buf setLong() {
-        return buffer.writeLong(0, 1);
+        return buffer.setLong(0, 1);
     }
 
     @Benchmark
     public int readBatch() {
-        buffer.readerIndex(0);
+        buffer.readerOffset(0);
         int result = 0;
         // WARNING!
         // Please do not replace this sum loop with a BlackHole::consume loop:
