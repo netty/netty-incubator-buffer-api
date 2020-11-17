@@ -81,7 +81,8 @@
       -dsa -da -ea:io.netty...
       -XX:+HeapDumpOnOutOfMemoryError
     </argLine.common>
-    <argLine.printGC>-XX:+PrintGCDetails</argLine.printGC>
+<!--    <argLine.printGC>-XX:+PrintGCDetails</argLine.printGC>-->
+    <argLine.printGC/>
   </properties>
 
   <build>
@@ -330,9 +331,20 @@
       <scope>test</scope>
     </dependency>
     <dependency>
+      <groupId>org.assertj</groupId>
+      <artifactId>assertj-core</artifactId>
+      <version>3.18.0</version>
+    </dependency>
+    <dependency>
       <groupId>io.netty</groupId>
       <artifactId>netty-build-common</artifactId>
       <version>${netty.build.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.openjdk.jmh</groupId>
+      <artifactId>jmh-core</artifactId>
+      <version>1.26</version>
       <scope>test</scope>
     </dependency>
   </dependencies>
