@@ -75,6 +75,7 @@ public class MemSegBufAccessBenchmark {
     @Setup
     public void setup() {
         buffer = bufferType.newBuffer();
+        buffer.writerOffset(batchSize);
     }
 
     private Buf buffer;
