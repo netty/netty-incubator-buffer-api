@@ -15,7 +15,6 @@
  */
 package io.netty.buffer.b2;
 
-import io.netty.util.ByteIterator;
 import jdk.incubator.foreign.MemorySegment;
 
 import java.nio.ByteBuffer;

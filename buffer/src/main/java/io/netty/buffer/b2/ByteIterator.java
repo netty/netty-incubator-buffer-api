@@ -12,7 +12,9 @@
  * or implied. See the License for the specific language governing permissions and limitations under
  * the License.
  */
-package io.netty.util;
+package io.netty.buffer.b2;
+
+import io.netty.util.ByteProcessor;
 
 /**
  * The ByteIterator scans through a sequence of bytes.

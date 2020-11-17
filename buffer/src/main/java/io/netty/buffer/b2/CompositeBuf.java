@@ -15,8 +15,6 @@
  */
 package io.netty.buffer.b2;
 
-import io.netty.util.ByteIterator;
-
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Arrays;
