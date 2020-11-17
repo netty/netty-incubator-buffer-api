@@ -893,7 +893,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
 
     private int searchOffsets(int index) {
         int i = Arrays.binarySearch(offsets, index);
-        return i < 0? -(i+2) : i;
+        return i < 0? -(i + 2) : i;
     }
 
     // <editor-fold defaultstate="collapsed" desc="Torn buffer access.">

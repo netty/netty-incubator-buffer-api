@@ -77,7 +77,7 @@ public interface MemoryManager {
         }
 
         @SuppressWarnings("unchecked")
-        private static <T,R> Drop<R> convert(Drop<T> drop) {
+        private static <T, R> Drop<R> convert(Drop<T> drop) {
             return (Drop<R>) drop;
         }
     }

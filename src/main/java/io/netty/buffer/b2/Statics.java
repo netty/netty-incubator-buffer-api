@@ -24,7 +24,7 @@ import java.util.concurrent.atomic.LongAdder;
 interface Statics {
     Cleaner CLEANER = Cleaner.create();
     LongAdder MEM_USAGE_NATIVE = new LongAdder();
-    ConcurrentHashMap<Long,Runnable> CLEANUP_ACTIONS = new ConcurrentHashMap<>();
+    ConcurrentHashMap<Long, Runnable> CLEANUP_ACTIONS = new ConcurrentHashMap<>();
     Drop<Buf> NO_OP_DROP = buf -> {
     };
 

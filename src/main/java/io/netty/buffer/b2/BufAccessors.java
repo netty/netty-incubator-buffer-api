@@ -18,7 +18,8 @@ package io.netty.buffer.b2;
 /**
  * This interface is just the primitive data accessor methods that {@link Buf} exposes.
  * It can be useful if you only need the data access methods, and perhaps wish to decorate or modify their behaviour.
- * Usually, you'd use the {@link Buf} interface directly, since this lets you properly control the buffer reference count.
+ * Usually, you'd use the {@link Buf} interface directly, since this lets you properly control the buffer reference
+ * count.
  */
 public interface BufAccessors {
     // <editor-fold defaultstate="collapsed" desc="Primitive accessors interface.">

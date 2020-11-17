@@ -152,8 +152,8 @@ public interface Buf extends Rc<Buf>, BufAccessors {
      *
      * @param offset The writer offset to set.
      * @return This Buf.
-     * @throws IndexOutOfBoundsException if the specified {@code offset} is less than the current {@link #readerOffset()}
-     *                                   or greater than {@link #capacity()}.
+     * @throws IndexOutOfBoundsException if the specified {@code offset} is less than the current
+     * {@link #readerOffset()} or greater than {@link #capacity()}.
      */
     Buf writerOffset(int offset);
 
