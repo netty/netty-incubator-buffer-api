@@ -13,8 +13,9 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package io.netty.buffer.b2;
+package io.netty.buffer.api;
 
+import io.netty.buffer.api.MemSegBuf.RecoverableMemory;
 import jdk.incubator.foreign.MemorySegment;
 
 import java.lang.ref.Cleaner;
@@ -72,7 +73,7 @@ public interface MemoryManager {
 
         @Override
         public Buf recoverMemory(Object recoverableMemory, Drop<Buf> drop) {
-            var recovery = (MemSegBuf.RecoverableMemory) recoverableMemory;
+            var recovery = (RecoverableMemory) recoverableMemory;
             return recovery.recover(convert(drop));
         }
 

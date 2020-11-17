@@ -13,7 +13,7 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package io.netty.buffer.b2;
+package io.netty.buffer.api;
 
 /**
  * This interface encapsulates the ownership of an {@link Rc}, and exposes a method that may be used to transfer this

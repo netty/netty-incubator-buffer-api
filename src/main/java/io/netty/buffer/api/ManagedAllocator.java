@@ -13,11 +13,11 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package io.netty.buffer.b2;
+package io.netty.buffer.api;
 
 import java.lang.ref.Cleaner;
 
-import static io.netty.buffer.b2.Statics.NO_OP_DROP;
+import static io.netty.buffer.api.Statics.NO_OP_DROP;
 
 class ManagedAllocator implements Allocator, AllocatorControl {
     private final MemoryManager manager;

@@ -13,8 +13,9 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package io.netty.buffer.b2;
+package io.netty.buffer.api;
 
+import io.netty.buffer.api.Fixture.Properties;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Disabled;
@@ -40,12 +41,6 @@ import java.util.function.Function;
 import java.util.stream.Stream;
 import java.util.stream.Stream.Builder;
 
-import static io.netty.buffer.b2.Fixture.Properties.CLEANER;
-import static io.netty.buffer.b2.Fixture.Properties.COMPOSITE;
-import static io.netty.buffer.b2.Fixture.Properties.DIRECT;
-import static io.netty.buffer.b2.Fixture.Properties.HEAP;
-import static io.netty.buffer.b2.Fixture.Properties.POOLED;
-import static io.netty.buffer.b2.Fixture.Properties.SLICE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -90,12 +85,12 @@ public class BufTest {
             return Arrays.stream(fxs);
         }
         List<Fixture> initFixtures = List.of(
-                new Fixture("heap", Allocator::heap, HEAP),
-                new Fixture("direct", Allocator::direct, DIRECT),
-                new Fixture("directWithCleaner", Allocator::directWithCleaner, DIRECT, CLEANER),
-                new Fixture("pooledHeap", Allocator::pooledHeap, POOLED, HEAP),
-                new Fixture("pooledDirect", Allocator::pooledDirect, POOLED, DIRECT),
-                new Fixture("pooledDirectWithCleaner", Allocator::pooledDirectWithCleaner, POOLED, DIRECT, CLEANER));
+                new Fixture("heap", Allocator::heap, Properties.HEAP),
+                new Fixture("direct", Allocator::direct, Properties.DIRECT),
+                new Fixture("directWithCleaner", Allocator::directWithCleaner, Properties.DIRECT, Properties.CLEANER),
+                new Fixture("pooledHeap", Allocator::pooledHeap, Properties.POOLED, Properties.HEAP),
+                new Fixture("pooledDirect", Allocator::pooledDirect, Properties.POOLED, Properties.DIRECT),
+                new Fixture("pooledDirectWithCleaner", Allocator::pooledDirectWithCleaner, Properties.POOLED, Properties.DIRECT, Properties.CLEANER));
         Builder<Fixture> builder = Stream.builder();
         initFixtures.forEach(builder);
 
@@ -121,7 +116,7 @@ public class BufTest {
                             b.close();
                         }
                     };
-                }, COMPOSITE));
+                }, Properties.COMPOSITE));
             }
         }
 
@@ -144,7 +139,7 @@ public class BufTest {
                     alloc.close();
                 }
             };
-        }, COMPOSITE));
+        }, Properties.COMPOSITE));
 
         for (Fixture fixture : initFixtures) {
             builder.add(new Fixture(fixture + ".ensureWritable", () -> {
@@ -184,7 +179,7 @@ public class BufTest {
                         allocator.close();
                     }
                 };
-            }, COMPOSITE));
+            }, Properties.COMPOSITE));
         }
 
         return builder.build().flatMap(f -> {
@@ -206,7 +201,7 @@ public class BufTest {
                         allocatorBase.close();
                     }
                 };
-            }, SLICE));
+            }, Properties.SLICE));
             andSlices.add(new Fixture(f + ".slice(1, capacity() - 2)", () -> {
                 var allocatorBase = f.get();
                 return new Allocator() {
@@ -222,7 +217,7 @@ public class BufTest {
                         allocatorBase.close();
                     }
                 };
-            }, SLICE));
+            }, Properties.SLICE));
             return andSlices.build();
         });
     }

@@ -17,4 +17,4 @@
 /**
  * Experimental {@code Buf} implementation, based on MemorySegment, as a potential alternative to {@code ByteBuf}.
  */
-package io.netty.buffer.b2;
+package io.netty.buffer.api;

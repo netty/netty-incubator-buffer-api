@@ -13,7 +13,7 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package io.netty.buffer.b2;
+package io.netty.buffer.api;
 
 /**
  * Thrown when resource disposal fails while closing a resource pool.

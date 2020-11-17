@@ -13,7 +13,7 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package io.netty.buffer.b2;
+package io.netty.buffer.api;
 
 /**
  * An Rc is a reference counted, thread-confined, resource of sorts. Because these resources are thread-confined, the

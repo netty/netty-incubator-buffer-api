@@ -13,14 +13,14 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package io.netty.buffer.b2;
+package io.netty.buffer.api;
 
 import java.lang.invoke.VarHandle;
 import java.util.ArrayList;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
-import static io.netty.buffer.b2.Statics.NO_OP_DROP;
+import static io.netty.buffer.api.Statics.NO_OP_DROP;
 import static java.lang.invoke.MethodHandles.lookup;
 
 class SizeClassedMemoryPool implements Allocator, AllocatorControl, Drop<Buf> {

@@ -13,7 +13,7 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package io.netty.buffer.b2;
+package io.netty.buffer.api;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -27,7 +27,8 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
      * non-composite copy of the buffer.
      */
     private static final int MAX_CAPACITY = Integer.MAX_VALUE - 8;
-    private static final Drop<CompositeBuf> COMPOSITE_DROP = new Drop<CompositeBuf>() {
+    private static final Drop<CompositeBuf>
+            COMPOSITE_DROP = new Drop<CompositeBuf>() {
         @Override
         public void drop(CompositeBuf obj) {
             for (Buf buf : obj.bufs) {

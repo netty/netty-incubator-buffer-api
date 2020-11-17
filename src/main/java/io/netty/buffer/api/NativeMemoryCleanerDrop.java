@@ -13,15 +13,15 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package io.netty.buffer.b2;
+package io.netty.buffer.api;
 
 import java.lang.invoke.VarHandle;
 import java.lang.ref.Cleaner.Cleanable;
 import java.lang.ref.WeakReference;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import static io.netty.buffer.b2.Statics.CLEANER;
-import static io.netty.buffer.b2.Statics.findVarHandle;
+import static io.netty.buffer.api.Statics.CLEANER;
+import static io.netty.buffer.api.Statics.findVarHandle;
 import static java.lang.invoke.MethodHandles.lookup;
 
 class NativeMemoryCleanerDrop implements Drop<Buf> {
