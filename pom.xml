@@ -72,6 +72,7 @@
     <netty.build.version>28</netty.build.version>
     <java.version>16</java.version>
     <junit.version>5.7.0</junit.version>
+    <surefire.version>3.0.0-M5</surefire.version>
     <skipTests>false</skipTests>
     <argLine.java9.extras />
     <!-- Export some stuff which is used during our tests -->
@@ -110,6 +111,10 @@
           <compilerArgument>-Xlint:-options</compilerArgument>
           <meminitial>256m</meminitial>
           <maxmem>1024m</maxmem>
+          <compilerArgs>
+            <arg>--add-modules</arg>
+            <arg>jdk.incubator.foreign</arg>
+          </compilerArgs>
           <excludes>
             <exclude>**/package-info.java</exclude>
           </excludes>
@@ -154,16 +159,77 @@
       </plugin>
       <plugin>
         <artifactId>maven-surefire-plugin</artifactId>
-        <version>2.22.1</version>
+        <version>${surefire.version}</version>
         <configuration>
           <includes>
             <include>**/*Test*.java</include>
           </includes>
           <runOrder>random</runOrder>
-          <argLine>${argLine.common} ${argLine.printGC} ${argLine.java9}</argLine>
+          <argLine>${argLine.common} ${argLine.printGC} ${argLine.java9} --add-modules jdk.incubator.foreign</argLine>
           <!-- Ensure the whole stacktrace is preserved when an exception is thrown. See https://issues.apache.org/jira/browse/SUREFIRE-1457 -->
           <trimStackTrace>false</trimStackTrace>
         </configuration>
+        <dependencies>
+          <!-- Declare the surefire dynamic dependencies explicitly, to speed up the docker build. -->
+          <dependency>
+            <groupId>org.codehaus.plexus</groupId>
+            <artifactId>plexus-utils</artifactId>
+            <version>1.1</version>
+          </dependency>
+          <dependency>
+            <groupId>org.apache.maven.surefire</groupId>
+            <artifactId>surefire-junit-platform</artifactId>
+            <version>${surefire.version}</version>
+          </dependency>
+          <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-engine</artifactId>
+            <version>5.3.2</version>
+            <type>pom</type>
+          </dependency>
+          <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-params</artifactId>
+            <version>5.3.2</version>
+            <type>pom</type>
+          </dependency>
+          <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-core</artifactId>
+            <version>2.28.2</version>
+            <type>pom</type>
+          </dependency>
+          <dependency>
+            <groupId>org.hamcrest</groupId>
+            <artifactId>hamcrest-library</artifactId>
+            <version>1.3</version>
+            <type>pom</type>
+          </dependency>
+          <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <version>4.13</version>
+            <type>pom</type>
+          </dependency>
+          <dependency>
+            <groupId>org.powermock</groupId>
+            <artifactId>powermock-reflect</artifactId>
+            <version>2.0.5</version>
+            <type>pom</type>
+          </dependency>
+          <dependency>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
+            <version>3.9.1</version>
+            <type>pom</type>
+          </dependency>
+          <dependency>
+            <groupId>org.easytesting</groupId>
+            <artifactId>fest-assert</artifactId>
+            <version>1.4</version>
+            <type>pom</type>
+          </dependency>
+        </dependencies>
       </plugin>
       <!-- always produce osgi bundles -->
       <plugin>
@@ -269,20 +335,6 @@
             <version>1.9.4</version>
           </dependency>
         </dependencies>
-      </plugin>
-      <plugin>
-        <artifactId>maven-jar-plugin</artifactId>
-        <version>3.2.0</version>
-        <executions>
-          <execution>
-            <id>default-jar</id>
-            <configuration>
-              <excludes>
-                <exclude>META-INF/native/**</exclude>
-              </excludes>
-            </configuration>
-          </execution>
-        </executions>
       </plugin>
     </plugins>
   </build>

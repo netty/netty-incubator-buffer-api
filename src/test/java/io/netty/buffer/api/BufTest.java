@@ -42,6 +42,11 @@ import java.util.function.Function;
 import java.util.stream.Stream;
 import java.util.stream.Stream.Builder;
 
+import static io.netty.buffer.api.Fixture.Properties.CLEANER;
+import static io.netty.buffer.api.Fixture.Properties.COMPOSITE;
+import static io.netty.buffer.api.Fixture.Properties.DIRECT;
+import static io.netty.buffer.api.Fixture.Properties.HEAP;
+import static io.netty.buffer.api.Fixture.Properties.POOLED;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -86,12 +91,12 @@ public class BufTest {
             return Arrays.stream(fxs);
         }
         List<Fixture> initFixtures = List.of(
-                new Fixture("heap", Allocator::heap, Properties.HEAP),
-                new Fixture("direct", Allocator::direct, Properties.DIRECT),
-                new Fixture("directWithCleaner", Allocator::directWithCleaner, Properties.DIRECT, Properties.CLEANER),
-                new Fixture("pooledHeap", Allocator::pooledHeap, Properties.POOLED, Properties.HEAP),
-                new Fixture("pooledDirect", Allocator::pooledDirect, Properties.POOLED, Properties.DIRECT),
-                new Fixture("pooledDirectWithCleaner", Allocator::pooledDirectWithCleaner, Properties.POOLED, Properties.DIRECT, Properties.CLEANER));
+                new Fixture("heap", Allocator::heap, HEAP),
+                new Fixture("direct", Allocator::direct, DIRECT),
+                new Fixture("directWithCleaner", Allocator::directWithCleaner, DIRECT, CLEANER),
+                new Fixture("pooledHeap", Allocator::pooledHeap, POOLED, HEAP),
+                new Fixture("pooledDirect", Allocator::pooledDirect, POOLED, DIRECT),
+                new Fixture("pooledDirectWithCleaner", Allocator::pooledDirectWithCleaner, POOLED, DIRECT, CLEANER));
         Builder<Fixture> builder = Stream.builder();
         initFixtures.forEach(builder);
 
@@ -117,7 +122,7 @@ public class BufTest {
                             b.close();
                         }
                     };
-                }, Properties.COMPOSITE));
+                }, COMPOSITE));
             }
         }
 
@@ -140,7 +145,7 @@ public class BufTest {
                     alloc.close();
                 }
             };
-        }, Properties.COMPOSITE));
+        }, COMPOSITE));
 
         for (Fixture fixture : initFixtures) {
             builder.add(new Fixture(fixture + ".ensureWritable", () -> {
@@ -180,7 +185,7 @@ public class BufTest {
                         allocator.close();
                     }
                 };
-            }, Properties.COMPOSITE));
+            }, COMPOSITE));
         }
 
         return builder.build().flatMap(f -> {

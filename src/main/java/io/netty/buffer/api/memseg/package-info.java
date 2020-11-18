@@ -15,6 +15,6 @@
  */
 
 /**
- * Incubating {@code Buf} API, as a proposed alternative to {@code ByteBuf}.
+ * Experimental {@code Buf} implementation, based on the MemorySegment API from OpenJDK Panama Foreign.
  */
-package io.netty.buffer.api;
+package io.netty.buffer.api.memseg;
