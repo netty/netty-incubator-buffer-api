@@ -1,4 +1,5 @@
 .PHONY: image test dbg clean build
+.DEFAULT_GOAL := build
 
 image:
 	docker build --tag netty-incubator-buffer:build .
