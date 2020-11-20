@@ -24,7 +24,18 @@ jobs:
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v2
+      - name: Prepare docker build cache
+        run:
+          echo ${{ secrets.GITHUB_TOKEN }} | docker login docker.pkg.github.com -u $GITHUB_ACTOR --password-stdin
+          docker pull docker.pkg.github.com/$GITHUB_REPOSITORY/build-cache || true
+          export DOCKER_BUILD_OPTS="--cache-from=docker.pkg.github.com/$GITHUB_REPOSITORY/build-cache"
 
       # Run the make script
       - name: Make build
         run: make build
+
+      # Cache build outputs
+      - name: Save docker build cache
+        run:
+          docker tag netty-incubator-buffer:build docker.pkg.github.com/$GITHUB_REPOSITORY/build-cache
+          docker push docker.pkg.github.com/$GITHUB_REPOSITORY/build-cache || true

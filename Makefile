@@ -2,7 +2,7 @@
 .DEFAULT_GOAL := build
 
 image:
-	docker build --tag netty-incubator-buffer:build .
+	docker build $(DOCKER_BUILD_OPTS) --tag netty-incubator-buffer:build .
 
 test: image
 	docker run --rm --name build-container netty-incubator-buffer:build
