@@ -38,6 +38,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Function;
 import java.util.stream.Stream;
 import java.util.stream.Stream.Builder;
@@ -83,6 +84,10 @@ public class BufTest {
 
     static Stream<Fixture> directPooledWithCleanerAllocators() {
         return fixtureCombinations().filter(f -> f.isDirect() && f.isCleaner() && f.isPooled());
+    }
+
+    static Stream<Fixture> poolingAllocators() {
+        return fixtureCombinations().filter(f -> f.isPooled());
     }
 
     private static Stream<Fixture> fixtureCombinations() {
@@ -1503,6 +1508,38 @@ public class BufTest {
             buf.writeLong(0x0102030405060708L);
             try (Buf slice = buf.slice()) {
                 assertEquals(0x0102030405060708L, slice.readLong());
+            }
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("poolingAllocators")
+    public void pooledBuffersMustResetStateBeforeReuse(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf expected = allocator.allocate(8)) {
+            for (int i = 0; i < 10; i++) {
+                try (Buf buf = allocator.allocate(8)) {
+                    assertEquals(expected.capacity(), buf.capacity());
+                    assertEquals(expected.readableBytes(), buf.readableBytes());
+                    assertEquals(expected.readerOffset(), buf.readerOffset());
+                    assertEquals(expected.writableBytes(), buf.writableBytes());
+                    assertEquals(expected.writerOffset(), buf.writerOffset());
+                    assertThat(buf.order()).isEqualTo(expected.order());
+                    byte[] bytes = new byte[8];
+                    buf.copyInto(0, bytes, 0, 8);
+                    assertThat(bytes).containsExactly(0, 0, 0, 0, 0, 0, 0, 0);
+
+                    var tlr = ThreadLocalRandom.current();
+                    buf.order(tlr.nextBoolean()? ByteOrder.LITTLE_ENDIAN : ByteOrder.BIG_ENDIAN);
+                    for (int j = 0; j < tlr.nextInt(0, 8); j++) {
+                        buf.writeByte((byte) 1);
+                    }
+                    if (buf.readableBytes() > 0) {
+                        for (int j = 0; j < tlr.nextInt(0, buf.readableBytes()); j++) {
+                            buf.readByte();
+                        }
+                    }
+                }
             }
         }
     }

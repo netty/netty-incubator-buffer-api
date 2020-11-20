@@ -16,6 +16,7 @@
 package io.netty.buffer.api;
 
 import java.lang.invoke.VarHandle;
+import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -42,7 +43,7 @@ class SizeClassedMemoryPool implements Allocator, AllocatorControl, Drop<Buf> {
         var sizeClassPool = getSizeClassPool(size);
         Send<Buf> send = sizeClassPool.poll();
         if (send != null) {
-            return send.receive();
+            return send.receive().reset().fill((byte) 0).order(ByteOrder.nativeOrder());
         }
         return createBuf(size, getDrop());
     }

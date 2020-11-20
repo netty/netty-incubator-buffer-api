@@ -288,9 +288,10 @@ public interface Buf extends Rc<Buf>, BufAccessors {
      * Resets the {@linkplain #readerOffset() read offset} and the {@linkplain #writerOffset() write offset} on this
      * buffer to their initial values.
      */
-    default void reset() {
+    default Buf reset() {
         readerOffset(0);
         writerOffset(0);
+        return this;
     }
 
     /**
