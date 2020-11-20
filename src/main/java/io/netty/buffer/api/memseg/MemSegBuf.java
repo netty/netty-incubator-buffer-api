@@ -79,6 +79,11 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
     }
 
     @Override
+    public String toString() {
+        return "Buf[roff:" + roff + ", woff:" + woff + ", cap:" + seg.byteSize() + ']';
+    }
+
+    @Override
     public Buf order(ByteOrder order) {
         isBigEndian = order == ByteOrder.BIG_ENDIAN;
         return this;

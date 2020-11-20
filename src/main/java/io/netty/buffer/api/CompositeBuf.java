@@ -116,6 +116,11 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
     }
 
     @Override
+    public String toString() {
+        return "Buf[roff:" + roff + ", woff:" + woff + ", cap:" + capacity + ']';
+    }
+
+    @Override
     public Buf order(ByteOrder order) {
         for (Buf buf : bufs) {
             buf.order(order);
