@@ -28,41 +28,27 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.NoSuchElementException;
 
-import static jdk.incubator.foreign.MemoryAccess.getByteAtOffset_BE;
-import static jdk.incubator.foreign.MemoryAccess.getByteAtOffset_LE;
-import static jdk.incubator.foreign.MemoryAccess.getCharAtOffset_BE;
-import static jdk.incubator.foreign.MemoryAccess.getCharAtOffset_LE;
-import static jdk.incubator.foreign.MemoryAccess.getDoubleAtOffset_BE;
-import static jdk.incubator.foreign.MemoryAccess.getDoubleAtOffset_LE;
-import static jdk.incubator.foreign.MemoryAccess.getFloatAtOffset_BE;
-import static jdk.incubator.foreign.MemoryAccess.getFloatAtOffset_LE;
-import static jdk.incubator.foreign.MemoryAccess.getIntAtOffset_BE;
-import static jdk.incubator.foreign.MemoryAccess.getIntAtOffset_LE;
-import static jdk.incubator.foreign.MemoryAccess.getLongAtOffset_BE;
-import static jdk.incubator.foreign.MemoryAccess.getLongAtOffset_LE;
-import static jdk.incubator.foreign.MemoryAccess.getShortAtOffset_BE;
-import static jdk.incubator.foreign.MemoryAccess.getShortAtOffset_LE;
-import static jdk.incubator.foreign.MemoryAccess.setByteAtOffset_BE;
-import static jdk.incubator.foreign.MemoryAccess.setByteAtOffset_LE;
-import static jdk.incubator.foreign.MemoryAccess.setCharAtOffset_BE;
-import static jdk.incubator.foreign.MemoryAccess.setCharAtOffset_LE;
-import static jdk.incubator.foreign.MemoryAccess.setDoubleAtOffset_BE;
-import static jdk.incubator.foreign.MemoryAccess.setDoubleAtOffset_LE;
-import static jdk.incubator.foreign.MemoryAccess.setFloatAtOffset_BE;
-import static jdk.incubator.foreign.MemoryAccess.setFloatAtOffset_LE;
-import static jdk.incubator.foreign.MemoryAccess.setIntAtOffset_BE;
-import static jdk.incubator.foreign.MemoryAccess.setIntAtOffset_LE;
-import static jdk.incubator.foreign.MemoryAccess.setLongAtOffset_BE;
-import static jdk.incubator.foreign.MemoryAccess.setLongAtOffset_LE;
-import static jdk.incubator.foreign.MemoryAccess.setShortAtOffset_BE;
-import static jdk.incubator.foreign.MemoryAccess.setShortAtOffset_LE;
+import static jdk.incubator.foreign.MemoryAccess.getByteAtOffset;
+import static jdk.incubator.foreign.MemoryAccess.getCharAtOffset;
+import static jdk.incubator.foreign.MemoryAccess.getDoubleAtOffset;
+import static jdk.incubator.foreign.MemoryAccess.getFloatAtOffset;
+import static jdk.incubator.foreign.MemoryAccess.getIntAtOffset;
+import static jdk.incubator.foreign.MemoryAccess.getLongAtOffset;
+import static jdk.incubator.foreign.MemoryAccess.getShortAtOffset;
+import static jdk.incubator.foreign.MemoryAccess.setByteAtOffset;
+import static jdk.incubator.foreign.MemoryAccess.setCharAtOffset;
+import static jdk.incubator.foreign.MemoryAccess.setDoubleAtOffset;
+import static jdk.incubator.foreign.MemoryAccess.setFloatAtOffset;
+import static jdk.incubator.foreign.MemoryAccess.setIntAtOffset;
+import static jdk.incubator.foreign.MemoryAccess.setLongAtOffset;
+import static jdk.incubator.foreign.MemoryAccess.setShortAtOffset;
 
 class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
     static final Drop<MemSegBuf> SEGMENT_CLOSE = buf -> buf.seg.close();
     private final AllocatorControl alloc;
     private final boolean isSendable;
     private MemorySegment seg;
-    private boolean isBigEndian;
+    private ByteOrder order;
     private int roff;
     private int woff;
 
@@ -75,7 +61,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
         this.alloc = alloc;
         seg = segment;
         this.isSendable = isSendable;
-        isBigEndian = ByteOrder.nativeOrder() == ByteOrder.BIG_ENDIAN;
+        order = ByteOrder.nativeOrder();
     }
 
     @Override
@@ -85,13 +71,13 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
 
     @Override
     public Buf order(ByteOrder order) {
-        isBigEndian = order == ByteOrder.BIG_ENDIAN;
+        this.order = order;
         return this;
     }
 
     @Override
     public ByteOrder order() {
-        return isBigEndian? ByteOrder.BIG_ENDIAN : ByteOrder.LITTLE_ENDIAN;
+        return order;
     }
 
     @Override
@@ -217,7 +203,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
                 if (!hasNextLong()) {
                     throw new NoSuchElementException("No 'long' value at offet " + currentOffset() + '.');
                 }
-                long val = getLongAtOffset_BE(segment, index);
+                long val = getLongAtOffset(segment, index, ByteOrder.BIG_ENDIAN);
                 index += Long.BYTES;
                 return val;
             }
@@ -232,7 +218,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
                 if (!hasNextByte()) {
                     throw new NoSuchElementException("No 'byte' value at offet " + currentOffset() + '.');
                 }
-                byte val = getByteAtOffset_BE(segment, index);
+                byte val = getByteAtOffset(segment, index);
                 index++;
                 return val;
             }
@@ -280,7 +266,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
                     throw new NoSuchElementException("No 'long' value at offet " + currentOffset() + '.');
                 }
                 index -= 7;
-                long val = getLongAtOffset_LE(segment, index);
+                long val = getLongAtOffset(segment, index, ByteOrder.LITTLE_ENDIAN);
                 index--;
                 return val;
             }
@@ -295,7 +281,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
                 if (!hasNextByte()) {
                     throw new NoSuchElementException("No 'byte' value at offet " + currentOffset() + '.');
                 }
-                byte val = getByteAtOffset_LE(segment, index);
+                byte val = getByteAtOffset(segment, index);
                 index--;
                 return val;
             }
@@ -336,7 +322,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
     @Override
     public byte readByte() {
         checkRead(roff, Byte.BYTES);
-        byte value = isBigEndian? getByteAtOffset_BE(seg, roff) : getByteAtOffset_LE(seg, roff);
+        byte value = getByteAtOffset(seg, roff);
         roff += Byte.BYTES;
         return value;
     }
@@ -344,13 +330,13 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
     @Override
     public byte getByte(int roff) {
         checkRead(roff, Byte.BYTES);
-        return isBigEndian? getByteAtOffset_BE(seg, roff) : getByteAtOffset_LE(seg, roff);
+        return getByteAtOffset(seg, roff);
     }
 
     @Override
     public int readUnsignedByte() {
         checkRead(roff, Byte.BYTES);
-        int value = (isBigEndian? getByteAtOffset_BE(seg, roff) : getByteAtOffset_LE(seg, roff)) & 0xFF;
+        int value = getByteAtOffset(seg, roff) & 0xFF;
         roff += Byte.BYTES;
         return value;
     }
@@ -358,55 +344,39 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
     @Override
     public int getUnsignedByte(int roff) {
         checkRead(roff, Byte.BYTES);
-        return (isBigEndian? getByteAtOffset_BE(seg, roff) : getByteAtOffset_LE(seg, roff)) & 0xFF;
+        return getByteAtOffset(seg, roff) & 0xFF;
     }
 
     @Override
     public Buf writeByte(byte value) {
-        if (isBigEndian) {
-            setByteAtOffset_BE(seg, woff, value);
-        } else {
-            setByteAtOffset_LE(seg, woff, value);
-        }
+        setByteAtOffset(seg, woff, value);
         woff += Byte.BYTES;
         return this;
     }
 
     @Override
     public Buf setByte(int woff, byte value) {
-        if (isBigEndian) {
-            setByteAtOffset_BE(seg, woff, value);
-        } else {
-            setByteAtOffset_LE(seg, woff, value);
-        }
+        setByteAtOffset(seg, woff, value);
         return this;
     }
 
     @Override
     public Buf writeUnsignedByte(int value) {
-        if (isBigEndian) {
-            setByteAtOffset_BE(seg, woff, (byte) (value & 0xFF));
-        } else {
-            setByteAtOffset_LE(seg, woff, (byte) (value & 0xFF));
-        }
+        setByteAtOffset(seg, woff, (byte) (value & 0xFF));
         woff += Byte.BYTES;
         return this;
     }
 
     @Override
     public Buf setUnsignedByte(int woff, int value) {
-        if (isBigEndian) {
-            setByteAtOffset_BE(seg, woff, (byte) (value & 0xFF));
-        } else {
-            setByteAtOffset_LE(seg, woff, (byte) (value & 0xFF));
-        }
+        setByteAtOffset(seg, woff, (byte) (value & 0xFF));
         return this;
     }
 
     @Override
     public char readChar() {
         checkRead(roff, 2);
-        char value = isBigEndian? getCharAtOffset_BE(seg, roff) : getCharAtOffset_LE(seg, roff);
+        char value = getCharAtOffset(seg, roff, order);
         roff += 2;
         return value;
     }
@@ -414,34 +384,26 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
     @Override
     public char getChar(int roff) {
         checkRead(roff, 2);
-        return isBigEndian? getCharAtOffset_BE(seg, roff) : getCharAtOffset_LE(seg, roff);
+        return getCharAtOffset(seg, roff, order);
     }
 
     @Override
     public Buf writeChar(char value) {
-        if (isBigEndian) {
-            setCharAtOffset_BE(seg, woff, value);
-        } else {
-            setCharAtOffset_LE(seg, woff, value);
-        }
+        setCharAtOffset(seg, woff, order, value);
         woff += 2;
         return this;
     }
 
     @Override
     public Buf setChar(int woff, char value) {
-        if (isBigEndian) {
-            setCharAtOffset_BE(seg, woff, value);
-        } else {
-            setCharAtOffset_LE(seg, woff, value);
-        }
+        setCharAtOffset(seg, woff, order, value);
         return this;
     }
 
     @Override
     public short readShort() {
         checkRead(roff, Short.BYTES);
-        short value = isBigEndian? getShortAtOffset_BE(seg, roff) : getShortAtOffset_LE(seg, roff);
+        short value = getShortAtOffset(seg, roff, order);
         roff += Short.BYTES;
         return value;
     }
@@ -449,13 +411,13 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
     @Override
     public short getShort(int roff) {
         checkRead(roff, Short.BYTES);
-        return isBigEndian? getShortAtOffset_BE(seg, roff) : getShortAtOffset_LE(seg, roff);
+        return getShortAtOffset(seg, roff, order);
     }
 
     @Override
     public int readUnsignedShort() {
         checkRead(roff, Short.BYTES);
-        int value = (isBigEndian? getShortAtOffset_BE(seg, roff) : getShortAtOffset_LE(seg, roff)) & 0xFFFF;
+        int value = getShortAtOffset(seg, roff, order) & 0xFFFF;
         roff += Short.BYTES;
         return value;
     }
@@ -463,61 +425,45 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
     @Override
     public int getUnsignedShort(int roff) {
         checkRead(roff, Short.BYTES);
-        return (isBigEndian? getShortAtOffset_BE(seg, roff) : getShortAtOffset_LE(seg, roff)) & 0xFFFF;
+        return getShortAtOffset(seg, roff, order) & 0xFFFF;
     }
 
     @Override
     public Buf writeShort(short value) {
-        if (isBigEndian) {
-            setShortAtOffset_BE(seg, woff, value);
-        } else {
-            setShortAtOffset_LE(seg, woff, value);
-        }
+        setShortAtOffset(seg, woff, order, value);
         woff += Short.BYTES;
         return this;
     }
 
     @Override
     public Buf setShort(int woff, short value) {
-        if (isBigEndian) {
-            setShortAtOffset_BE(seg, woff, value);
-        } else {
-            setShortAtOffset_LE(seg, woff, value);
-        }
+        setShortAtOffset(seg, woff, order, value);
         return this;
     }
 
     @Override
     public Buf writeUnsignedShort(int value) {
-        if (isBigEndian) {
-            setShortAtOffset_BE(seg, woff, (short) (value & 0xFFFF));
-        } else {
-            setShortAtOffset_LE(seg, woff, (short) (value & 0xFFFF));
-        }
+        setShortAtOffset(seg, woff, order, (short) (value & 0xFFFF));
         woff += Short.BYTES;
         return this;
     }
 
     @Override
     public Buf setUnsignedShort(int woff, int value) {
-        if (isBigEndian) {
-            setShortAtOffset_BE(seg, woff, (short) (value & 0xFFFF));
-        } else {
-            setShortAtOffset_LE(seg, woff, (short) (value & 0xFFFF));
-        }
+        setShortAtOffset(seg, woff, order, (short) (value & 0xFFFF));
         return this;
     }
 
     @Override
     public int readMedium() {
         checkRead(roff, 3);
-        int value = isBigEndian?
-                getByteAtOffset_BE(seg, roff) << 16 |
-                (getByteAtOffset_BE(seg, roff + 1) & 0xFF) << 8 |
-                getByteAtOffset_BE(seg, roff + 2) & 0xFF :
-                getByteAtOffset_BE(seg, roff) & 0xFF |
-                (getByteAtOffset_BE(seg, roff + 1) & 0xFF) << 8 |
-                getByteAtOffset_BE(seg, roff + 2) << 16;
+        int value = order == ByteOrder.BIG_ENDIAN?
+                getByteAtOffset(seg, roff) << 16 |
+                (getByteAtOffset(seg, roff + 1) & 0xFF) << 8 |
+                getByteAtOffset(seg, roff + 2) & 0xFF :
+                getByteAtOffset(seg, roff) & 0xFF |
+                (getByteAtOffset(seg, roff + 1) & 0xFF) << 8 |
+                getByteAtOffset(seg, roff + 2) << 16;
         roff += 3;
         return value;
     }
@@ -525,25 +471,25 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
     @Override
     public int getMedium(int roff) {
         checkRead(roff, 3);
-        return isBigEndian?
-                getByteAtOffset_BE(seg, roff) << 16 |
-                (getByteAtOffset_BE(seg, roff + 1) & 0xFF) << 8 |
-                getByteAtOffset_BE(seg, roff + 2) & 0xFF :
-                getByteAtOffset_BE(seg, roff) & 0xFF |
-                (getByteAtOffset_BE(seg, roff + 1) & 0xFF) << 8 |
-                getByteAtOffset_BE(seg, roff + 2) << 16;
+        return order == ByteOrder.BIG_ENDIAN?
+                getByteAtOffset(seg, roff) << 16 |
+                (getByteAtOffset(seg, roff + 1) & 0xFF) << 8 |
+                getByteAtOffset(seg, roff + 2) & 0xFF :
+                getByteAtOffset(seg, roff) & 0xFF |
+                (getByteAtOffset(seg, roff + 1) & 0xFF) << 8 |
+                getByteAtOffset(seg, roff + 2) << 16;
     }
 
     @Override
     public int readUnsignedMedium() {
         checkRead(roff, 3);
-        int value = isBigEndian?
-                (getByteAtOffset_BE(seg, roff) << 16 |
-                (getByteAtOffset_BE(seg, roff + 1) & 0xFF) << 8 |
-                getByteAtOffset_BE(seg, roff + 2) & 0xFF) & 0xFFFFFF :
-                (getByteAtOffset_BE(seg, roff) & 0xFF |
-                (getByteAtOffset_BE(seg, roff + 1) & 0xFF) << 8 |
-                getByteAtOffset_BE(seg, roff + 2) << 16) & 0xFFFFFF;
+        int value = order == ByteOrder.BIG_ENDIAN?
+                (getByteAtOffset(seg, roff) << 16 |
+                (getByteAtOffset(seg, roff + 1) & 0xFF) << 8 |
+                getByteAtOffset(seg, roff + 2) & 0xFF) & 0xFFFFFF :
+                (getByteAtOffset(seg, roff) & 0xFF |
+                (getByteAtOffset(seg, roff + 1) & 0xFF) << 8 |
+                getByteAtOffset(seg, roff + 2) << 16) & 0xFFFFFF;
         roff += 3;
         return value;
     }
@@ -551,26 +497,26 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
     @Override
     public int getUnsignedMedium(int roff) {
         checkRead(roff, 3);
-        return isBigEndian?
-                (getByteAtOffset_BE(seg, roff) << 16 |
-                (getByteAtOffset_BE(seg, roff + 1) & 0xFF) << 8 |
-                getByteAtOffset_BE(seg, roff + 2) & 0xFF) & 0xFFFFFF :
-                (getByteAtOffset_BE(seg, roff) & 0xFF |
-                (getByteAtOffset_BE(seg, roff + 1) & 0xFF) << 8 |
-                getByteAtOffset_BE(seg, roff + 2) << 16) & 0xFFFFFF;
+        return order == ByteOrder.BIG_ENDIAN?
+                (getByteAtOffset(seg, roff) << 16 |
+                (getByteAtOffset(seg, roff + 1) & 0xFF) << 8 |
+                getByteAtOffset(seg, roff + 2) & 0xFF) & 0xFFFFFF :
+                (getByteAtOffset(seg, roff) & 0xFF |
+                (getByteAtOffset(seg, roff + 1) & 0xFF) << 8 |
+                getByteAtOffset(seg, roff + 2) << 16) & 0xFFFFFF;
     }
 
     @Override
     public Buf writeMedium(int value) {
         checkWrite(woff, 3);
-        if (isBigEndian) {
-            setByteAtOffset_BE(seg, woff, (byte) (value >> 16));
-            setByteAtOffset_BE(seg, woff + 1, (byte) (value >> 8 & 0xFF));
-            setByteAtOffset_BE(seg, woff + 2, (byte) (value & 0xFF));
+        if (order == ByteOrder.BIG_ENDIAN) {
+            setByteAtOffset(seg, woff, (byte) (value >> 16));
+            setByteAtOffset(seg, woff + 1, (byte) (value >> 8 & 0xFF));
+            setByteAtOffset(seg, woff + 2, (byte) (value & 0xFF));
         } else {
-            setByteAtOffset_BE(seg, woff, (byte) (value & 0xFF));
-            setByteAtOffset_BE(seg, woff + 1, (byte) (value >> 8 & 0xFF));
-            setByteAtOffset_BE(seg, woff + 2, (byte) (value >> 16 & 0xFF));
+            setByteAtOffset(seg, woff, (byte) (value & 0xFF));
+            setByteAtOffset(seg, woff + 1, (byte) (value >> 8 & 0xFF));
+            setByteAtOffset(seg, woff + 2, (byte) (value >> 16 & 0xFF));
         }
         woff += 3;
         return this;
@@ -579,14 +525,14 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
     @Override
     public Buf setMedium(int woff, int value) {
         checkWrite(woff, 3);
-        if (isBigEndian) {
-            setByteAtOffset_BE(seg, woff, (byte) (value >> 16));
-            setByteAtOffset_BE(seg, woff + 1, (byte) (value >> 8 & 0xFF));
-            setByteAtOffset_BE(seg, woff + 2, (byte) (value & 0xFF));
+        if (order == ByteOrder.BIG_ENDIAN) {
+            setByteAtOffset(seg, woff, (byte) (value >> 16));
+            setByteAtOffset(seg, woff + 1, (byte) (value >> 8 & 0xFF));
+            setByteAtOffset(seg, woff + 2, (byte) (value & 0xFF));
         } else {
-            setByteAtOffset_BE(seg, woff, (byte) (value & 0xFF));
-            setByteAtOffset_BE(seg, woff + 1, (byte) (value >> 8 & 0xFF));
-            setByteAtOffset_BE(seg, woff + 2, (byte) (value >> 16 & 0xFF));
+            setByteAtOffset(seg, woff, (byte) (value & 0xFF));
+            setByteAtOffset(seg, woff + 1, (byte) (value >> 8 & 0xFF));
+            setByteAtOffset(seg, woff + 2, (byte) (value >> 16 & 0xFF));
         }
         return this;
     }
@@ -594,14 +540,14 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
     @Override
     public Buf writeUnsignedMedium(int value) {
         checkWrite(woff, 3);
-        if (isBigEndian) {
-            setByteAtOffset_BE(seg, woff, (byte) (value >> 16));
-            setByteAtOffset_BE(seg, woff + 1, (byte) (value >> 8 & 0xFF));
-            setByteAtOffset_BE(seg, woff + 2, (byte) (value & 0xFF));
+        if (order == ByteOrder.BIG_ENDIAN) {
+            setByteAtOffset(seg, woff, (byte) (value >> 16));
+            setByteAtOffset(seg, woff + 1, (byte) (value >> 8 & 0xFF));
+            setByteAtOffset(seg, woff + 2, (byte) (value & 0xFF));
         } else {
-            setByteAtOffset_BE(seg, woff, (byte) (value & 0xFF));
-            setByteAtOffset_BE(seg, woff + 1, (byte) (value >> 8 & 0xFF));
-            setByteAtOffset_BE(seg, woff + 2, (byte) (value >> 16 & 0xFF));
+            setByteAtOffset(seg, woff, (byte) (value & 0xFF));
+            setByteAtOffset(seg, woff + 1, (byte) (value >> 8 & 0xFF));
+            setByteAtOffset(seg, woff + 2, (byte) (value >> 16 & 0xFF));
         }
         woff += 3;
         return this;
@@ -610,14 +556,14 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
     @Override
     public Buf setUnsignedMedium(int woff, int value) {
         checkWrite(woff, 3);
-        if (isBigEndian) {
-            setByteAtOffset_BE(seg, woff, (byte) (value >> 16));
-            setByteAtOffset_BE(seg, woff + 1, (byte) (value >> 8 & 0xFF));
-            setByteAtOffset_BE(seg, woff + 2, (byte) (value & 0xFF));
+        if (order == ByteOrder.BIG_ENDIAN) {
+            setByteAtOffset(seg, woff, (byte) (value >> 16));
+            setByteAtOffset(seg, woff + 1, (byte) (value >> 8 & 0xFF));
+            setByteAtOffset(seg, woff + 2, (byte) (value & 0xFF));
         } else {
-            setByteAtOffset_BE(seg, woff, (byte) (value & 0xFF));
-            setByteAtOffset_BE(seg, woff + 1, (byte) (value >> 8 & 0xFF));
-            setByteAtOffset_BE(seg, woff + 2, (byte) (value >> 16 & 0xFF));
+            setByteAtOffset(seg, woff, (byte) (value & 0xFF));
+            setByteAtOffset(seg, woff + 1, (byte) (value >> 8 & 0xFF));
+            setByteAtOffset(seg, woff + 2, (byte) (value >> 16 & 0xFF));
         }
         return this;
     }
@@ -625,7 +571,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
     @Override
     public int readInt() {
         checkRead(roff, Integer.BYTES);
-        int value = isBigEndian? getIntAtOffset_BE(seg, roff) : getIntAtOffset_LE(seg, roff);
+        int value = getIntAtOffset(seg, roff, order);
         roff += Integer.BYTES;
         return value;
     }
@@ -633,13 +579,13 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
     @Override
     public int getInt(int roff) {
         checkRead(roff, Integer.BYTES);
-        return isBigEndian? getIntAtOffset_BE(seg, roff) : getIntAtOffset_LE(seg, roff);
+        return getIntAtOffset(seg, roff, order);
     }
 
     @Override
     public long readUnsignedInt() {
         checkRead(roff, Integer.BYTES);
-        long value = (isBigEndian? getIntAtOffset_BE(seg, roff) : getIntAtOffset_LE(seg, roff)) & 0xFFFFFFFFL;
+        long value = getIntAtOffset(seg, roff, order) & 0xFFFFFFFFL;
         roff += Integer.BYTES;
         return value;
     }
@@ -647,55 +593,39 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
     @Override
     public long getUnsignedInt(int roff) {
         checkRead(roff, Integer.BYTES);
-        return (isBigEndian? getIntAtOffset_BE(seg, roff) : getIntAtOffset_LE(seg, roff)) & 0xFFFFFFFFL;
+        return getIntAtOffset(seg, roff, order) & 0xFFFFFFFFL;
     }
 
     @Override
     public Buf writeInt(int value) {
-        if (isBigEndian) {
-            setIntAtOffset_BE(seg, woff, value);
-        } else {
-            setIntAtOffset_LE(seg, woff, value);
-        }
+        setIntAtOffset(seg, woff, order, value);
         woff += Integer.BYTES;
         return this;
     }
 
     @Override
     public Buf setInt(int woff, int value) {
-        if (isBigEndian) {
-            setIntAtOffset_BE(seg, woff, value);
-        } else {
-            setIntAtOffset_LE(seg, woff, value);
-        }
+        setIntAtOffset(seg, woff, order, value);
         return this;
     }
 
     @Override
     public Buf writeUnsignedInt(long value) {
-        if (isBigEndian) {
-            setIntAtOffset_BE(seg, woff, (int) (value & 0xFFFFFFFFL));
-        } else {
-            setIntAtOffset_LE(seg, woff, (int) (value & 0xFFFFFFFFL));
-        }
+        setIntAtOffset(seg, woff, order, (int) (value & 0xFFFFFFFFL));
         woff += Integer.BYTES;
         return this;
     }
 
     @Override
     public Buf setUnsignedInt(int woff, long value) {
-        if (isBigEndian) {
-            setIntAtOffset_BE(seg, woff, (int) (value & 0xFFFFFFFFL));
-        } else {
-            setIntAtOffset_LE(seg, woff, (int) (value & 0xFFFFFFFFL));
-        }
+        setIntAtOffset(seg, woff, order, (int) (value & 0xFFFFFFFFL));
         return this;
     }
 
     @Override
     public float readFloat() {
         checkRead(roff, Float.BYTES);
-        float value = isBigEndian? getFloatAtOffset_BE(seg, roff) : getFloatAtOffset_LE(seg, roff);
+        float value = getFloatAtOffset(seg, roff, order);
         roff += Float.BYTES;
         return value;
     }
@@ -703,34 +633,26 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
     @Override
     public float getFloat(int roff) {
         checkRead(roff, Float.BYTES);
-        return isBigEndian? getFloatAtOffset_BE(seg, roff) : getFloatAtOffset_LE(seg, roff);
+        return getFloatAtOffset(seg, roff, order);
     }
 
     @Override
     public Buf writeFloat(float value) {
-        if (isBigEndian) {
-            setFloatAtOffset_BE(seg, woff, value);
-        } else {
-            setFloatAtOffset_LE(seg, woff, value);
-        }
+        setFloatAtOffset(seg, woff, order, value);
         woff += Float.BYTES;
         return this;
     }
 
     @Override
     public Buf setFloat(int woff, float value) {
-        if (isBigEndian) {
-            setFloatAtOffset_BE(seg, woff, value);
-        } else {
-            setFloatAtOffset_LE(seg, woff, value);
-        }
+        setFloatAtOffset(seg, woff, order, value);
         return this;
     }
 
     @Override
     public long readLong() {
         checkRead(roff, Long.BYTES);
-        long value = isBigEndian? getLongAtOffset_BE(seg, roff) : getLongAtOffset_LE(seg, roff);
+        long value = getLongAtOffset(seg, roff, order);
         roff += Long.BYTES;
         return value;
     }
@@ -738,34 +660,26 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
     @Override
     public long getLong(int roff) {
         checkRead(roff, Long.BYTES);
-        return isBigEndian? getLongAtOffset_BE(seg, roff) : getLongAtOffset_LE(seg, roff);
+        return getLongAtOffset(seg, roff, order);
     }
 
     @Override
     public Buf writeLong(long value) {
-        if (isBigEndian) {
-            setLongAtOffset_BE(seg, woff, value);
-        } else {
-            setLongAtOffset_LE(seg, woff, value);
-        }
+        setLongAtOffset(seg, woff, order, value);
         woff += Long.BYTES;
         return this;
     }
 
     @Override
     public Buf setLong(int woff, long value) {
-        if (isBigEndian) {
-            setLongAtOffset_BE(seg, woff, value);
-        } else {
-            setLongAtOffset_LE(seg, woff, value);
-        }
+        setLongAtOffset(seg, woff, order, value);
         return this;
     }
 
     @Override
     public double readDouble() {
         checkRead(roff, Double.BYTES);
-        double value = isBigEndian? getDoubleAtOffset_BE(seg, roff) : getDoubleAtOffset_LE(seg, roff);
+        double value = getDoubleAtOffset(seg, roff, order);
         roff += Double.BYTES;
         return value;
     }
@@ -773,27 +687,19 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
     @Override
     public double getDouble(int roff) {
         checkRead(roff, Double.BYTES);
-        return isBigEndian? getDoubleAtOffset_BE(seg, roff) : getDoubleAtOffset_LE(seg, roff);
+        return getDoubleAtOffset(seg, roff, order);
     }
 
     @Override
     public Buf writeDouble(double value) {
-        if (isBigEndian) {
-            setDoubleAtOffset_BE(seg, woff, value);
-        } else {
-            setDoubleAtOffset_LE(seg, woff, value);
-        }
+        setDoubleAtOffset(seg, woff, order, value);
         woff += Double.BYTES;
         return this;
     }
 
     @Override
     public Buf setDouble(int woff, double value) {
-        if (isBigEndian) {
-            setDoubleAtOffset_BE(seg, woff, value);
-        } else {
-            setDoubleAtOffset_LE(seg, woff, value);
-        }
+        setDoubleAtOffset(seg, woff, order, value);
         return this;
     }
     // </editor-fold>
@@ -808,7 +714,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
             public MemSegBuf transferOwnership(Drop<MemSegBuf> drop) {
                 var newSegment = isConfined? transferSegment.handoff(Thread.currentThread()) : transferSegment;
                 MemSegBuf copy = new MemSegBuf(newSegment, drop, alloc);
-                copy.isBigEndian = outer.isBigEndian;
+                copy.order = outer.order;
                 copy.roff = outer.roff;
                 copy.woff = outer.woff;
                 return copy;
