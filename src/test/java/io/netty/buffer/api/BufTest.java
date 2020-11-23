@@ -1513,7 +1513,7 @@ public class BufTest {
     }
 
     @ParameterizedTest
-    @MethodSource("poolingAllocators")
+    @MethodSource("allocators")
     public void pooledBuffersMustResetStateBeforeReuse(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf expected = allocator.allocate(8)) {
