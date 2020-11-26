@@ -712,8 +712,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
         return new Owned<MemSegBuf>() {
             @Override
             public MemSegBuf transferOwnership(Drop<MemSegBuf> drop) {
-                var newSegment = isConfined? transferSegment.handoff(Thread.currentThread()) : transferSegment;
-                MemSegBuf copy = new MemSegBuf(newSegment, drop, alloc);
+                MemSegBuf copy = new MemSegBuf(transferSegment, drop, alloc);
                 copy.order = outer.order;
                 copy.roff = outer.roff;
                 copy.woff = outer.woff;
