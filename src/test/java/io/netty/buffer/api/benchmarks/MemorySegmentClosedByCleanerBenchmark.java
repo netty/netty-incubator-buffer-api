@@ -43,6 +43,7 @@ import static java.util.concurrent.CompletableFuture.completedFuture;
 public class MemorySegmentClosedByCleanerBenchmark {
     private static final Allocator direct = Allocator.direct();
     private static final Allocator withCleaner = Allocator.directWithCleaner();
+    private static final Allocator directPooled = Allocator.pooledDirect();
 
     @Param({"heavy", "light"})
     public String workload;
@@ -62,6 +63,13 @@ public class MemorySegmentClosedByCleanerBenchmark {
     @Benchmark
     public Buf explicitClose() throws Exception {
         try (Buf buf = process(direct.allocate(256))) {
+            return buf;
+        }
+    }
+
+    @Benchmark
+    public Buf explicitPooledClose() throws Exception {
+        try (Buf buf = process(directPooled.allocate(256))) {
             return buf;
         }
     }
