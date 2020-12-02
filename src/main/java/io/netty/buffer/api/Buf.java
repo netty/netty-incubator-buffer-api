@@ -302,9 +302,9 @@ public interface Buf extends Rc<Buf>, BufAccessors {
      * {@linkplain #readerOffset() reader offset} and {@linkplain #writerOffset() writer offset} are not modified while
      * the iteration takes place. Otherwise unpredictable behaviour might result.
      *
-     * @return A {@link ByteIterator} for the readable bytes of this buffer.
+     * @return A {@link ByteCursor} for the readable bytes of this buffer.
      */
-    default ByteIterator iterate() {
+    default ByteCursor iterate() {
         return iterate(readerOffset(), readableBytes());
     }
 
@@ -320,11 +320,11 @@ public interface Buf extends Rc<Buf>, BufAccessors {
      * @param fromOffset The offset into the buffer where iteration should start.
      *                  The first byte read from the iterator will be the byte at this offset.
      * @param length The number of bytes to iterate.
-     * @return A {@link ByteIterator} for the given stretch of bytes of this buffer.
+     * @return A {@link ByteCursor} for the given stretch of bytes of this buffer.
      * @throws IllegalArgumentException if the length is negative, or if the region given by the {@code fromOffset} and
      * the {@code length} reaches outside of the bounds of this buffer.
      */
-    ByteIterator iterate(int fromOffset, int length);
+    ByteCursor iterate(int fromOffset, int length);
 
     /**
      * Iterate the readable bytes of this buffer, in reverse. The {@linkplain #readerOffset() reader offset} and
@@ -334,9 +334,9 @@ public interface Buf extends Rc<Buf>, BufAccessors {
      * {@linkplain #readerOffset() reader offset} and {@linkplain #writerOffset() writer offset} are not modified while
      * the iteration takes place. Otherwise unpredictable behaviour might result.
      *
-     * @return A {@link ByteIterator} for the readable bytes of this buffer.
+     * @return A {@link ByteCursor} for the readable bytes of this buffer.
      */
-    default ByteIterator iterateReverse() {
+    default ByteCursor iterateReverse() {
         int woff = writerOffset();
         return iterateReverse(woff == 0? 0 : woff - 1, readableBytes());
     }
@@ -353,11 +353,11 @@ public interface Buf extends Rc<Buf>, BufAccessors {
      * @param fromOffset The offset into the buffer where iteration should start.
      *                  The first byte read from the iterator will be the byte at this offset.
      * @param length The number of bytes to iterate.
-     * @return A {@link ByteIterator} for the given stretch of bytes of this buffer.
+     * @return A {@link ByteCursor} for the given stretch of bytes of this buffer.
      * @throws IllegalArgumentException if the length is negative, or if the region given by the {@code fromOffset} and
      * the {@code length} reaches outside of the bounds of this buffer.
      */
-    ByteIterator iterateReverse(int fromOffset, int length);
+    ByteCursor iterateReverse(int fromOffset, int length);
 
     /**
      * Ensure that this buffer has {@linkplain #writableBytes() available space for writing} the given number of

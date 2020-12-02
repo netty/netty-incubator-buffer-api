@@ -18,7 +18,7 @@ package io.netty.buffer.api.memseg;
 import io.netty.buffer.api.Allocator;
 import io.netty.buffer.api.AllocatorControl;
 import io.netty.buffer.api.Buf;
-import io.netty.buffer.api.ByteIterator;
+import io.netty.buffer.api.ByteCursor;
 import io.netty.buffer.api.Drop;
 import io.netty.buffer.api.Owned;
 import io.netty.buffer.api.RcSupport;
@@ -163,13 +163,13 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
         // We read longs in BE, in reverse, so they need to be flipped for writing.
         dest.order(ByteOrder.LITTLE_ENDIAN);
         try {
-            while (itr.hasNextLong()) {
-                long val = itr.nextLong();
+            while (itr.nextLong()) {
+                long val = itr.getLong();
                 length -= Long.BYTES;
                 dest.setLong(destPos + length, val);
             }
-            while (itr.hasNextByte()) {
-                dest.setByte(destPos + --length, itr.nextByte());
+            while (itr.nextByte()) {
+                dest.setByte(destPos + --length, itr.getByte());
             }
         } finally {
             dest.order(prevOrder);
@@ -177,7 +177,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
     }
 
     @Override
-    public ByteIterator iterate(int fromOffset, int length) {
+    public ByteCursor iterate(int fromOffset, int length) {
         if (fromOffset < 0) {
             throw new IllegalArgumentException("The fromOffset cannot be negative: " + fromOffset + '.');
         }
@@ -188,39 +188,41 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
             throw new IllegalArgumentException("The fromOffset+length is beyond the end of the buffer: " +
                                                "fromOffset=" + fromOffset + ", length=" + length + '.');
         }
-        return new ByteIterator() {
+        return new ByteCursor() {
             final MemorySegment segment = seg;
             int index = fromOffset;
             final int end = index + length;
+            long longValue = -1;
+            byte byteValue = -1;
 
             @Override
-            public boolean hasNextLong() {
-                return index + Long.BYTES <= end;
-            }
-
-            @Override
-            public long nextLong() {
-                if (!hasNextLong()) {
-                    throw new NoSuchElementException("No 'long' value at offet " + currentOffset() + '.');
+            public boolean nextLong() {
+                if (index + Long.BYTES <= end) {
+                    longValue = getLongAtOffset(segment, index, ByteOrder.BIG_ENDIAN);
+                    index += Long.BYTES;
+                    return true;
                 }
-                long val = getLongAtOffset(segment, index, ByteOrder.BIG_ENDIAN);
-                index += Long.BYTES;
-                return val;
+                return false;
             }
 
             @Override
-            public boolean hasNextByte() {
-                return index < end;
+            public long getLong() {
+                return longValue;
             }
 
             @Override
-            public byte nextByte() {
-                if (!hasNextByte()) {
-                    throw new NoSuchElementException("No 'byte' value at offet " + currentOffset() + '.');
+            public boolean nextByte() {
+                if (index < end) {
+                    byteValue = getByteAtOffset(segment, index);
+                    index++;
+                    return true;
                 }
-                byte val = getByteAtOffset(segment, index);
-                index++;
-                return val;
+                return false;
+            }
+
+            @Override
+            public byte getByte() {
+                return byteValue;
             }
 
             @Override
@@ -236,7 +238,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
     }
 
     @Override
-    public ByteIterator iterateReverse(int fromOffset, int length) {
+    public ByteCursor iterateReverse(int fromOffset, int length) {
         if (fromOffset < 0) {
             throw new IllegalArgumentException("The fromOffset cannot be negative: " + fromOffset + '.');
         }
@@ -250,40 +252,42 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
             throw new IllegalArgumentException("The fromOffset-length would underflow the buffer: " +
                                                "fromOffset=" + fromOffset + ", length=" + length + '.');
         }
-        return new ByteIterator() {
+        return new ByteCursor() {
             final MemorySegment segment = seg;
             int index = fromOffset;
             final int end = index - length;
+            long longValue = -1;
+            byte byteValue = -1;
 
             @Override
-            public boolean hasNextLong() {
-                return index - Long.BYTES >= end;
-            }
-
-            @Override
-            public long nextLong() {
-                if (!hasNextLong()) {
-                    throw new NoSuchElementException("No 'long' value at offet " + currentOffset() + '.');
+            public boolean nextLong() {
+                if (index - Long.BYTES >= end) {
+                    index -= 7;
+                    longValue = getLongAtOffset(segment, index, ByteOrder.LITTLE_ENDIAN);
+                    index--;
+                    return true;
                 }
-                index -= 7;
-                long val = getLongAtOffset(segment, index, ByteOrder.LITTLE_ENDIAN);
-                index--;
-                return val;
+                return false;
             }
 
             @Override
-            public boolean hasNextByte() {
-                return index > end;
+            public long getLong() {
+                return longValue;
             }
 
             @Override
-            public byte nextByte() {
-                if (!hasNextByte()) {
-                    throw new NoSuchElementException("No 'byte' value at offet " + currentOffset() + '.');
+            public boolean nextByte() {
+                if (index > end) {
+                    byteValue = getByteAtOffset(segment, index);
+                    index--;
+                    return true;
                 }
-                byte val = getByteAtOffset(segment, index);
-                index--;
-                return val;
+                return false;
+            }
+
+            @Override
+            public byte getByte() {
+                return byteValue;
             }
 
             @Override

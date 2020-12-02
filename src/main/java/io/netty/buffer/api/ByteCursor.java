@@ -17,48 +17,55 @@ package io.netty.buffer.api;
 import io.netty.util.ByteProcessor;
 
 /**
- * The ByteIterator scans through a sequence of bytes.
+ * The ByteCursor scans through a sequence of bytes.
  * This is similar to {@link ByteProcessor}, but for external iteration rather than internal iteration.
  * The external iteration allows the callers to control the pace of the iteration.
  * The API includes methods for reading {@code long}s as a batch of 8 bytes.
  * The long values are always in big-endian format, so that the highest-order byte in the long value, contain the byte
- * that would otherwise have been returned by the next call to {@link #nextByte()}.
+ * that would otherwise have been returned by the next call to {@link #getByte()}.
  */
-public interface ByteIterator {
+public interface ByteCursor {
     /**
-     * Check if the iterator has at least 8 bytes left.
-     * Note that when this method returns {@code false}, the {@link #hasNextByte()} can still return {@code true}.
+     * Check if the iterator has at least 8 bytes left, and if so, read those 8 bytes and move the cursor forward.
+     * The bytes are packed as a {@code long} value in big-endian format, such that the highest-order byte
+     * in the long, is the byte that would otherwise have been returned by the next call to {@link #getByte()},
+     * after a call to {@link #nextByte()}.
+     * The bytes (as a {@code long}) will then be available through the {@link #getLong()} method.
+     * <p>
+     * Note that when this method returns {@code false}, the {@link #nextByte()} can still return {@code true}.
      * It is recommended to have any long-processing loop be followed by a byte-processing loop for the 7 or fewer
-     * bytes that might form a tail in the iterator.
+     * bytes that might form a tail in the cursor.
+     * <p>
+     * Also note that this method will not influence what is returned the {@link #getByte()} method.
      *
-     * @return {@code true} if a call to {@link #nextLong()} would succeed, otherwise {@code false}.
+     * @return {@code true} if the cursor read 8 bytes and moved forward, otherwise {@code false}.
      */
-    boolean hasNextLong();
+    boolean nextLong();
 
     /**
-     * Read and return the next 8 bytes, and move the iterator position forward by 8 bytes.
-     * The bytes are packed and return as a {@code long} value in big-endian format, such that the highest-order byte
-     * in the long, is the byte that would otherwise have been returned by the next call to {@link #nextByte()}.
+     * Return the last 8 bytes read by {@link #nextLong()}.
      *
-     * @return The next 8 bytes in big-endian format.
-     * @throws java.util.NoSuchElementException If the iterator has fewer than 8 bytes left.
+     * @return The 8 bytes, in big-endian format, that was read by the most recent successful call to
+     * {@link #nextLong()}.
      */
-    long nextLong();
+    long getLong();
 
     /**
-     * Check if the iterator has at least one byte left.
+     * Check if the iterator has at least one byte left, and if so, read that byte and move the cursor forward.
+     * The byte will then be available through the {@link #getByte()}.
+     * <p>
+     * Note that this method will not influence what is returned from the {@link #getLong()} method.
      *
-     * @return {@code true} if the next call to {@link #nextByte()} would succeed, otherwise {@code false}.
+     * @return {@code true} if the cursor read a byte and moved forward, otherwise {@code false}.
      */
-    boolean hasNextByte();
+    boolean nextByte();
 
     /**
-     * Read and return the next byte, and move the iterator position] forward by one byte.
+     * Return the last byte that was read by {@link #nextByte()}.
      *
-     * @return The next byte.
-     * @throws java.util.NoSuchElementException If the iterator has no more bytes left.
+     * @return The next byte that was read by the most recent successful call to {@link #nextByte()}.
      */
-    byte nextByte();
+    byte getByte();
 
     /**
      * The current position of this iterator into the underlying sequence of bytes.
@@ -85,14 +92,10 @@ public interface ByteIterator {
      */
     default int process(ByteProcessor processor) {
         boolean requestMore = true;
-        int index = currentOffset();
-        if (hasNextByte()) {
-            byte val = nextByte();
-            while ((requestMore = processor.process(val)) && hasNextByte()) {
-                val = nextByte();
-                index++;
-            }
+        int count = 0;
+        while (nextByte() && (requestMore = processor.process(getByte()))) {
+            count++;
         }
-        return requestMore? -1 : index;
+        return requestMore? -1 : count;
     }
 }
