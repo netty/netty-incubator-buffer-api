@@ -1513,6 +1513,40 @@ public class BufTest {
     }
 
     @ParameterizedTest
+    @MethodSource("nonSliceAllocators")
+    public void ensureWritableOnCompositeBuffersMustRespectExistingBigEndianByteOrder(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator()) {
+            Buf composite;
+            try (Buf a = allocator.allocate(4, ByteOrder.BIG_ENDIAN)) {
+                composite = allocator.compose(a);
+            }
+            try (composite) {
+                composite.writeInt(0x01020304);
+                composite.ensureWritable(4);
+                composite.writeInt(0x05060708);
+                assertEquals(0x0102030405060708L, composite.readLong());
+            }
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("nonSliceAllocators")
+    public void ensureWritableOnCompositeBuffersMustRespectExistingLittleEndianByteOrder(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator()) {
+            Buf composite;
+            try (Buf a = allocator.allocate(4, ByteOrder.LITTLE_ENDIAN)) {
+                composite = allocator.compose(a);
+            }
+            try (composite) {
+                composite.writeInt(0x05060708);
+                composite.ensureWritable(4);
+                composite.writeInt(0x01020304);
+                assertEquals(0x0102030405060708L, composite.readLong());
+            }
+        }
+    }
+
+    @ParameterizedTest
     @MethodSource("allocators")
     public void pooledBuffersMustResetStateBeforeReuse(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
@@ -1539,6 +1573,235 @@ public class BufTest {
                             buf.readByte();
                         }
                     }
+                }
+            }
+        }
+    }
+
+    @Test
+    public void emptyCompositeBufferMustUseNativeByteOrder() {
+        try (Allocator allocator = Allocator.heap();
+             Buf composite = allocator.compose()) {
+            assertThat(composite.order()).isEqualTo(ByteOrder.nativeOrder());
+        }
+    }
+
+    @Test
+    public void extendOnNonCompositeBufferMustThrow() {
+        try (Allocator allocator = Allocator.heap();
+             Buf a = allocator.allocate(8);
+             Buf b = allocator.allocate(8)) {
+            var exc = assertThrows(IllegalArgumentException.class, () -> Allocator.extend(a, b));
+            assertThat(exc).hasMessageContaining("Expected").hasMessageContaining("composite");
+        }
+    }
+
+    @Test
+    public void extendingNonOwnedCompositeBufferMustThrow() {
+        try (Allocator allocator = Allocator.heap();
+             Buf a = allocator.allocate(8);
+             Buf b = allocator.allocate(8);
+             Buf composed = allocator.compose(a)) {
+            try (Buf ignore = composed.acquire()) {
+                var exc = assertThrows(IllegalStateException.class, () -> Allocator.extend(composed, b));
+                assertThat(exc).hasMessageContaining("owned");
+            }
+        }
+    }
+
+    @Test
+    public void extendingCompositeBufferWithItselfMustThrow() {
+        try (Allocator allocator = Allocator.heap()) {
+            Buf composite;
+            try (Buf a = allocator.allocate(8)) {
+                composite = allocator.compose(a);
+            }
+            try (composite) {
+                var exc = assertThrows(IllegalArgumentException.class, () -> Allocator.extend(composite, composite));
+                assertThat(exc).hasMessageContaining("itself");
+            }
+        }
+        try (Allocator allocator = Allocator.heap();
+             Buf composite = allocator.compose()) {
+            var exc = assertThrows(IllegalArgumentException.class, () -> Allocator.extend(composite, composite));
+            assertThat(exc).hasMessageContaining("itself");
+        }
+    }
+
+    @Test
+    public void extendingCompositeBufferWithNullMustThrow() {
+        try (Allocator allocator = Allocator.heap();
+             Buf composite = allocator.compose()) {
+            assertThrows(NullPointerException.class, () -> Allocator.extend(composite, null));
+        }
+    }
+
+    @Test
+    public void extendingCompositeBufferMustIncreaseCapacityByGivenBigEndianBuffer() {
+        try (Allocator allocator = Allocator.heap();
+             Buf composite = allocator.compose()) {
+            assertThat(composite.capacity()).isZero();
+            try (Buf buf = allocator.allocate(8, ByteOrder.BIG_ENDIAN)) {
+                Allocator.extend(composite, buf);
+            }
+            assertThat(composite.capacity()).isEqualTo(8);
+            composite.writeLong(0x0102030405060708L);
+            assertThat(composite.readLong()).isEqualTo(0x0102030405060708L);
+        }
+    }
+
+    @Test
+    public void extendingCompositeBufferMustIncreaseCapacityByGivenLittleEndianBuffer() {
+        try (Allocator allocator = Allocator.heap();
+             Buf composite = allocator.compose()) {
+            assertThat(composite.capacity()).isZero();
+            try (Buf buf = allocator.allocate(8, ByteOrder.LITTLE_ENDIAN)) {
+                Allocator.extend(composite, buf);
+            }
+            assertThat(composite.capacity()).isEqualTo(8);
+            composite.writeLong(0x0102030405060708L);
+            assertThat(composite.readLong()).isEqualTo(0x0102030405060708L);
+        }
+    }
+
+    @Test
+    public void extendingBigEndianCompositeBufferMustThrowIfExtensionIsLittleEndian() {
+        try (Allocator allocator = Allocator.heap()) {
+            Buf composite;
+            try (Buf a = allocator.allocate(8, ByteOrder.BIG_ENDIAN)) {
+                composite = allocator.compose(a);
+            }
+            try (composite) {
+                try (Buf b = allocator.allocate(8, ByteOrder.LITTLE_ENDIAN)) {
+                    var exc = assertThrows(IllegalArgumentException.class, () -> Allocator.extend(composite, b));
+                    assertThat(exc).hasMessageContaining("byte order");
+                }
+            }
+        }
+    }
+
+    @Test
+    public void extendingLittleEndianCompositeBufferMustThrowIfExtensionIsBigEndian() {
+        try (Allocator allocator = Allocator.heap()) {
+            Buf composite;
+            try (Buf a = allocator.allocate(8, ByteOrder.LITTLE_ENDIAN)) {
+                composite = allocator.compose(a);
+            }
+            try (composite) {
+                try (Buf b = allocator.allocate(8, ByteOrder.BIG_ENDIAN)) {
+                    var exc = assertThrows(IllegalArgumentException.class, () -> Allocator.extend(composite, b));
+                    assertThat(exc).hasMessageContaining("byte order");
+                }
+            }
+        }
+    }
+
+    @Test
+    public void emptyCompositeBufferMustAllowExtendingWithBufferWithBigEndianByteOrder() {
+        try (Allocator allocator = Allocator.heap()) {
+            try (Buf composite = allocator.compose()) {
+                try (Buf b = allocator.allocate(8, ByteOrder.BIG_ENDIAN)) {
+                    Allocator.extend(composite, b);
+                    assertThat(composite.order()).isEqualTo(ByteOrder.BIG_ENDIAN);
+                }
+            }
+        }
+    }
+
+    @Test
+    public void emptyCompositeBufferMustAllowExtendingWithBufferWithLittleEndianByteOrder() {
+        try (Allocator allocator = Allocator.heap()) {
+            try (Buf composite = allocator.compose()) {
+                try (Buf b = allocator.allocate(8, ByteOrder.LITTLE_ENDIAN)) {
+                    Allocator.extend(composite, b);
+                    assertThat(composite.order()).isEqualTo(ByteOrder.LITTLE_ENDIAN);
+                }
+            }
+        }
+    }
+
+    @Test
+    public void whenExtendingCompositeBufferWithWriteOffsetAtCapacityExtensionWriteOffsetCanBeNonZero() {
+        try (Allocator allocator = Allocator.heap()) {
+            Buf composite;
+            try (Buf a = allocator.allocate(8)) {
+                composite = allocator.compose(a);
+            }
+            try (composite) {
+                composite.writeLong(0);
+                try (Buf b = allocator.allocate(8)) {
+                    b.writeInt(1);
+                    Allocator.extend(composite, b);
+                    assertThat(composite.capacity()).isEqualTo(16);
+                    assertThat(composite.writerOffset()).isEqualTo(12);
+                }
+            }
+        }
+    }
+
+    @Test
+    public void whenExtendingCompositeBufferWithWriteOffsetLessThanCapacityExtensionWriteOffsetMustZero() {
+        try (Allocator allocator = Allocator.heap()) {
+            Buf composite;
+            try (Buf a = allocator.allocate(8)) {
+                composite = allocator.compose(a);
+            }
+            try (composite) {
+                composite.writeInt(0);
+                try (Buf b = allocator.allocate(8)) {
+                    b.writeInt(1);
+                    var exc = assertThrows(IllegalArgumentException.class, () -> Allocator.extend(composite, b));
+                    assertThat(exc).hasMessageContaining("unwritten gap");
+                    b.writerOffset(0);
+                    Allocator.extend(composite, b);
+                    assertThat(composite.capacity()).isEqualTo(16);
+                    assertThat(composite.writerOffset()).isEqualTo(4);
+                }
+            }
+        }
+    }
+
+    @Test
+    public void whenExtendingCompositeBufferWithReadOffsetAtCapacityExtensionReadOffsetCanBeNonZero() {
+        try (Allocator allocator = Allocator.heap()) {
+            Buf composite;
+            try (Buf a = allocator.allocate(8)) {
+                composite = allocator.compose(a);
+            }
+            try (composite) {
+                composite.writeLong(0);
+                composite.readLong();
+                try (Buf b = allocator.allocate(8)) {
+                    b.writeInt(1);
+                    b.readInt();
+                    Allocator.extend(composite, b);
+                    assertThat(composite.capacity()).isEqualTo(16);
+                    assertThat(composite.writerOffset()).isEqualTo(12);
+                }
+            }
+        }
+    }
+
+    @Test
+    public void whenExtendingCompositeBufferWithReadOffsetLessThanCapacityExtensionReadOffsetMustZero() {
+        try (Allocator allocator = Allocator.heap()) {
+            Buf composite;
+            try (Buf a = allocator.allocate(8)) {
+                composite = allocator.compose(a);
+            }
+            try (composite) {
+                composite.writeLong(0);
+                composite.readInt();
+                try (Buf b = allocator.allocate(8)) {
+                    b.writeInt(1);
+                    b.readInt();
+                    var exc = assertThrows(IllegalArgumentException.class, () -> Allocator.extend(composite, b));
+                    assertThat(exc).hasMessageContaining("unread gap");
+                    b.readerOffset(0);
+                    Allocator.extend(composite, b);
+                    assertThat(composite.capacity()).isEqualTo(16);
+                    assertThat(composite.writerOffset()).isEqualTo(12);
+                    assertThat(composite.readerOffset()).isEqualTo(4);
                 }
             }
         }
