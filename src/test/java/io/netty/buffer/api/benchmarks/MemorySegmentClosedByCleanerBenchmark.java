@@ -34,8 +34,8 @@ import java.util.concurrent.TimeUnit;
 
 import static java.util.concurrent.CompletableFuture.completedFuture;
 
-@Warmup(iterations = 30, time = 1)
-@Measurement(iterations = 30, time = 1)
+@Warmup(iterations = 10, time = 1)
+@Measurement(iterations = 10, time = 1)
 @Fork(value = 5, jvmArgsAppend = { "-XX:+UnlockDiagnosticVMOptions", "-XX:+DebugNonSafepoints" })
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
