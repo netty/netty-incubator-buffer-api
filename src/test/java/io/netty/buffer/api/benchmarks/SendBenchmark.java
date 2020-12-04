@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 The Netty Project
+ * Copyright 2020 The Netty Project
  *
  * The Netty Project licenses this file to you under the Apache License,
  * version 2.0 (the "License"); you may not use this file except in compliance
@@ -40,9 +40,9 @@ import static java.util.concurrent.CompletableFuture.completedFuture;
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
 @State(Scope.Benchmark)
 public class SendBenchmark {
-    private static final Allocator nonPooled = Allocator.heap();
-    private static final Allocator pooled = Allocator.pooledHeap();
-    private static final Function<Send<Buf>, Send<Buf>> bounce = send -> {
+    private static final Allocator NON_POOLED = Allocator.heap();
+    private static final Allocator POOLED = Allocator.pooledHeap();
+    private static final Function<Send<Buf>, Send<Buf>> BUFFER_BOUNCE = send -> {
         try (Buf buf = send.receive()) {
             return buf.send();
         }
@@ -50,8 +50,8 @@ public class SendBenchmark {
 
     @Benchmark
     public Buf sendNonPooled() throws Exception {
-        try (Buf buf = nonPooled.allocate(8)) {
-            try (Buf receive = completedFuture(buf.send()).thenApplyAsync(bounce).get().receive()) {
+        try (Buf buf = NON_POOLED.allocate(8)) {
+            try (Buf receive = completedFuture(buf.send()).thenApplyAsync(BUFFER_BOUNCE).get().receive()) {
                 return receive;
             }
         }
@@ -59,8 +59,8 @@ public class SendBenchmark {
 
     @Benchmark
     public Buf sendPooled() throws Exception {
-        try (Buf buf = pooled.allocate(8)) {
-            try (Buf receive = completedFuture(buf.send()).thenApplyAsync(bounce).get().receive()) {
+        try (Buf buf = POOLED.allocate(8)) {
+            try (Buf receive = completedFuture(buf.send()).thenApplyAsync(BUFFER_BOUNCE).get().receive()) {
                 return receive;
             }
         }
