@@ -329,25 +329,31 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
             int index = fromOffset;
             final int end = fromOffset + length;
             int bufferIndex = startBufferIndex;
+            int initOffset = startCursor.currentOffset();
             ByteCursor cursor = startCursor;
             long longValue = -1;
             byte byteValue = -1;
 
             @Override
             public boolean readLong() {
+                if (cursor.readLong()) {
+                    longValue = cursor.getLong();
+                    return true;
+                }
                 if (bytesLeft() >= Long.BYTES) {
-                    if (cursor.readLong()) {
-                        longValue = cursor.getLong();
-                        index += Long.BYTES;
-                    } else {
-                        longValue = nextLongFromBytes(); // Leave index increments to 'readByte'
-                    }
+                    longValue = nextLongFromBytes();
                     return true;
                 }
                 return false;
             }
 
             private long nextLongFromBytes() {
+                if (cursor.bytesLeft() == 0) {
+                    nextCursor();
+                    if (cursor.readLong()) {
+                        return cursor.getLong();
+                    }
+                }
                 long val = 0;
                 for (int i = 0; i < 8; i++) {
                     readByte();
@@ -364,18 +370,24 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
 
             @Override
             public boolean readByte() {
-                if (index < end) {
-                    if (!cursor.readByte()) {
-                        bufferIndex++;
-                        Buf nextBuf = bufs[bufferIndex];
-                        cursor = nextBuf.openCursor(0, Math.min(nextBuf.capacity(), bytesLeft()));
-                        cursor.readByte();
-                    }
+                if (cursor.readByte()) {
                     byteValue = cursor.getByte();
-                    index++;
+                    return true;
+                }
+                if (bytesLeft() > 0) {
+                    nextCursor();
+                    cursor.readByte();
+                    byteValue = cursor.getByte();
                     return true;
                 }
                 return false;
+            }
+
+            private void nextCursor() {
+                bufferIndex++;
+                Buf nextBuf = bufs[bufferIndex];
+                cursor = nextBuf.openCursor(0, Math.min(nextBuf.capacity(), bytesLeft()));
+                initOffset = 0;
             }
 
             @Override
@@ -385,12 +397,15 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
 
             @Override
             public int currentOffset() {
+                int currOff = cursor.currentOffset();
+                index += currOff - initOffset;
+                initOffset = currOff;
                 return index;
             }
 
             @Override
             public int bytesLeft() {
-                return end - index;
+                return end - currentOffset();
             }
         };
     }
@@ -415,25 +430,31 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
             int index = fromOffset;
             final int end = fromOffset - length;
             int bufferIndex = startBufferIndex;
+            int initOffset = startCursor.currentOffset();
             ByteCursor cursor = startCursor;
             long longValue = -1;
             byte byteValue = -1;
 
             @Override
             public boolean readLong() {
+                if (cursor.readLong()) {
+                    longValue = cursor.getLong();
+                    return true;
+                }
                 if (bytesLeft() >= Long.BYTES) {
-                    if (cursor.readLong()) {
-                        index -= Long.BYTES;
-                        longValue = cursor.getLong();
-                    } else {
-                        longValue = nextLongFromBytes(); // Leave index increments to 'readByte'
-                    }
+                    longValue = nextLongFromBytes();
                     return true;
                 }
                 return false;
             }
 
             private long nextLongFromBytes() {
+                if (cursor.bytesLeft() == 0) {
+                    nextCursor();
+                    if (cursor.readLong()) {
+                        return cursor.getLong();
+                    }
+                }
                 long val = 0;
                 for (int i = 0; i < 8; i++) {
                     readByte();
@@ -450,19 +471,26 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
 
             @Override
             public boolean readByte() {
-                if (index > end) {
-                    if (!cursor.readByte()) {
-                        bufferIndex--;
-                        Buf nextBuf = bufs[bufferIndex];
-                        int length = Math.min(nextBuf.capacity(), bytesLeft());
-                        cursor = nextBuf.openReverseCursor(nextBuf.capacity() - 1, length);
-                        cursor.readByte();
-                    }
+                if (cursor.readByte()) {
                     byteValue = cursor.getByte();
-                    index--;
+                    return true;
+                }
+                if (bytesLeft() > 0) {
+                    nextCursor();
+                    cursor.readByte();
+                    byteValue = cursor.getByte();
                     return true;
                 }
                 return false;
+            }
+
+            private void nextCursor() {
+                bufferIndex--;
+                Buf nextBuf = bufs[bufferIndex];
+                int length = Math.min(nextBuf.capacity(), bytesLeft());
+                int offset = nextBuf.capacity() - 1;
+                cursor = nextBuf.openReverseCursor(offset, length);
+                initOffset = offset;
             }
 
             @Override
@@ -472,12 +500,15 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
 
             @Override
             public int currentOffset() {
+                int currOff = cursor.currentOffset();
+                index -= initOffset - currOff;
+                initOffset = currOff;
                 return index;
             }
 
             @Override
             public int bytesLeft() {
-                return index - end;
+                return currentOffset() - end;
             }
         };
     }
