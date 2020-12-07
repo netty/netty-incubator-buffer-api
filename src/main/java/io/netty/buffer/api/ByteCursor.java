@@ -29,10 +29,10 @@ public interface ByteCursor {
      * Check if the iterator has at least 8 bytes left, and if so, read those 8 bytes and move the cursor forward.
      * The bytes are packed as a {@code long} value in big-endian format, such that the highest-order byte
      * in the long, is the byte that would otherwise have been returned by the next call to {@link #getByte()},
-     * after a call to {@link #nextByte()}.
+     * after a call to {@link #readByte()}.
      * The bytes (as a {@code long}) will then be available through the {@link #getLong()} method.
      * <p>
-     * Note that when this method returns {@code false}, the {@link #nextByte()} can still return {@code true}.
+     * Note that when this method returns {@code false}, the {@link #readByte()} can still return {@code true}.
      * It is recommended to have any long-processing loop be followed by a byte-processing loop for the 7 or fewer
      * bytes that might form a tail in the cursor.
      * <p>
@@ -40,14 +40,14 @@ public interface ByteCursor {
      *
      * @return {@code true} if the cursor read 8 bytes and moved forward, otherwise {@code false}.
      */
-    boolean nextLong();
+    boolean readLong();
 
     /**
-     * Return the last 8 bytes read by {@link #nextLong()}.
-     * If {@link #nextLong()} has not been called on this cursor before, then {@code -1} is returned.
+     * Return the last 8 bytes read by {@link #readLong()}.
+     * If {@link #readLong()} has not been called on this cursor before, then {@code -1} is returned.
      *
      * @return The 8 bytes, in big-endian format, that was read by the most recent successful call to
-     * {@link #nextLong()}.
+     * {@link #readLong()}.
      */
     long getLong();
 
@@ -59,13 +59,13 @@ public interface ByteCursor {
      *
      * @return {@code true} if the cursor read a byte and moved forward, otherwise {@code false}.
      */
-    boolean nextByte();
+    boolean readByte();
 
     /**
-     * Return the last byte that was read by {@link #nextByte()}.
-     * If {@link #nextByte()} has not been called on this cursor before, then {@code -1} is returned.
+     * Return the last byte that was read by {@link #readByte()}.
+     * If {@link #readByte()} has not been called on this cursor before, then {@code -1} is returned.
      *
-     * @return The next byte that was read by the most recent successful call to {@link #nextByte()}.
+     * @return The next byte that was read by the most recent successful call to {@link #readByte()}.
      */
     byte getByte();
 
@@ -95,7 +95,7 @@ public interface ByteCursor {
     default int process(ByteProcessor processor) {
         boolean requestMore = true;
         int count = 0;
-        while (nextByte() && (requestMore = processor.process(getByte()))) {
+        while (readByte() && (requestMore = processor.process(getByte()))) {
             count++;
         }
         return requestMore? -1 : count;

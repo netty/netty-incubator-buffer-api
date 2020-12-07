@@ -26,7 +26,6 @@ import jdk.incubator.foreign.MemorySegment;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.util.NoSuchElementException;
 
 import static jdk.incubator.foreign.MemoryAccess.getByteAtOffset;
 import static jdk.incubator.foreign.MemoryAccess.getCharAtOffset;
@@ -158,17 +157,17 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
     public void copyInto(int srcPos, Buf dest, int destPos, int length) {
         // todo optimise: specialise for MemSegBuf.
         // Iterate in reverse to account for src and dest buffer overlap.
-        var itr = iterateReverse(srcPos + length - 1, length);
+        var itr = openReverseCursor(srcPos + length - 1, length);
         ByteOrder prevOrder = dest.order();
         // We read longs in BE, in reverse, so they need to be flipped for writing.
         dest.order(ByteOrder.LITTLE_ENDIAN);
         try {
-            while (itr.nextLong()) {
+            while (itr.readLong()) {
                 long val = itr.getLong();
                 length -= Long.BYTES;
                 dest.setLong(destPos + length, val);
             }
-            while (itr.nextByte()) {
+            while (itr.readByte()) {
                 dest.setByte(destPos + --length, itr.getByte());
             }
         } finally {
@@ -177,7 +176,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
     }
 
     @Override
-    public ByteCursor iterate(int fromOffset, int length) {
+    public ByteCursor openCursor(int fromOffset, int length) {
         if (fromOffset < 0) {
             throw new IllegalArgumentException("The fromOffset cannot be negative: " + fromOffset + '.');
         }
@@ -196,7 +195,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
             byte byteValue = -1;
 
             @Override
-            public boolean nextLong() {
+            public boolean readLong() {
                 if (index + Long.BYTES <= end) {
                     longValue = getLongAtOffset(segment, index, ByteOrder.BIG_ENDIAN);
                     index += Long.BYTES;
@@ -211,7 +210,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
             }
 
             @Override
-            public boolean nextByte() {
+            public boolean readByte() {
                 if (index < end) {
                     byteValue = getByteAtOffset(segment, index);
                     index++;
@@ -238,7 +237,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
     }
 
     @Override
-    public ByteCursor iterateReverse(int fromOffset, int length) {
+    public ByteCursor openReverseCursor(int fromOffset, int length) {
         if (fromOffset < 0) {
             throw new IllegalArgumentException("The fromOffset cannot be negative: " + fromOffset + '.');
         }
@@ -260,7 +259,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
             byte byteValue = -1;
 
             @Override
-            public boolean nextLong() {
+            public boolean readLong() {
                 if (index - Long.BYTES >= end) {
                     index -= 7;
                     longValue = getLongAtOffset(segment, index, ByteOrder.LITTLE_ENDIAN);
@@ -276,7 +275,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
             }
 
             @Override
-            public boolean nextByte() {
+            public boolean readByte() {
                 if (index > end) {
                     byteValue = getByteAtOffset(segment, index);
                     index--;
