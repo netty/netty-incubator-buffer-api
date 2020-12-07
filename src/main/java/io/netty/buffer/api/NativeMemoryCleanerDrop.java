@@ -61,9 +61,9 @@ class NativeMemoryCleanerDrop implements Drop<Buf> {
         var mem = manager.unwrapRecoverableMemory(buf);
         var delegate = this.delegate;
         WeakReference<Buf> ref = new WeakReference<>(buf);
-        AtomicBoolean gate = new AtomicBoolean();
+        AtomicBoolean gate = new AtomicBoolean(true);
         cleanable = new GatedCleanable(gate, CLEANER.register(this, () -> {
-            if (gate.compareAndSet(false, true)) {
+            if (gate.getAndSet(false)) {
                 Buf b = ref.get();
                 if (b == null) {
                     pool.recoverMemory(mem);
@@ -84,7 +84,7 @@ class NativeMemoryCleanerDrop implements Drop<Buf> {
         }
 
         public void disable() {
-            gate.set(true);
+            gate.set(false);
         }
 
         @Override
