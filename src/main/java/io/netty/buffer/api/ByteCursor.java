@@ -44,6 +44,7 @@ public interface ByteCursor {
 
     /**
      * Return the last 8 bytes read by {@link #nextLong()}.
+     * If {@link #nextLong()} has not been called on this cursor before, then {@code -1} is returned.
      *
      * @return The 8 bytes, in big-endian format, that was read by the most recent successful call to
      * {@link #nextLong()}.
@@ -62,6 +63,7 @@ public interface ByteCursor {
 
     /**
      * Return the last byte that was read by {@link #nextByte()}.
+     * If {@link #nextByte()} has not been called on this cursor before, then {@code -1} is returned.
      *
      * @return The next byte that was read by the most recent successful call to {@link #nextByte()}.
      */
