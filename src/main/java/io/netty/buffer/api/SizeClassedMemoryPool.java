@@ -70,7 +70,7 @@ class SizeClassedMemoryPool implements Allocator, AllocatorControl, Drop<Buf> {
                 Send<Buf> send;
                 while ((send = v.poll()) != null) {
                     try {
-                        dispose(send.receive());
+                        send.receive().close();
                     } catch (Exception e) {
                         capturedExceptions.add(e);
                     }
@@ -86,12 +86,16 @@ class SizeClassedMemoryPool implements Allocator, AllocatorControl, Drop<Buf> {
 
     @Override
     public void drop(Buf buf) {
+        if (closed) {
+            dispose(buf);
+            return;
+        }
         var sizeClassPool = getSizeClassPool(buf.capacity());
         sizeClassPool.offer(buf.send());
         if (closed) {
             Send<Buf> send;
             while ((send = sizeClassPool.poll()) != null) {
-                dispose(send.receive());
+                send.receive().close();
             }
         }
     }
