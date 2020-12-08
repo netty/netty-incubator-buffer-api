@@ -15,9 +15,12 @@
  */
 package io.netty.buffer.api;
 
+import java.util.Objects;
+import java.util.function.Function;
+
 public abstract class RcSupport<I extends Rc<I>, T extends RcSupport<I, T>> implements Rc<I> {
     private int acquires; // Closed if negative.
-    private final Drop<T> drop;
+    private Drop<T> drop;
 
     protected RcSupport(Drop<T> drop) {
         this.drop = drop;
@@ -112,6 +115,12 @@ public abstract class RcSupport<I extends Rc<I>, T extends RcSupport<I, T>> impl
      */
     protected Drop<T> unsafeGetDrop() {
         return drop;
+    }
+
+    protected Drop<T> unsafeExchangeDrop(Drop<T> replacement) {
+        Objects.requireNonNull(replacement, "Replacement drop cannot be null.");
+        drop = replacement;
+        return replacement;
     }
 
     @SuppressWarnings("unchecked")

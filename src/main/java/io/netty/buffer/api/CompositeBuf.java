@@ -27,12 +27,9 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
      * non-composite copy of the buffer.
      */
     private static final int MAX_CAPACITY = Integer.MAX_VALUE - 8;
-    private static final Drop<CompositeBuf> COMPOSITE_DROP = new Drop<CompositeBuf>() {
-        @Override
-        public void drop(CompositeBuf obj) {
-            for (Buf buf : obj.bufs) {
-                buf.close();
-            }
+    private static final Drop<CompositeBuf> COMPOSITE_DROP = buf -> {
+        for (Buf b : buf.bufs) {
+            b.close();
         }
     };
 
@@ -45,6 +42,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
     private int roff;
     private int woff;
     private int subOffset; // The next offset *within* a consituent buffer to read from or write to.
+    private ByteOrder order;
 
     CompositeBuf(Allocator allocator, Buf[] bufs) {
         this(allocator, true, bufs.clone(), COMPOSITE_DROP); // Clone prevents external modification of array.
@@ -64,6 +62,9 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
                     throw new IllegalArgumentException("Constituent buffers have inconsistent byte order.");
                 }
             }
+            order = bufs[0].order();
+        } else {
+            order = ByteOrder.nativeOrder();
         }
         this.bufs = bufs;
         computeBufferOffsets();
@@ -129,6 +130,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
 
     @Override
     public Buf order(ByteOrder order) {
+        this.order = order;
         for (Buf buf : bufs) {
             buf.order(order);
         }
@@ -137,7 +139,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
 
     @Override
     public ByteOrder order() {
-        return bufs.length > 0? bufs[0].order() : ByteOrder.nativeOrder();
+        return order;
     }
 
     @Override
@@ -543,6 +545,9 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
                     "This buffer uses " + order() + " byte order, and cannot be extended with " +
                     "a buffer that uses " + extension.order() + " byte order.");
         }
+        if (bufs.length == 0) {
+            order = extension.order();
+        }
         long newSize = capacity() + (long) extension.capacity();
         Allocator.checkSize(newSize);
 
@@ -559,6 +564,36 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
         bufs = Arrays.copyOf(bufs, bufs.length + 1);
         bufs[bufs.length - 1] = extension;
         computeBufferOffsets();
+    }
+
+    @Override
+    public Buf bifurcate() {
+        if (!isOwned()) {
+            throw new IllegalStateException("Cannot bifurcate a buffer that is not owned.");
+        }
+        if (bufs.length == 0) {
+            // Bifurcating a zero-length buffer is trivial.
+            return new CompositeBuf(allocator, true, bufs, unsafeGetDrop()).order(order);
+        }
+
+        int i = searchOffsets(woff);
+        int off = woff - offsets[i];
+        Buf[] bifs = Arrays.copyOf(bufs, off == 0? i : 1 + i);
+        bufs = Arrays.copyOfRange(bufs, off == bufs[i].capacity()? 1 + i : i, bufs.length);
+        if (off > 0 && bifs.length > 0 && off < bifs[bifs.length - 1].capacity()) {
+            bifs[bifs.length - 1] = bufs[0].bifurcate();
+        }
+        computeBufferOffsets();
+        try {
+            var compositeBuf = new CompositeBuf(allocator, true, bifs, unsafeGetDrop());
+            compositeBuf.order = order; // Preserve byte order even if bifs array is empty.
+            return compositeBuf;
+        } finally {
+            // Drop our references to the buffers in the bifs array. They belong to the new composite buffer now.
+            for (Buf bif : bifs) {
+                bif.close();
+            }
+        }
     }
 
     // <editor-fold defaultstate="collapsed" desc="Primitive accessors.">
@@ -856,7 +891,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
                     received[i] = sends[i].receive();
                 }
                 var composite = new CompositeBuf(allocator, true, received, drop);
-                drop.accept(composite);
+                drop.reconnect(composite);
                 return composite;
             }
         };

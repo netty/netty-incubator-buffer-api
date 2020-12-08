@@ -373,4 +373,48 @@ public interface Buf extends Rc<Buf>, BufAccessors {
      * That is, if {@link #countBorrows()} is not {@code 0}.
      */
     void ensureWritable(int size);
+
+    /**
+     * Split the buffer into two, at the {@linkplain #writerOffset() write offset} position.
+     * <p>
+     * The region of this buffer that contain the read and readable bytes, will be captured and returned in a new
+     * buffer, that will hold its own ownership of that region. This allows the returned buffer to be indepentently
+     * {@linkplain #send() sent} to other threads.
+     * <p>
+     * The returned buffer will adopt the {@link #readerOffset()} of this buffer, and have its {@link #writerOffset()}
+     * and {@link #capacity()} both set to the equal to the write offset of this buffer.
+     * <p>
+     * The memory region in the returned buffer will become inaccessible through this buffer. This buffer will have its
+     * capacity reduced by the capacity of the returned buffer, and the read and write offsets of this buffer will both
+     * become zero, even though their position in memory remain unchanged.
+     * <p>
+     * Effectively, the following transformation takes place:
+     * <pre>{@code
+     *         This buffer:
+     *          +------------------------------------------+
+     *         0|   |r/o                  |w/o             |cap
+     *          +---+---------------------+----------------+
+     *         /   /                     / \               \
+     *        /   /                     /   \               \
+     *       /   /                     /     \               \
+     *      /   /                     /       \               \
+     *     /   /                     /         \               \
+     *    +---+---------------------+           +---------------+
+     *    |   |r/o                  |w/o & cap  |r/o & w/o      |cap
+     *    +---+---------------------+           +---------------+
+     *    Returned buffer.                      This buffer.
+     * }</pre>
+     * When the buffers are in this state, both of the bifurcated parts retain an atomic reference count on the
+     * underlying memory. This means that shared underlying memory will not be deallocated or returned to a pool, until
+     * all of the bifurcated parts have been closed.
+     * <p>
+     * Composite buffers have it a little easier, in that at most only one of the constituent buffers will actually be
+     * bifurcated. If the split point lands perfectly between two constituent buffers, then a composite buffer can
+     * simply split its internal array in two.
+     * <p>
+     * Bifurcated buffers support all operations that normal buffers do, including {@link #ensureWritable(int)}.
+     *
+     * @return A new buffer with independent and exclusive ownership over the read and readable bytes from this buffer.
+     */
+    Buf bifurcate();
 }
