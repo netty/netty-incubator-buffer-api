@@ -112,6 +112,27 @@ public interface Allocator extends AutoCloseable {
     }
 
     /**
+     * Extend the given composite buffer with the given extension buffer.
+     * This works as if the extension had originally been included at the end of the list of constituent buffers when
+     * the composite buffer was created.
+     * The composite buffer is modified in-place.
+     *
+     * @see #compose(Buf...)
+     * @param composite The composite buffer (from a prior {@link #compose(Buf...)} call) to extend with the given
+     *                 extension buffer.
+     * @param extension The buffer to extend the composite buffer with.
+     */
+    static void extend(Buf composite, Buf extension) {
+        if (composite.getClass() != CompositeBuf.class) {
+            throw new IllegalArgumentException(
+                    "Expected the first buffer to be a composite buffer, " +
+                    "but it is a " + composite.getClass() + " buffer: " + composite + '.');
+        }
+        CompositeBuf buf = (CompositeBuf) composite;
+        buf.extendWith(extension);
+    }
+
+    /**
      * Close this allocator, freeing all of its internal resources. It is not specified if the allocator can still be
      * used after this method has been called on it.
      */

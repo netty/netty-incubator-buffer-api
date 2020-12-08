@@ -19,6 +19,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Arrays;
 import java.util.NoSuchElementException;
+import java.util.Objects;
 
 final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
     /**
@@ -64,6 +65,16 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
                     throw new IllegalArgumentException("Constituent buffers have inconsistent byte order.");
                 }
             }
+        }
+        this.bufs = bufs;
+        computeBufferOffsets();
+        tornBufAccessors = new TornBufAccessors(this);
+    }
+
+    private void computeBufferOffsets() {
+        if (bufs.length > 0) {
+            int woff = 0;
+            int roff = 0;
             boolean woffMidpoint = false;
             for (Buf buf : bufs) {
                 if (buf.writableBytes() == 0) {
@@ -73,7 +84,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
                     woffMidpoint = true;
                 } else if (buf.writerOffset() != 0) {
                     throw new IllegalArgumentException(
-                            "The given buffers cannot be composed because they have an unwritten gap: " +
+                            "The given buffers cannot be composed because they leave an unwritten gap: " +
                             Arrays.toString(bufs) + '.');
                 }
             }
@@ -86,19 +97,17 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
                     roffMidpoint = true;
                 } else if (buf.readerOffset() != 0) {
                     throw new IllegalArgumentException(
-                            "The given buffers cannot be composed because they have an unread gap: " +
+                            "The given buffers cannot be composed because they leave an unread gap: " +
                             Arrays.toString(bufs) + '.');
                 }
             }
             assert roff <= woff:
                     "The given buffers place the read offset ahead of the write offset: " + Arrays.toString(bufs) + '.';
+            // Commit computed offsets.
+            this.woff = woff;
+            this.roff = roff;
         }
-        this.bufs = bufs;
-        computeBufferOffsets();
-        tornBufAccessors = new TornBufAccessors(this);
-    }
 
-    private void computeBufferOffsets() {
         offsets = new int[bufs.length];
         long cap = 0;
         for (int i = 0; i < bufs.length; i++) {
@@ -129,7 +138,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
 
     @Override
     public ByteOrder order() {
-        return bufs[0].order();
+        return bufs.length > 0? bufs[0].order() : ByteOrder.nativeOrder();
     }
 
     @Override
@@ -481,10 +490,40 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
             long newSize = capacity() + (long) size;
             Allocator.checkSize(newSize);
             int growth = size - writableBytes();
-            bufs = Arrays.copyOf(bufs, bufs.length + 1);
-            bufs[bufs.length - 1] = allocator.allocate(growth);
-            computeBufferOffsets();
+            Buf extension = bufs.length == 0? allocator.allocate(growth) : allocator.allocate(growth, order());
+            unsafeExtendWith(extension);
         }
+    }
+
+    void extendWith(Buf extension) {
+        Objects.requireNonNull(extension, "Extension buffer cannot be null.");
+        if (!isOwned()) {
+            throw new IllegalStateException("This buffer cannot be extended because it is not in an owned state.");
+        }
+        if (extension == this) {
+            throw new IllegalArgumentException("This buffer cannot be extended with itself.");
+        }
+        if (bufs.length > 0 && extension.order() != order()) {
+            throw new IllegalArgumentException(
+                    "This buffer uses " + order() + " byte order, and cannot be extended with " +
+                    "a buffer that uses " + extension.order() + " byte order.");
+        }
+        long newSize = capacity() + (long) extension.capacity();
+        Allocator.checkSize(newSize);
+
+        Buf[] restoreTemp = bufs; // We need this to restore our buffer array, in case offset computations fail.
+        try {
+            unsafeExtendWith(extension.acquire());
+        } catch (Exception e) {
+            bufs = restoreTemp;
+            throw e;
+        }
+    }
+
+    private void unsafeExtendWith(Buf extension) {
+        bufs = Arrays.copyOf(bufs, bufs.length + 1);
+        bufs[bufs.length - 1] = extension;
+        computeBufferOffsets();
     }
 
     // <editor-fold defaultstate="collapsed" desc="Primitive accessors.">
