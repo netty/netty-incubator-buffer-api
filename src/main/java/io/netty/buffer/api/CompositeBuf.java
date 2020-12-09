@@ -18,7 +18,6 @@ package io.netty.buffer.api;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Arrays;
-import java.util.NoSuchElementException;
 import java.util.Objects;
 
 final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
@@ -293,18 +292,17 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
 
         // Iterate in reverse to account for src and dest buffer overlap.
         // todo optimise by delegating to constituent buffers.
-        var itr = iterateReverse(srcPos + length - 1, length);
+        var cursor = openReverseCursor(srcPos + length - 1, length);
         ByteOrder prevOrder = dest.order();
         // We read longs in BE, in reverse, so they need to be flipped for writing.
         dest.order(ByteOrder.LITTLE_ENDIAN);
         try {
-            while (itr.hasNextLong()) {
-                long val = itr.nextLong();
+            while (cursor.readLong()) {
                 length -= Long.BYTES;
-                dest.setLong(destPos + length, val);
+                dest.setLong(destPos + length, cursor.getLong());
             }
-            while (itr.hasNextByte()) {
-                dest.setByte(destPos + --length, itr.nextByte());
+            while (cursor.readByte()) {
+                dest.setByte(destPos + --length, cursor.getByte());
             }
         } finally {
             dest.order(prevOrder);
@@ -312,7 +310,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
     }
 
     @Override
-    public ByteIterator iterate(int fromOffset, int length) {
+    public ByteCursor openCursor(int fromOffset, int length) {
         if (fromOffset < 0) {
             throw new IllegalArgumentException("The fromOffset cannot be negative: " + fromOffset + '.');
         }
@@ -326,77 +324,94 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
         int startBufferIndex = searchOffsets(fromOffset);
         int off = fromOffset - offsets[startBufferIndex];
         Buf startBuf = bufs[startBufferIndex];
-        ByteIterator startIterator = startBuf.iterate(off, Math.min(startBuf.capacity() - off, length));
-        return new ByteIterator() {
+        ByteCursor startCursor = startBuf.openCursor(off, Math.min(startBuf.capacity() - off, length));
+        return new ByteCursor() {
             int index = fromOffset;
             final int end = fromOffset + length;
             int bufferIndex = startBufferIndex;
-            ByteIterator itr = startIterator;
+            int initOffset = startCursor.currentOffset();
+            ByteCursor cursor = startCursor;
+            long longValue = -1;
+            byte byteValue = -1;
 
             @Override
-            public boolean hasNextLong() {
-                return bytesLeft() >= Long.BYTES;
-            }
-
-            @Override
-            public long nextLong() {
-                if (itr.hasNextLong()) {
-                    long val = itr.nextLong();
-                    index += Long.BYTES;
-                    return val;
+            public boolean readLong() {
+                if (cursor.readLong()) {
+                    longValue = cursor.getLong();
+                    return true;
                 }
-                if (!hasNextLong()) {
-                    throw new NoSuchElementException();
+                if (bytesLeft() >= Long.BYTES) {
+                    longValue = nextLongFromBytes();
+                    return true;
                 }
-                return nextLongFromBytes(); // Leave index increments to 'nextByte'
+                return false;
             }
 
             private long nextLongFromBytes() {
+                if (cursor.bytesLeft() == 0) {
+                    nextCursor();
+                    if (cursor.readLong()) {
+                        return cursor.getLong();
+                    }
+                }
                 long val = 0;
                 for (int i = 0; i < 8; i++) {
+                    readByte();
                     val <<= 8;
-                    val |= nextByte();
+                    val |= getByte();
                 }
                 return val;
             }
 
             @Override
-            public boolean hasNextByte() {
-                return index < end;
+            public long getLong() {
+                return longValue;
             }
 
             @Override
-            public byte nextByte() {
-                if (itr.hasNextByte()) {
-                    byte val = itr.nextByte();
-                    index++;
-                    return val;
+            public boolean readByte() {
+                if (cursor.readByte()) {
+                    byteValue = cursor.getByte();
+                    return true;
                 }
-                if (!hasNextByte()) {
-                    throw new NoSuchElementException();
+                if (bytesLeft() > 0) {
+                    nextCursor();
+                    cursor.readByte();
+                    byteValue = cursor.getByte();
+                    return true;
                 }
+                return false;
+            }
+
+            private void nextCursor() {
                 bufferIndex++;
                 Buf nextBuf = bufs[bufferIndex];
-                itr = nextBuf.iterate(0, Math.min(nextBuf.capacity(), bytesLeft()));
-                byte val = itr.nextByte();
-                index++;
-                return val;
+                cursor = nextBuf.openCursor(0, Math.min(nextBuf.capacity(), bytesLeft()));
+                initOffset = 0;
+            }
+
+            @Override
+            public byte getByte() {
+                return byteValue;
             }
 
             @Override
             public int currentOffset() {
+                int currOff = cursor.currentOffset();
+                index += currOff - initOffset;
+                initOffset = currOff;
                 return index;
             }
 
             @Override
             public int bytesLeft() {
-                return end - index;
+                return end - currentOffset();
             }
         };
     }
 
     @Override
-    public ByteIterator iterateReverse(int fromOffset, int length) {
+    public ByteCursor openReverseCursor(int fromOffset, int length) {
         if (fromOffset < 0) {
             throw new IllegalArgumentException("The fromOffset cannot be negative: " + fromOffset + '.');
         }
@@ -410,70 +425,90 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
         int startBufferIndex = searchOffsets(fromOffset);
         int off = fromOffset - offsets[startBufferIndex];
         Buf startBuf = bufs[startBufferIndex];
-        ByteIterator startIterator = startBuf.iterateReverse(off, Math.min(off + 1, length));
-        return new ByteIterator() {
+        ByteCursor startCursor = startBuf.openReverseCursor(off, Math.min(off + 1, length));
+        return new ByteCursor() {
             int index = fromOffset;
             final int end = fromOffset - length;
             int bufferIndex = startBufferIndex;
-            ByteIterator itr = startIterator;
+            int initOffset = startCursor.currentOffset();
+            ByteCursor cursor = startCursor;
+            long longValue = -1;
+            byte byteValue = -1;
 
             @Override
-            public boolean hasNextLong() {
-                return bytesLeft() >= Long.BYTES;
-            }
-
-            @Override
-            public long nextLong() {
-                if (itr.hasNextLong()) {
-                    index -= Long.BYTES;
-                    return itr.nextLong();
+            public boolean readLong() {
+                if (cursor.readLong()) {
+                    longValue = cursor.getLong();
+                    return true;
                 }
-                if (!hasNextLong()) {
-                    throw new NoSuchElementException();
+                if (bytesLeft() >= Long.BYTES) {
+                    longValue = nextLongFromBytes();
+                    return true;
                 }
-                return nextLongFromBytes(); // Leave index increments to 'nextByte'
+                return false;
             }
 
             private long nextLongFromBytes() {
+                if (cursor.bytesLeft() == 0) {
+                    nextCursor();
+                    if (cursor.readLong()) {
+                        return cursor.getLong();
+                    }
+                }
                 long val = 0;
                 for (int i = 0; i < 8; i++) {
+                    readByte();
                     val <<= 8;
-                    val |= nextByte();
+                    val |= getByte();
                 }
                 return val;
             }
 
             @Override
-            public boolean hasNextByte() {
-                return index > end;
+            public long getLong() {
+                return longValue;
             }
 
             @Override
-            public byte nextByte() {
-                if (itr.hasNextByte()) {
-                    byte val = itr.nextByte();
-                    index--;
-                    return val;
+            public boolean readByte() {
+                if (cursor.readByte()) {
+                    byteValue = cursor.getByte();
+                    return true;
                 }
-                if (!hasNextByte()) {
-                    throw new NoSuchElementException();
+                if (bytesLeft() > 0) {
+                    nextCursor();
+                    cursor.readByte();
+                    byteValue = cursor.getByte();
+                    return true;
                 }
+                return false;
+            }
+
+            private void nextCursor() {
                 bufferIndex--;
                 Buf nextBuf = bufs[bufferIndex];
-                itr = nextBuf.iterateReverse(nextBuf.capacity() - 1, Math.min(nextBuf.capacity(), bytesLeft()));
-                byte val = itr.nextByte();
-                index--;
-                return val;
+                int length = Math.min(nextBuf.capacity(), bytesLeft());
+                int offset = nextBuf.capacity() - 1;
+                cursor = nextBuf.openReverseCursor(offset, length);
+                initOffset = offset;
+            }
+
+            @Override
+            public byte getByte() {
+                return byteValue;
             }
 
             @Override
             public int currentOffset() {
+                int currOff = cursor.currentOffset();
+                index -= initOffset - currOff;
+                initOffset = currOff;
                 return index;
             }
 
             @Override
             public int bytesLeft() {
-                return index - end;
+                return currentOffset() - end;
             }
         };
     }

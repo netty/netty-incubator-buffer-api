@@ -295,69 +295,70 @@ public interface Buf extends Rc<Buf>, BufAccessors {
     }
 
     /**
-     * Iterate the readable bytes of this buffer. The {@linkplain #readerOffset() reader offset} and
-     * {@linkplain #writerOffset() witer offset} are not modified by the iterator.
+     * Open a cursor to iterate the readable bytes of this buffer. The {@linkplain #readerOffset() reader offset} and
+     * {@linkplain #writerOffset() witer offset} are not modified by the cursor.
      * <p>
-     * Care should be taken to ensure that the buffers lifetime extends beyond the iteration, and the
-     * {@linkplain #readerOffset() reader offset} and {@linkplain #writerOffset() writer offset} are not modified while
-     * the iteration takes place. Otherwise unpredictable behaviour might result.
+     * Care should be taken to ensure that the buffers lifetime extends beyond the cursor and the iteration, and that
+     * the {@linkplain #readerOffset() reader offset} and {@linkplain #writerOffset() writer offset} are not modified
+     * while the iteration takes place. Otherwise unpredictable behaviour might result.
      *
-     * @return A {@link ByteIterator} for the readable bytes of this buffer.
+     * @return A {@link ByteCursor} for iterating the readable bytes of this buffer.
      */
-    default ByteIterator iterate() {
-        return iterate(readerOffset(), readableBytes());
+    default ByteCursor openCursor() {
+        return openCursor(readerOffset(), readableBytes());
     }
 
     /**
-     * Iterate the given number bytes of this buffer, starting at the given offset.
+     * Open a cursor to iterate the given number bytes of this buffer, starting at the given offset.
      * The {@linkplain #readerOffset() reader offset} and {@linkplain #writerOffset() witer offset} are not modified by
-     * the iterator.
+     * the cursor.
      * <p>
-     * Care should be taken to ensure that the buffers lifetime extends beyond the iteration, and the
-     * {@linkplain #readerOffset() reader offset} and {@linkplain #writerOffset() writer offset} are not modified while
-     * the iteration takes place. Otherwise unpredictable behaviour might result.
+     * Care should be taken to ensure that the buffers lifetime extends beyond the cursor and the iteration, and that
+     * the {@linkplain #readerOffset() reader offset} and {@linkplain #writerOffset() writer offset} are not modified
+     * while the iteration takes place. Otherwise unpredictable behaviour might result.
      *
      * @param fromOffset The offset into the buffer where iteration should start.
      *                  The first byte read from the iterator will be the byte at this offset.
      * @param length The number of bytes to iterate.
-     * @return A {@link ByteIterator} for the given stretch of bytes of this buffer.
+     * @return A {@link ByteCursor} for the given stretch of bytes of this buffer.
      * @throws IllegalArgumentException if the length is negative, or if the region given by the {@code fromOffset} and
      * the {@code length} reaches outside of the bounds of this buffer.
      */
-    ByteIterator iterate(int fromOffset, int length);
+    ByteCursor openCursor(int fromOffset, int length);
 
     /**
-     * Iterate the readable bytes of this buffer, in reverse. The {@linkplain #readerOffset() reader offset} and
-     * {@linkplain #writerOffset() witer offset} are not modified by the iterator.
+     * Open a cursor to iterate the readable bytes of this buffer, in reverse.
+     * The {@linkplain #readerOffset() reader offset} and {@linkplain #writerOffset() witer offset} are not modified by
+     * the cursor.
      * <p>
-     * Care should be taken to ensure that the buffers lifetime extends beyond the iteration, and the
-     * {@linkplain #readerOffset() reader offset} and {@linkplain #writerOffset() writer offset} are not modified while
-     * the iteration takes place. Otherwise unpredictable behaviour might result.
+     * Care should be taken to ensure that the buffers lifetime extends beyond the cursor and the iteration, and that
+     * the {@linkplain #readerOffset() reader offset} and {@linkplain #writerOffset() writer offset} are not modified
+     * while the iteration takes place. Otherwise unpredictable behaviour might result.
      *
-     * @return A {@link ByteIterator} for the readable bytes of this buffer.
+     * @return A {@link ByteCursor} for the readable bytes of this buffer.
      */
-    default ByteIterator iterateReverse() {
+    default ByteCursor openReverseCursor() {
         int woff = writerOffset();
-        return iterateReverse(woff == 0? 0 : woff - 1, readableBytes());
+        return openReverseCursor(woff == 0? 0 : woff - 1, readableBytes());
     }
 
     /**
-     * Iterate the given number bytes of this buffer, in reverse, starting at the given offset.
+     * Open a cursor to iterate the given number bytes of this buffer, in reverse, starting at the given offset.
      * The {@linkplain #readerOffset() reader offset} and {@linkplain #writerOffset() witer offset} are not modified by
-     * the iterator.
+     * the cursor.
      * <p>
-     * Care should be taken to ensure that the buffers lifetime extends beyond the iteration, and the
-     * {@linkplain #readerOffset() reader offset} and {@linkplain #writerOffset() writer offset} are not modified while
-     * the iteration takes place. Otherwise unpredictable behaviour might result.
+     * Care should be taken to ensure that the buffers lifetime extends beyond the cursor and the iteration, and that
+     * the {@linkplain #readerOffset() reader offset} and {@linkplain #writerOffset() writer offset} are not modified
+     * while the iteration takes place. Otherwise unpredictable behaviour might result.
      *
      * @param fromOffset The offset into the buffer where iteration should start.
      *                  The first byte read from the iterator will be the byte at this offset.
      * @param length The number of bytes to iterate.
-     * @return A {@link ByteIterator} for the given stretch of bytes of this buffer.
+     * @return A {@link ByteCursor} for the given stretch of bytes of this buffer.
      * @throws IllegalArgumentException if the length is negative, or if the region given by the {@code fromOffset} and
      * the {@code length} reaches outside of the bounds of this buffer.
      */
-    ByteIterator iterateReverse(int fromOffset, int length);
+    ByteCursor openReverseCursor(int fromOffset, int length);
 
     /**
      * Ensure that this buffer has {@linkplain #writableBytes() available space for writing} the given number of

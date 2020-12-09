@@ -92,26 +92,26 @@ public class ByteIterationBenchmark {
 
     @Benchmark
     public long sum() {
-        var itr = buf.iterate();
+        var itr = buf.openCursor();
         long sum = 0;
-        while (itr.hasNextLong()) {
-            sum += itr.nextLong();
+        while (itr.readLong()) {
+            sum += itr.getLong();
         }
-        while (itr.hasNextByte()) {
-            sum += itr.nextByte();
+        while (itr.readByte()) {
+            sum += itr.getByte();
         }
         return sum;
     }
 
     @Benchmark
     public long sumReverse() {
-        var itr = buf.iterateReverse();
+        var itr = buf.openReverseCursor();
         long sum = 0;
-        while (itr.hasNextLong()) {
-            sum += itr.nextLong();
+        while (itr.readLong()) {
+            sum += itr.getLong();
         }
-        while (itr.hasNextByte()) {
-            sum += itr.nextByte();
+        while (itr.readByte()) {
+            sum += itr.getByte();
         }
         return sum;
     }
