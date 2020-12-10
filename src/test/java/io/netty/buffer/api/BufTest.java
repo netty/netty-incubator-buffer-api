@@ -2034,6 +2034,50 @@ public class BufTest {
         }
     }
 
+    @ParameterizedTest
+    @MethodSource("nonSliceAllocators")
+    public void bifurcatedBuffersMustBeAccessibleInOtherThreads(Fixture fixture) throws Exception {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(8)) {
+            buf.writeInt(42);
+            var send = buf.bifurcate().send();
+            var fut = executor.submit(() -> {
+                try (Buf receive = send.receive()) {
+                    assertEquals(42, receive.readInt());
+                    receive.readerOffset(0).writerOffset(0).writeInt(24);
+                    assertEquals(24, receive.readInt());
+                }
+            });
+            fut.get();
+            buf.writeInt(32);
+            assertEquals(32, buf.readInt());
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("nonSliceAllocators")
+    public void sendMustNotMakeBifurcatedBuffersInaccessible(Fixture fixture) throws Exception {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(16)) {
+            buf.writeInt(64);
+            var bifA = buf.bifurcate();
+            buf.writeInt(42);
+            var send = buf.bifurcate().send();
+            buf.writeInt(72);
+            var bifB = buf.bifurcate();
+            var fut = executor.submit(() -> {
+                try (Buf receive = send.receive()) {
+                    assertEquals(42, receive.readInt());
+                }
+            });
+            fut.get();
+            buf.writeInt(32);
+            assertEquals(32, buf.readInt());
+            assertEquals(64, bifA.readInt());
+            assertEquals(72, bifB.readInt());
+        }
+    }
+
     // <editor-fold defaultstate="collapsed" desc="Primitive accessors tests.">
     @ParameterizedTest
     @MethodSource("allocators")
