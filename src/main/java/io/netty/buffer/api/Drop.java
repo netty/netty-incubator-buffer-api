@@ -15,8 +15,6 @@
  */
 package io.netty.buffer.api;
 
-import java.util.function.Consumer;
-
 /**
  * The Drop interface is used by {@link Rc} instances to implement their resource disposal mechanics. The {@link
  * #drop(Object)} method will be called by the Rc when their last reference is closed.
@@ -24,7 +22,7 @@ import java.util.function.Consumer;
  * @param <T>
  */
 @FunctionalInterface
-public interface Drop<T> extends Consumer<T> {
+public interface Drop<T> {
     /**
      * Dispose of the resources in the given Rc.
      *
@@ -37,7 +35,6 @@ public interface Drop<T> extends Consumer<T> {
      *
      * @param obj The new Rc instance with the new owner.
      */
-    @Override
-    default void accept(T obj) {
+    default void attach(T obj) {
     }
 }

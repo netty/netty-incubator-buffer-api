@@ -28,7 +28,7 @@ public interface AllocatorControl {
      * This allows a buffer to implement {@link Buf#ensureWritable(int)} by having new memory allocated to it,
      * without that memory being attached to some other lifetime.
      *
-     *  @param originator The buffer that originated the request for an untethered memory allocated.
+     * @param originator The buffer that originated the request for an untethered memory allocated.
      * @param size The size of the requested memory allocation, in bytes.
      * @return A "recoverable memory" object that is the requested allocation.
      */

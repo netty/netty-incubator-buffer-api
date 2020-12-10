@@ -65,6 +65,16 @@ public class BufTest {
         return fixtures = fixtureCombinations().toArray(Fixture[]::new);
     }
 
+    static List<Fixture> initialAllocators() {
+        return List.of(
+                new Fixture("heap", Allocator::heap, HEAP),
+                new Fixture("direct", Allocator::direct, DIRECT),
+                new Fixture("directWithCleaner", Allocator::directWithCleaner, DIRECT, CLEANER),
+                new Fixture("pooledHeap", Allocator::pooledHeap, POOLED, HEAP),
+                new Fixture("pooledDirect", Allocator::pooledDirect, POOLED, DIRECT),
+                new Fixture("pooledDirectWithCleaner", Allocator::pooledDirectWithCleaner, POOLED, DIRECT, CLEANER));
+    }
+
     static Stream<Fixture> nonSliceAllocators() {
         return fixtureCombinations().filter(f -> !f.isSlice());
     }
@@ -94,13 +104,7 @@ public class BufTest {
         if (fxs != null) {
             return Arrays.stream(fxs);
         }
-        List<Fixture> initFixtures = List.of(
-                new Fixture("heap", Allocator::heap, HEAP),
-                new Fixture("direct", Allocator::direct, DIRECT),
-                new Fixture("directWithCleaner", Allocator::directWithCleaner, DIRECT, CLEANER),
-                new Fixture("pooledHeap", Allocator::pooledHeap, POOLED, HEAP),
-                new Fixture("pooledDirect", Allocator::pooledDirect, POOLED, DIRECT),
-                new Fixture("pooledDirectWithCleaner", Allocator::pooledDirectWithCleaner, POOLED, DIRECT, CLEANER));
+        List<Fixture> initFixtures = initialAllocators();
         Builder<Fixture> builder = Stream.builder();
         initFixtures.forEach(builder);
 
@@ -192,44 +196,68 @@ public class BufTest {
             }, COMPOSITE));
         }
 
-        return builder.build().flatMap(f -> {
-            // Inject slice versions of everything
-            Builder<Fixture> andSlices = Stream.builder();
-            andSlices.add(f);
-            andSlices.add(new Fixture(f + ".slice(0, capacity())", () -> {
-                var allocatorBase = f.get();
-                return new Allocator() {
-                    @Override
-                    public Buf allocate(int size) {
-                        try (Buf base = allocatorBase.allocate(size)) {
-                            return base.slice(0, base.capacity()).writerOffset(0);
-                        }
-                    }
+        return builder.build().flatMap(BufTest::injectBifurcations).flatMap(BufTest::injectSlices);
+    }
 
-                    @Override
-                    public void close() {
-                        allocatorBase.close();
+    private static Stream<Fixture> injectBifurcations(Fixture f) {
+        Builder<Fixture> builder = Stream.builder();
+        builder.add(f);
+        builder.add(new Fixture(f + ".bifurcate", () -> {
+            var allocatorBase = f.get();
+            return new Allocator() {
+                @Override
+                public Buf allocate(int size) {
+                    try (Buf buf = allocatorBase.allocate(size + 1)) {
+                        buf.writerOffset(size);
+                        return buf.bifurcate().writerOffset(0);
                     }
-                };
-            }, Properties.SLICE));
-            andSlices.add(new Fixture(f + ".slice(1, capacity() - 2)", () -> {
-                var allocatorBase = f.get();
-                return new Allocator() {
-                    @Override
-                    public Buf allocate(int size) {
-                        try (Buf base = allocatorBase.allocate(size + 2)) {
-                            return base.slice(1, size).writerOffset(0);
-                        }
-                    }
+                }
 
-                    @Override
-                    public void close() {
-                        allocatorBase.close();
+                @Override
+                public void close() {
+                    allocatorBase.close();
+                }
+            };
+        }, f.getProperties()));
+        return builder.build();
+    }
+
+    private static Stream<Fixture> injectSlices(Fixture f) {
+        Builder<Fixture> builder = Stream.builder();
+        builder.add(f);
+        builder.add(new Fixture(f + ".slice(0, capacity())", () -> {
+            var allocatorBase = f.get();
+            return new Allocator() {
+                @Override
+                public Buf allocate(int size) {
+                    try (Buf base = allocatorBase.allocate(size)) {
+                        return base.slice(0, base.capacity()).writerOffset(0);
                     }
-                };
-            }, Properties.SLICE));
-            return andSlices.build();
-        });
+                }
+
+                @Override
+                public void close() {
+                    allocatorBase.close();
+                }
+            };
+        }, Properties.SLICE));
+        builder.add(new Fixture(f + ".slice(1, capacity() - 2)", () -> {
+            var allocatorBase = f.get();
+            return new Allocator() {
+                @Override
+                public Buf allocate(int size) {
+                    try (Buf base = allocatorBase.allocate(size + 2)) {
+                        return base.slice(1, size).writerOffset(0);
+                    }
+                }
+
+                @Override
+                public void close() {
+                    allocatorBase.close();
+                }
+            };
+        }, Properties.SLICE));
+        return builder.build();
     }
 
     @BeforeAll
@@ -342,7 +370,7 @@ public class BufTest {
     }
 
     @ParameterizedTest
-    @MethodSource("nonSliceAllocators")
+    @MethodSource("initialAllocators")
     void mustThrowWhenAllocatingZeroSizedBuffer(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator()) {
             assertThrows(IllegalArgumentException.class, () -> allocator.allocate(0));
@@ -1811,6 +1839,242 @@ public class BufTest {
                     assertThat(composite.readerOffset()).isEqualTo(4);
                 }
             }
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("nonSliceAllocators")
+    public void bifurcateOfNonOwnedBufferMustThrow(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(8)) {
+            buf.writeInt(1);
+            try (Buf acquired = buf.acquire()) {
+                var exc = assertThrows(IllegalStateException.class, () -> acquired.bifurcate());
+                assertThat(exc).hasMessageContaining("owned");
+            }
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("nonSliceAllocators")
+    public void bifurcatedPartMustContainFirstHalfOfBuffer(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(16).order(ByteOrder.BIG_ENDIAN)) {
+            buf.writeLong(0x0102030405060708L);
+            assertThat(buf.readByte()).isEqualTo((byte) 0x01);
+            try (Buf bif = buf.bifurcate()) {
+                // Original buffer:
+                assertThat(buf.capacity()).isEqualTo(8);
+                assertThat(buf.readerOffset()).isZero();
+                assertThat(buf.writerOffset()).isZero();
+                assertThat(buf.readableBytes()).isZero();
+                assertThrows(IndexOutOfBoundsException.class, () -> buf.readByte());
+
+                // Bifurcated part:
+                assertThat(bif.capacity()).isEqualTo(8);
+                assertThat(bif.readerOffset()).isOne();
+                assertThat(bif.writerOffset()).isEqualTo(8);
+                assertThat(bif.readableBytes()).isEqualTo(7);
+                assertThat(bif.readByte()).isEqualTo((byte) 0x02);
+                assertThat(bif.readInt()).isEqualTo(0x03040506);
+                assertThat(bif.readByte()).isEqualTo((byte) 0x07);
+                assertThat(bif.readByte()).isEqualTo((byte) 0x08);
+                assertThrows(IndexOutOfBoundsException.class, () -> bif.readByte());
+            }
+
+            // Bifurcated part does NOT return when closed:
+            assertThat(buf.capacity()).isEqualTo(8);
+            assertThat(buf.readerOffset()).isZero();
+            assertThat(buf.writerOffset()).isZero();
+            assertThat(buf.readableBytes()).isZero();
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.readByte());
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("nonSliceAllocators")
+    public void bifurcatedPartsMustBeIndividuallySendable(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(16).order(ByteOrder.BIG_ENDIAN)) {
+            buf.writeLong(0x0102030405060708L);
+            assertThat(buf.readByte()).isEqualTo((byte) 0x01);
+            try (Buf sentBif = buf.bifurcate().send().receive()) {
+                try (Buf sentBuf = buf.send().receive()) {
+                    assertThat(sentBuf.capacity()).isEqualTo(8);
+                    assertThat(sentBuf.readerOffset()).isZero();
+                    assertThat(sentBuf.writerOffset()).isZero();
+                    assertThat(sentBuf.readableBytes()).isZero();
+                    assertThrows(IndexOutOfBoundsException.class, () -> sentBuf.readByte());
+                }
+
+                assertThat(sentBif.capacity()).isEqualTo(8);
+                assertThat(sentBif.readerOffset()).isOne();
+                assertThat(sentBif.writerOffset()).isEqualTo(8);
+                assertThat(sentBif.readableBytes()).isEqualTo(7);
+                assertThat(sentBif.readByte()).isEqualTo((byte) 0x02);
+                assertThat(sentBif.readInt()).isEqualTo(0x03040506);
+                assertThat(sentBif.readByte()).isEqualTo((byte) 0x07);
+                assertThat(sentBif.readByte()).isEqualTo((byte) 0x08);
+                assertThrows(IndexOutOfBoundsException.class, () -> sentBif.readByte());
+            }
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("nonSliceAllocators")
+    public void mustBePossibleToBifurcateMoreThanOnce(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(16).order(ByteOrder.BIG_ENDIAN)) {
+            buf.writeLong(0x0102030405060708L);
+            try (Buf a = buf.bifurcate()) {
+                a.writerOffset(4);
+                try (Buf b = a.bifurcate()) {
+                    assertEquals(0x01020304, b.readInt());
+                    a.writerOffset(4);
+                    assertEquals(0x05060708, a.readInt());
+                    assertThrows(IndexOutOfBoundsException.class, () -> b.readByte());
+                    assertThrows(IndexOutOfBoundsException.class, () -> a.readByte());
+                    buf.writeLong(0xA1A2A3A4A5A6A7A8L);
+                    buf.writerOffset(4);
+                    try (Buf c = buf.bifurcate()) {
+                        assertEquals(0xA1A2A3A4, c.readInt());
+                        buf.writerOffset(4);
+                        assertEquals(0xA5A6A7A8, buf.readInt());
+                        assertThrows(IndexOutOfBoundsException.class, () -> c.readByte());
+                        assertThrows(IndexOutOfBoundsException.class, () -> buf.readByte());
+                    }
+                }
+            }
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("nonSliceAllocators")
+    public void bifurcatedBufferMustHaveSameByteOrderAsParent(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(8).order(ByteOrder.BIG_ENDIAN)) {
+            buf.writeLong(0x0102030405060708L);
+            try (Buf a = buf.bifurcate()) {
+                assertThat(a.order()).isEqualTo(ByteOrder.BIG_ENDIAN);
+                a.order(ByteOrder.LITTLE_ENDIAN);
+                a.writerOffset(4);
+                try (Buf b = a.bifurcate()) {
+                    assertThat(b.order()).isEqualTo(ByteOrder.LITTLE_ENDIAN);
+                    assertThat(buf.order()).isEqualTo(ByteOrder.BIG_ENDIAN);
+                }
+            }
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("nonSliceAllocators")
+    public void ensureWritableOnBifurcatedBuffers(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(8)) {
+            buf.writeLong(0x0102030405060708L);
+            try (Buf a = buf.bifurcate()) {
+                assertEquals(0x0102030405060708L, a.readLong());
+                a.ensureWritable(8);
+                a.writeLong(0xA1A2A3A4A5A6A7A8L);
+                assertEquals(0xA1A2A3A4A5A6A7A8L, a.readLong());
+
+                buf.ensureWritable(8);
+                buf.writeLong(0xA1A2A3A4A5A6A7A8L);
+                assertEquals(0xA1A2A3A4A5A6A7A8L, buf.readLong());
+            }
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("nonSliceAllocators")
+    public void ensureWritableOnBifurcatedBuffersWithOddOffsets(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(10).order(ByteOrder.BIG_ENDIAN)) {
+            buf.writeLong(0x0102030405060708L);
+            buf.writeByte((byte) 0x09);
+            buf.readByte();
+            try (Buf a = buf.bifurcate()) {
+                assertEquals(0x0203040506070809L, a.readLong());
+                a.ensureWritable(8);
+                a.writeLong(0xA1A2A3A4A5A6A7A8L);
+                assertEquals(0xA1A2A3A4A5A6A7A8L, a.readLong());
+
+                buf.ensureWritable(8);
+                buf.writeLong(0xA1A2A3A4A5A6A7A8L);
+                assertEquals(0xA1A2A3A4A5A6A7A8L, buf.readLong());
+            }
+        }
+    }
+
+    @Test
+    public void bifurcateOnEmptyBigEndianCompositeBuffer() {
+        try (Allocator allocator = Allocator.heap();
+             Buf buf = allocator.compose().order(ByteOrder.BIG_ENDIAN)) {
+            verifyBifurcateEmptyCompositeBuffer(buf);
+        }
+    }
+
+    @Test
+    public void bifurcateOnEmptyLittleEndianCompositeBuffer() {
+        try (Allocator allocator = Allocator.heap();
+             Buf buf = allocator.compose().order(ByteOrder.LITTLE_ENDIAN)) {
+            verifyBifurcateEmptyCompositeBuffer(buf);
+        }
+    }
+
+    private void verifyBifurcateEmptyCompositeBuffer(Buf buf) {
+        try (Buf a = buf.bifurcate()) {
+            a.ensureWritable(4);
+            buf.ensureWritable(4);
+            a.writeInt(1);
+            buf.writeInt(2);
+            assertEquals(1, a.readInt());
+            assertEquals(2, buf.readInt());
+            assertThat(a.order()).isEqualTo(buf.order());
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("nonSliceAllocators")
+    public void bifurcatedBuffersMustBeAccessibleInOtherThreads(Fixture fixture) throws Exception {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(8)) {
+            buf.writeInt(42);
+            var send = buf.bifurcate().send();
+            var fut = executor.submit(() -> {
+                try (Buf receive = send.receive()) {
+                    assertEquals(42, receive.readInt());
+                    receive.readerOffset(0).writerOffset(0).writeInt(24);
+                    assertEquals(24, receive.readInt());
+                }
+            });
+            fut.get();
+            buf.writeInt(32);
+            assertEquals(32, buf.readInt());
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("nonSliceAllocators")
+    public void sendMustNotMakeBifurcatedBuffersInaccessible(Fixture fixture) throws Exception {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(16)) {
+            buf.writeInt(64);
+            var bifA = buf.bifurcate();
+            buf.writeInt(42);
+            var send = buf.bifurcate().send();
+            buf.writeInt(72);
+            var bifB = buf.bifurcate();
+            var fut = executor.submit(() -> {
+                try (Buf receive = send.receive()) {
+                    assertEquals(42, receive.readInt());
+                }
+            });
+            fut.get();
+            buf.writeInt(32);
+            assertEquals(32, buf.readInt());
+            assertEquals(64, bifA.readInt());
+            assertEquals(72, bifB.readInt());
         }
     }
 

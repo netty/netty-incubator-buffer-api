@@ -54,7 +54,7 @@ class SizeClassedMemoryPool implements Allocator, AllocatorControl, Drop<Buf> {
 
     protected Buf createBuf(int size, Drop<Buf> drop) {
         var buf = manager.allocateShared(this, size, drop, null);
-        drop.accept(buf);
+        drop.attach(buf);
         return buf;
     }
 
@@ -119,7 +119,7 @@ class SizeClassedMemoryPool implements Allocator, AllocatorControl, Drop<Buf> {
     public void recoverMemory(Object memory) {
         var drop = getDrop();
         var buf = manager.recoverMemory(memory, drop);
-        drop.accept(buf);
+        drop.attach(buf);
         buf.close();
     }
 

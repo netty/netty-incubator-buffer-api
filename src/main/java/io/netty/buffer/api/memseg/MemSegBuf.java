@@ -315,10 +315,47 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
             RecoverableMemory recoverableMemory = (RecoverableMemory) alloc.allocateUntethered(this, (int) newSize);
             var newSegment = recoverableMemory.segment;
             newSegment.copyFrom(seg);
-            alloc.recoverMemory(recoverableMemory()); // Release old memory segment.
+
+            // Release old memory segment:
+            var drop = unsafeGetDrop();
+            if (drop instanceof BifurcatedDrop) {
+                // Disconnect from the bifurcated drop, since we'll get our own fresh memory segment.
+                drop.drop(this);
+                drop = ((BifurcatedDrop<MemSegBuf>) drop).unwrap();
+                unsafeExchangeDrop(drop);
+            } else {
+                alloc.recoverMemory(recoverableMemory());
+            }
+
             seg = newSegment;
-            unsafeGetDrop().accept(this);
+            drop.attach(this);
         }
+    }
+
+    @Override
+    public Buf bifurcate() {
+        if (!isOwned()) {
+            throw new IllegalStateException("Cannot bifurcate a buffer that is not owned.");
+        }
+        var drop = unsafeGetDrop();
+        if (seg.ownerThread() != null) {
+            seg = seg.share();
+            drop.attach(this);
+        }
+        if (drop instanceof BifurcatedDrop) {
+            ((BifurcatedDrop<?>) drop).increment();
+        } else {
+            drop = unsafeExchangeDrop(new BifurcatedDrop<MemSegBuf>(new MemSegBuf(seg, drop, alloc), drop));
+        }
+        var bifurcatedSeg = seg.asSlice(0, woff);
+        var bifurcatedBuf = new MemSegBuf(bifurcatedSeg, drop, alloc);
+        bifurcatedBuf.woff = woff;
+        bifurcatedBuf.roff = roff;
+        bifurcatedBuf.order(order);
+        seg = seg.asSlice(woff, seg.byteSize() - woff);
+        woff = 0;
+        roff = 0;
+        return bifurcatedBuf;
     }
 
     // <editor-fold defaultstate="collapsed" desc="Primitive accessors implementation.">
