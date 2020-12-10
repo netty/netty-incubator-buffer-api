@@ -118,8 +118,7 @@ public abstract class RcSupport<I extends Rc<I>, T extends RcSupport<I, T>> impl
     }
 
     protected Drop<T> unsafeExchangeDrop(Drop<T> replacement) {
-        Objects.requireNonNull(replacement, "Replacement drop cannot be null.");
-        drop = replacement;
+        drop = Objects.requireNonNull(replacement, "Replacement drop cannot be null.");
         return replacement;
     }
 

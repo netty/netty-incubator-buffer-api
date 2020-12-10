@@ -17,45 +17,65 @@ package io.netty.buffer.api.memseg;
 
 import io.netty.buffer.api.Drop;
 
-public class BifurcatedDrop<T> implements Drop<T> {
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.VarHandle;
+
+class BifurcatedDrop<T> implements Drop<T> {
+    private static final VarHandle COUNT;
+    static {
+        try {
+            COUNT = MethodHandles.lookup().findVarHandle(BifurcatedDrop.class, "count", int.class);
+        } catch (Exception e) {
+            throw new ExceptionInInitializerError(e);
+        }
+    }
+
     private final T originalBuf;
     private final Drop<T> delegate;
-    private int count;
-    private Exception closeTrace;
+    @SuppressWarnings("FieldMayBeFinal")
+    private volatile int count;
 
-    public BifurcatedDrop(T originalBuf, Drop<T> delegate) {
+    BifurcatedDrop(T originalBuf, Drop<T> delegate) {
         this.originalBuf = originalBuf;
         this.delegate = delegate;
         count = 2; // These are created by buffer bifurcation, so we initially have 2 references to this drop.
     }
 
-    public synchronized void increment() {
-        checkValidState();
-        count++;
+    void increment() {
+        int c;
+        do {
+            c = count;
+            checkValidState(c);
+        } while (!COUNT.compareAndSet(this, c, c + 1));
     }
 
     @Override
     public synchronized void drop(T obj) {
-        checkValidState();
-        if (--count == 0) {
-            closeTrace = new Exception("close: " + delegate);
-            delegate.reconnect(originalBuf);
+        int c;
+        int n;
+        do {
+            c = count;
+            n = c - 1;
+            checkValidState(c);
+        } while (!COUNT.compareAndSet(this, c, n));
+        if (n == 0) {
+            delegate.attach(originalBuf);
             delegate.drop(originalBuf);
         }
     }
 
     @Override
-    public void reconnect(T obj) {
-        delegate.reconnect(obj);
+    public void attach(T obj) {
+        delegate.attach(obj);
     }
 
     Drop<T> unwrap() {
         return delegate;
     }
 
-    private void checkValidState() {
+    private static void checkValidState(int count) {
         if (count == 0) {
-            throw new IllegalStateException("Underlying resources have already been freed.", closeTrace);
+            throw new IllegalStateException("Underlying resources have already been freed.");
         }
     }
 }

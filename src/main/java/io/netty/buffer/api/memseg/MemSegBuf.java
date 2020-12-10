@@ -328,7 +328,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
             }
 
             seg = newSegment;
-            drop.reconnect(this);
+            drop.attach(this);
         }
     }
 
@@ -340,7 +340,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
         var drop = unsafeGetDrop();
         if (seg.ownerThread() != null) {
             seg = seg.share();
-            drop.reconnect(this);
+            drop.attach(this);
         }
         if (drop instanceof BifurcatedDrop) {
             ((BifurcatedDrop<?>) drop).increment();

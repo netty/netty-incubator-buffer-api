@@ -21,6 +21,7 @@ package io.netty.buffer.api;
  *
  * @param <T>
  */
+@FunctionalInterface
 public interface Drop<T> {
     /**
      * Dispose of the resources in the given Rc.
@@ -34,6 +35,6 @@ public interface Drop<T> {
      *
      * @param obj The new Rc instance with the new owner.
      */
-    default void reconnect(T obj) {
+    default void attach(T obj) {
     }
 }

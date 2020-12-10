@@ -49,7 +49,7 @@ class NativeMemoryCleanerDrop implements Drop<Buf> {
     }
 
     @Override
-    public void reconnect(Buf buf) {
+    public void attach(Buf buf) {
         // Unregister old cleanable, if any, to avoid uncontrolled build-up.
         GatedCleanable c = (GatedCleanable) CLEANABLE.getAndSet(this, null);
         if (c != null) {

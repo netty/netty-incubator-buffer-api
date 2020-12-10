@@ -37,7 +37,7 @@ class TransferSend<I extends Rc<I>, T extends Rc<I>> implements Send<I> {
     public I receive() {
         gateReception();
         var copy = outgoing.transferOwnership(drop);
-        drop.reconnect(copy);
+        drop.attach(copy);
         return (I) copy;
     }
 

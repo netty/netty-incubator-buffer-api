@@ -130,9 +130,11 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
 
     @Override
     public Buf order(ByteOrder order) {
-        this.order = order;
-        for (Buf buf : bufs) {
-            buf.order(order);
+        if (this.order != order) {
+            this.order = order;
+            for (Buf buf : bufs) {
+                buf.order(order);
+            }
         }
         return this;
     }
@@ -891,7 +893,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
                     received[i] = sends[i].receive();
                 }
                 var composite = new CompositeBuf(allocator, true, received, drop);
-                drop.reconnect(composite);
+                drop.attach(composite);
                 return composite;
             }
         };
