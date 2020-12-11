@@ -14,6 +14,7 @@ dbg:
 
 clean:
 	docker rm -fv build-container-dbg
+	docker rm -fv build-container
 
 build: image
 	docker create --name build-container netty-incubator-buffer:build
