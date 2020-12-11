@@ -322,7 +322,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
                 // Disconnect from the bifurcated drop, since we'll get our own fresh memory segment.
                 drop.drop(this);
                 drop = ((BifurcatedDrop<MemSegBuf>) drop).unwrap();
-                unsafeExchangeDrop(drop);
+                unsafeSetDrop(drop);
             } else {
                 alloc.recoverMemory(recoverableMemory());
             }
@@ -345,7 +345,8 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
         if (drop instanceof BifurcatedDrop) {
             ((BifurcatedDrop<?>) drop).increment();
         } else {
-            drop = unsafeExchangeDrop(new BifurcatedDrop<MemSegBuf>(new MemSegBuf(seg, drop, alloc), drop));
+            drop = new BifurcatedDrop<MemSegBuf>(new MemSegBuf(seg, drop, alloc), drop);
+            unsafeSetDrop(drop);
         }
         var bifurcatedSeg = seg.asSlice(0, woff);
         var bifurcatedBuf = new MemSegBuf(bifurcatedSeg, drop, alloc);
