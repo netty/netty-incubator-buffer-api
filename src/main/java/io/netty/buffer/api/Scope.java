@@ -30,7 +30,7 @@ import java.util.ArrayDeque;
  * <p>
  * Note that scopes are not thread-safe. They are intended to be used from a single thread.
  */
-public class Scope implements AutoCloseable {
+public final class Scope implements AutoCloseable {
     private final ArrayDeque<Rc<?>> deque = new ArrayDeque<>();
 
     /**

@@ -123,13 +123,22 @@ public interface Allocator extends AutoCloseable {
      * @param extension The buffer to extend the composite buffer with.
      */
     static void extend(Buf composite, Buf extension) {
-        if (composite.getClass() != CompositeBuf.class) {
+        if (!isComposite(composite)) {
             throw new IllegalArgumentException(
                     "Expected the first buffer to be a composite buffer, " +
                     "but it is a " + composite.getClass() + " buffer: " + composite + '.');
         }
         CompositeBuf buf = (CompositeBuf) composite;
         buf.extendWith(extension);
+    }
+
+    /**
+     * Check if the given buffer is a {@linkplain #compose(Buf...) composite} buffer or not.
+     * @param composite The buffer to check.
+     * @return {@code true} if the given buffer was created with {@link #compose(Buf...)}, {@code false} otherwise.
+     */
+    static boolean isComposite(Buf composite) {
+        return composite.getClass() == CompositeBuf.class;
     }
 
     /**

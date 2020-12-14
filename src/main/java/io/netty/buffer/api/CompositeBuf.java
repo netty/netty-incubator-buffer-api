@@ -31,6 +31,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
         for (Buf b : buf.bufs) {
             b.close();
         }
+        buf.makeInaccessible();
     };
 
     private final Allocator allocator;
@@ -43,6 +44,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
     private int woff;
     private int subOffset; // The next offset *within* a consituent buffer to read from or write to.
     private ByteOrder order;
+    private boolean closed;
 
     CompositeBuf(Allocator allocator, Buf[] bufs) {
         this(allocator, true, bufs.clone(), COMPOSITE_DROP); // Clone prevents external modification of array.
@@ -885,6 +887,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
             }
             throw throwable;
         }
+        makeInaccessible();
         return new Owned<CompositeBuf>() {
             @Override
             public CompositeBuf transferOwnership(Drop<CompositeBuf> drop) {
@@ -897,6 +900,13 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
                 return composite;
             }
         };
+    }
+
+    void makeInaccessible() {
+        capacity = 0;
+        roff = 0;
+        woff = 0;
+        closed = true;
     }
 
     @Override
@@ -979,7 +989,10 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
         }
     }
 
-    private IndexOutOfBoundsException indexOutOfBounds(int index) {
+    private RuntimeException indexOutOfBounds(int index) {
+        if (closed) {
+            return new IllegalStateException("This buffer is closed.");
+        }
         return new IndexOutOfBoundsException(
                 "Index " + index + " is out of bounds: [read 0 to " + woff + ", write 0 to " +
                 (capacity - 1) + "].");
