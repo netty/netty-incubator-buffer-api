@@ -384,6 +384,29 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
         return bifurcatedBuf;
     }
 
+    @Override
+    public void compact() {
+        if (!isOwned()) {
+            throw new IllegalStateException("Buffer must be owned in order to compact.");
+        }
+        int distance = roff;
+        if (distance == 0) {
+            return;
+        }
+        int pos = 0;
+        var cursor = openCursor();
+        while (cursor.readLong()) {
+            setLongAtOffset(seg, pos, ByteOrder.BIG_ENDIAN, cursor.getLong());
+            pos += Long.BYTES;
+        }
+        while (cursor.readByte()) {
+            setByteAtOffset(seg, pos, cursor.getByte());
+            pos++;
+        }
+        roff -= distance;
+        woff -= distance;
+    }
+
     // <editor-fold defaultstate="collapsed" desc="Primitive accessors implementation.">
     @Override
     public byte readByte() {

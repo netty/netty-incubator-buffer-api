@@ -2195,6 +2195,43 @@ public class BufTest {
         }
     }
 
+    @ParameterizedTest
+    @MethodSource("nonSliceAllocators")
+    public void compactMustDiscardReadBytes(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(16, ByteOrder.BIG_ENDIAN)) {
+            buf.writeLong(0x0102030405060708L).writeInt(0x090A0B0C);
+            assertEquals(0x01020304, buf.readInt());
+            assertEquals(12, buf.writerOffset());
+            assertEquals(4, buf.readerOffset());
+            assertEquals(4, buf.writableBytes());
+            assertEquals(8, buf.readableBytes());
+            assertEquals(16, buf.capacity());
+            buf.compact();
+            assertEquals(8, buf.writerOffset());
+            assertEquals(0, buf.readerOffset());
+            assertEquals(8, buf.writableBytes());
+            assertEquals(8, buf.readableBytes());
+            assertEquals(16, buf.capacity());
+            assertEquals(0x05060708090A0B0CL, buf.readLong());
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("nonSliceAllocators")
+    public void compactMustThrowForUnownedBuffer(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(8, ByteOrder.BIG_ENDIAN)) {
+            buf.writeLong(0x0102030405060708L);
+            assertEquals((byte) 0x01, buf.readByte());
+            try (Buf ignore = buf.acquire()) {
+                assertThrows(IllegalStateException.class, () -> buf.compact());
+                assertEquals(1, buf.readerOffset());
+            }
+            assertEquals((byte) 0x02, buf.readByte());
+        }
+    }
+
     // <editor-fold defaultstate="collapsed" desc="Primitive accessors tests.">
     @ParameterizedTest
     @MethodSource("allocators")

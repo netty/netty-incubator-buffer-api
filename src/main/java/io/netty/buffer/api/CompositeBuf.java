@@ -20,6 +20,9 @@ import java.nio.ByteOrder;
 import java.util.Arrays;
 import java.util.Objects;
 
+import static jdk.incubator.foreign.MemoryAccess.setByteAtOffset;
+import static jdk.incubator.foreign.MemoryAccess.setLongAtOffset;
+
 final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
     /**
      * The max array size is JVM implementation dependant, but most seem to settle on {@code Integer.MAX_VALUE - 8}.
@@ -598,6 +601,35 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
                 bif.close();
             }
         }
+    }
+
+    @Override
+    public void compact() {
+        if (!isOwned()) {
+            throw new IllegalStateException("Buffer must be owned in order to compact.");
+        }
+        int distance = roff;
+        if (distance == 0) {
+            return;
+        }
+        int pos = 0;
+        var oldOrder = order;
+        order = ByteOrder.BIG_ENDIAN;
+        try {
+            var cursor = openCursor();
+            while (cursor.readLong()) {
+                setLong(pos, cursor.getLong());
+                pos += Long.BYTES;
+            }
+            while (cursor.readByte()) {
+                setByte(pos, cursor.getByte());
+                pos++;
+            }
+        } finally {
+            order = oldOrder;
+        }
+        readerOffset(0);
+        writerOffset(woff - distance);
     }
 
     // <editor-fold defaultstate="collapsed" desc="Primitive accessors.">

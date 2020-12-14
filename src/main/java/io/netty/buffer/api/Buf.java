@@ -417,4 +417,11 @@ public interface Buf extends Rc<Buf>, BufAccessors {
      * @return A new buffer with independent and exclusive ownership over the read and readable bytes from this buffer.
      */
     Buf bifurcate();
+
+    /**
+     * Discards the read bytes, and moves the buffer contents to the beginning of the buffer.
+     *
+     * The buffer must be {@linkplain #isOwned() owned}, or an exception will be thrown.
+     */
+    void compact();
 }
