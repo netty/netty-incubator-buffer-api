@@ -393,16 +393,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
         if (distance == 0) {
             return;
         }
-        int pos = 0;
-        var cursor = openCursor();
-        while (cursor.readLong()) {
-            setLongAtOffset(seg, pos, ByteOrder.BIG_ENDIAN, cursor.getLong());
-            pos += Long.BYTES;
-        }
-        while (cursor.readByte()) {
-            setByteAtOffset(seg, pos, cursor.getByte());
-            pos++;
-        }
+        seg.copyFrom(seg.asSlice(roff, woff - roff));
         roff -= distance;
         woff -= distance;
     }
