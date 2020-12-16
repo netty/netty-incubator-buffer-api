@@ -86,12 +86,7 @@ public abstract class BufHolder<T extends BufHolder<T>> implements Rc<T> {
     @Override
     public Send<T> send() {
         var send = buf.send();
-        return new Send<T>() {
-            @Override
-            public T receive() {
-                return BufHolder.this.receive(send.receive());
-            }
-        };
+        return () -> receive(send.receive());
     }
 
     /**
@@ -116,7 +111,7 @@ public abstract class BufHolder<T extends BufHolder<T>> implements Rc<T> {
      *
      * @param newBuf The new {@link Buf} instance that is replacing the currently held buffer.
      */
-    protected void replace(Buf newBuf) {
+    protected final void replaceBuf(Buf newBuf) {
         try (var ignore = buf) {
             buf = newBuf.acquire();
         }
@@ -134,7 +129,7 @@ public abstract class BufHolder<T extends BufHolder<T>> implements Rc<T> {
      *
      * @param send The new {@link Buf} instance that is replacing the currently held buffer.
      */
-    protected void replace(Send<Buf> send) {
+    protected final void replaceBuf(Send<Buf> send) {
         try (var ignore = buf) {
             buf = send.receive();
         }
@@ -152,7 +147,7 @@ public abstract class BufHolder<T extends BufHolder<T>> implements Rc<T> {
      *
      * @param newBuf The new {@link Buf} instance that is replacing the currently held buffer.
      */
-    protected void replaceVolatile(Buf newBuf) {
+    protected final void replaceBufVolatile(Buf newBuf) {
         var prev = (Buf) BUF.getAndSet(this, newBuf.acquire());
         prev.close();
     }
@@ -167,9 +162,9 @@ public abstract class BufHolder<T extends BufHolder<T>> implements Rc<T> {
      * <p>
      * The buffer assignment is performed using a volatile store.
      *
-     * @param send The new {@link Buf} instance that is replacing the currently held buffer.
+     * @param send The {@link Send} with the new {@link Buf} instance that is replacing the currently held buffer.
      */
-    protected void replaceVolatile(Send<Buf> send) {
+    protected final void replaceBufVolatile(Send<Buf> send) {
         var prev = (Buf) BUF.getAndSet(this, send.receive());
         prev.close();
     }
@@ -181,7 +176,7 @@ public abstract class BufHolder<T extends BufHolder<T>> implements Rc<T> {
      *
      * @return The {@link Buf} instance being held by this {@linkplain T buffer holder}.
      */
-    protected Buf getBuf() {
+    protected final Buf getBuf() {
         return buf;
     }
 
@@ -192,7 +187,7 @@ public abstract class BufHolder<T extends BufHolder<T>> implements Rc<T> {
      *
      * @return The {@link Buf} instance being held by this {@linkplain T buffer holder}.
      */
-    protected Buf getBufVolatile() {
+    protected final Buf getBufVolatile() {
         return (Buf) BUF.getVolatile(this);
     }
 }

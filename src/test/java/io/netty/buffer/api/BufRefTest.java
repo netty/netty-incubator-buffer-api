@@ -60,7 +60,7 @@ class BufRefTest {
             assertThat(ref.contents().readInt()).isEqualTo(42);
 
             try (Buf buf = allocator.allocate(8)) {
-                ref.replaceVolatile(buf); // Pass replacement directly.
+                ref.replace(buf); // Pass replacement directly.
             }
 
             assertThrows(IllegalStateException.class, () -> orig.writeInt(32));
@@ -84,7 +84,7 @@ class BufRefTest {
             assertThat(ref.contents().readInt()).isEqualTo(42);
 
             try (Buf buf = allocator.allocate(8)) {
-                ref.replaceVolatile(buf.send()); // Pass replacement via send().
+                ref.replace(buf.send()); // Pass replacement via send().
             }
 
             assertThrows(IllegalStateException.class, () -> orig.writeInt(32));

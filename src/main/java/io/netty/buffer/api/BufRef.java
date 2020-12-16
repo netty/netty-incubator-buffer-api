@@ -49,14 +49,32 @@ public final class BufRef extends BufHolder<BufRef> {
         return new BufRef(buf);
     }
 
-    @Override
-    public void replaceVolatile(Buf newBuf) {
-        super.replaceVolatile(newBuf);
+    /**
+     * Replace the underlying referenced buffer with the given buffer.
+     * <p>
+     * <strong>Note:</strong> this method decreases the reference count of the current buffer,
+     * and increases the reference count of the new buffer.
+     * <p>
+     * The buffer assignment is performed using a volatile store.
+     *
+     * @param newBuf The new {@link Buf} instance that is replacing the currently held buffer.
+     */
+    public void replace(Buf newBuf) {
+        replaceBufVolatile(newBuf);
     }
 
-    @Override
-    public void replaceVolatile(Send<Buf> send) {
-        super.replaceVolatile(send);
+    /**
+     * Replace the underlying referenced buffer with the given buffer.
+     * <p>
+     * <strong>Note:</strong> this method decreases the reference count of the current buffer,
+     * and takes exclusive ownership of the sent buffer.
+     * <p>
+     * The buffer assignment is performed using a volatile store.
+     *
+     * @param send The {@link Send} with the new {@link Buf} instance that is replacing the currently held buffer.
+     */
+    public void replace(Send<Buf> send) {
+        replaceBufVolatile(send);
     }
 
     /**
