@@ -523,20 +523,54 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
     }
 
     @Override
-    public void ensureWritable(int size) {
+    public void ensureWritable(int size, boolean allowCompaction) {
         if (!isOwned()) {
             throw new IllegalStateException("Buffer is not owned. Only owned buffers can call ensureWritable.");
         }
         if (size < 0) {
             throw new IllegalArgumentException("Cannot ensure writable for a negative size: " + size + '.');
         }
-        if (writableBytes() < size) {
-            long newSize = capacity() + (long) size;
-            Allocator.checkSize(newSize);
-            int growth = size - writableBytes();
-            Buf extension = bufs.length == 0? allocator.allocate(growth) : allocator.allocate(growth, order());
-            unsafeExtendWith(extension);
+        if (writableBytes() >= size) {
+            // We already have enough space.
+            return;
         }
+
+        if (allowCompaction && size <= roff) {
+            // Let's see if we can solve some or all of the requested size with compaction.
+            // We always compact as much as is possible, regardless of size. This amortizes our work.
+            int compactableBuffers = 0;
+            for (Buf buf : bufs) {
+                if (buf.capacity() != buf.readerOffset()) {
+                    break;
+                }
+                compactableBuffers++;
+            }
+            if (compactableBuffers > 0) {
+                Buf[] compactable;
+                if (compactableBuffers < bufs.length) {
+                    compactable = new Buf[compactableBuffers];
+                    System.arraycopy(bufs, 0, compactable, 0, compactable.length);
+                    System.arraycopy(bufs, compactable.length, bufs, 0, bufs.length - compactable.length);
+                    System.arraycopy(compactable, 0, bufs, bufs.length - compactable.length, compactable.length);
+                } else {
+                    compactable = bufs;
+                }
+                for (Buf buf : compactable) {
+                    buf.reset();
+                }
+                computeBufferOffsets();
+                if (writableBytes() >= size) {
+                    // Now we have enough space.
+                    return;
+                }
+            }
+        }
+
+        long newSize = capacity() + (long) size;
+        Allocator.checkSize(newSize);
+        int growth = size - writableBytes();
+        Buf extension = bufs.length == 0? allocator.allocate(growth) : allocator.allocate(growth, order());
+        unsafeExtendWith(extension);
     }
 
     void extendWith(Buf extension) {

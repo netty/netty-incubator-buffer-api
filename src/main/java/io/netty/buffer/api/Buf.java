@@ -367,12 +367,53 @@ public interface Buf extends Rc<Buf>, BufAccessors {
      * If this buffer already has the necessary space, then this method returns immediately.
      * If this buffer does not already have the necessary space, then it will be expanded using the {@link Allocator}
      * the buffer was created with.
+     * This method is the same as calling {@link #ensureWritable(int, boolean)} where {@code allowCompaction} is
+     * {@code false}.
      *
      * @param size The requested number of bytes of space that should be available for writing.
      * @throws IllegalStateException if this buffer is not in an owned state.
-     * That is, if {@link #countBorrows()} is not {@code 0}.
+     * That is, if {@link #isOwned()} is {@code false}.
      */
-    void ensureWritable(int size);
+    default void ensureWritable(int size) {
+        ensureWritable(size, true);
+    }
+
+    /**
+     * Ensure that this buffer has {@linkplain #writableBytes() available space for writing} the given number of
+     * bytes.
+     * The buffer must be in {@linkplain #isOwned() an owned state}, or an exception will be thrown.
+     * If this buffer already has the necessary space, then this method returns immediately.
+     * If this buffer does not already have the necessary space, then space will be made available in one or all of
+     * the following available ways:
+     *
+     * <ul>
+     *     <li>
+     *         If {@code allowCompaction} is {@code true}, and sum of the read and writable bytes would be enough to
+     *         satisfy the request, and it (depending on the buffer implementation) seems faster and easier to compact
+     *         the existing buffer rather than allocation a new buffer, then the requested bytes will be made available
+     *         that way. The compaction will not necessarily work the same way as the {@link #compact()} method, as the
+     *         implementation may be able to make the requested bytes available with less effort than is strictly
+     *         mandated by the {@link #compact()} method.
+     *     </li>
+     *     <li>
+     *         Regardless of the value of the {@code allowCompaction}, the implementation may make more space available
+     *         by just allocating more or larger buffers. This allocation would use the same {@link Allocator} that this
+     *         buffer was created with.
+     *     </li>
+     *     <li>
+     *         If {@code allowCompaction} is {@code true}, then the implementation may choose to do a combination of
+     *         compaction and allocation.
+     *     </li>
+     * </ul>
+     *
+     * @param size The requested number of bytes of space that should be available for writing.
+     * @param allowCompaction {@code true} if the method is allowed to modify the
+     *                                   {@linkplain #readerOffset() reader offset} and
+     *                                   {@linkplain #writerOffset() writer offset}, otherwise {@code false}.
+     * @throws IllegalStateException if this buffer is not in an owned state.
+     * That is, if {@link #isOwned()} is {@code false}.
+     */
+    void ensureWritable(int size, boolean allowCompaction);
 
     /**
      * Split the buffer into two, at the {@linkplain #writerOffset() write offset} position.

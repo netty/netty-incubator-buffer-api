@@ -323,38 +323,50 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
     }
 
     @Override
-    public void ensureWritable(int size) {
+    public void ensureWritable(int size, boolean allowCompaction) {
         if (!isOwned()) {
             throw new IllegalStateException("Buffer is not owned. Only owned buffers can call ensureWritable.");
         }
         if (size < 0) {
             throw new IllegalArgumentException("Cannot ensure writable for a negative size: " + size + '.');
         }
-        if (writableBytes() < size) {
-            long newSize = capacity() + size - (long) writableBytes();
-            Allocator.checkSize(newSize);
-            RecoverableMemory recoverableMemory = (RecoverableMemory) alloc.allocateUntethered(this, (int) newSize);
-            var newSegment = recoverableMemory.segment;
-            newSegment.copyFrom(seg);
-
-            // Release old memory segment:
-            var drop = unsafeGetDrop();
-            if (drop instanceof BifurcatedDrop) {
-                // Disconnect from the bifurcated drop, since we'll get our own fresh memory segment.
-                int roff = this.roff;
-                int woff = this.woff;
-                drop.drop(this);
-                drop = ((BifurcatedDrop) drop).unwrap();
-                unsafeSetDrop(drop);
-                this.roff = roff;
-                this.woff = woff;
-            } else {
-                alloc.recoverMemory(recoverableMemory());
-            }
-
-            seg = newSegment;
-            drop.attach(this);
+        if (writableBytes() >= size) {
+            // We already have enough space.
+            return;
         }
+
+        if (allowCompaction && writableBytes() + readerOffset() >= size) {
+            // We can solve this with compaction.
+            compact();
+            return;
+        }
+
+        // Allocate a bigger buffer.
+        long newSize = capacity() + size - (long) writableBytes();
+        Allocator.checkSize(newSize);
+        RecoverableMemory recoverableMemory = (RecoverableMemory) alloc.allocateUntethered(this, (int) newSize);
+        var newSegment = recoverableMemory.segment;
+
+        // Copy contents.
+        newSegment.copyFrom(seg);
+
+        // Release old memory segment:
+        var drop = unsafeGetDrop();
+        if (drop instanceof BifurcatedDrop) {
+            // Disconnect from the bifurcated drop, since we'll get our own fresh memory segment.
+            int roff = this.roff;
+            int woff = this.woff;
+            drop.drop(this);
+            drop = ((BifurcatedDrop) drop).unwrap();
+            unsafeSetDrop(drop);
+            this.roff = roff;
+            this.woff = woff;
+        } else {
+            alloc.recoverMemory(recoverableMemory());
+        }
+
+        seg = newSegment;
+        drop.attach(this);
     }
 
     @Override
