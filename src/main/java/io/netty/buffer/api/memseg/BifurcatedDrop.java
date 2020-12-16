@@ -50,7 +50,7 @@ class BifurcatedDrop implements Drop<MemSegBuf> {
     }
 
     @Override
-    public synchronized void drop(MemSegBuf buf) {
+    public void drop(MemSegBuf buf) {
         int c;
         int n;
         do {

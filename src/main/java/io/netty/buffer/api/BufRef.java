@@ -29,6 +29,7 @@ public final class BufRef extends BufHolder<BufRef> {
      */
     public BufRef(Buf buf) {
         super(buf);
+        // BufRef is meant to be atomic, so we need to add a fence to get the semantics of a volatile store.
         VarHandle.fullFence();
     }
 
@@ -39,6 +40,7 @@ public final class BufRef extends BufHolder<BufRef> {
      */
     public BufRef(Send<Buf> send) {
         super(send);
+        // BufRef is meant to be atomic, so we need to add a fence to get the semantics of a volatile store.
         VarHandle.fullFence();
     }
 
