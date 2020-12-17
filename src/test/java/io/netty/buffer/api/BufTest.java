@@ -383,7 +383,7 @@ public class BufTest {
         }
     }
 
-    private void verifyInaccessible(Buf buf) {
+    private static void verifyInaccessible(Buf buf) {
         assertThrows(IllegalStateException.class, () -> buf.readByte());
         assertThrows(IllegalStateException.class, () -> buf.readUnsignedByte());
         assertThrows(IllegalStateException.class, () -> buf.readChar());
@@ -1690,6 +1690,29 @@ public class BufTest {
     }
 
     @ParameterizedTest
+    @MethodSource("nonSliceAllocators")
+    public void ensureWritableWithCompactionMustNotAllocateIfCompactionIsEnough(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(64)) {
+            while (buf.writableBytes() > 0) {
+                buf.writeByte((byte) 42);
+            }
+            while (buf.readableBytes() > 0) {
+                buf.readByte();
+            }
+            buf.ensureWritable(4, true);
+            buf.writeInt(42);
+            assertThat(buf.capacity()).isEqualTo(64);
+
+            buf.writerOffset(60).readerOffset(60);
+            buf.ensureWritable(8, true);
+            buf.writeLong(42);
+            // Don't assert the capacity on this one, because single-component
+            // composite buffers may choose to allocate rather than compact.
+        }
+    }
+
+    @ParameterizedTest
     @MethodSource("allocators")
     public void pooledBuffersMustResetStateBeforeReuse(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
@@ -2139,7 +2162,7 @@ public class BufTest {
         }
     }
 
-    private void verifyBifurcateEmptyCompositeBuffer(Buf buf) {
+    private static void verifyBifurcateEmptyCompositeBuffer(Buf buf) {
         try (Buf a = buf.bifurcate()) {
             a.ensureWritable(4);
             buf.ensureWritable(4);
@@ -2192,6 +2215,43 @@ public class BufTest {
             assertEquals(32, buf.readInt());
             assertEquals(64, bifA.readInt());
             assertEquals(72, bifB.readInt());
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("nonSliceAllocators")
+    public void compactMustDiscardReadBytes(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(16, ByteOrder.BIG_ENDIAN)) {
+            buf.writeLong(0x0102030405060708L).writeInt(0x090A0B0C);
+            assertEquals(0x01020304, buf.readInt());
+            assertEquals(12, buf.writerOffset());
+            assertEquals(4, buf.readerOffset());
+            assertEquals(4, buf.writableBytes());
+            assertEquals(8, buf.readableBytes());
+            assertEquals(16, buf.capacity());
+            buf.compact();
+            assertEquals(8, buf.writerOffset());
+            assertEquals(0, buf.readerOffset());
+            assertEquals(8, buf.writableBytes());
+            assertEquals(8, buf.readableBytes());
+            assertEquals(16, buf.capacity());
+            assertEquals(0x05060708090A0B0CL, buf.readLong());
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("nonSliceAllocators")
+    public void compactMustThrowForUnownedBuffer(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(8, ByteOrder.BIG_ENDIAN)) {
+            buf.writeLong(0x0102030405060708L);
+            assertEquals((byte) 0x01, buf.readByte());
+            try (Buf ignore = buf.acquire()) {
+                assertThrows(IllegalStateException.class, () -> buf.compact());
+                assertEquals(1, buf.readerOffset());
+            }
+            assertEquals((byte) 0x02, buf.readByte());
         }
     }
 
