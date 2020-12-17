@@ -150,14 +150,10 @@ public interface Allocator extends AutoCloseable {
     }
 
     static Allocator heap() {
-        return new ManagedAllocator(MemoryManager.getHeapMemoryManager(), null);
+        return new ManagedAllocator(MemoryManager.getHeapMemoryManager(), Statics.CLEANER);
     }
 
     static Allocator direct() {
-        return new ManagedAllocator(MemoryManager.getNativeMemoryManager(), null);
-    }
-
-    static Allocator directWithCleaner() {
         return new ManagedAllocator(MemoryManager.getNativeMemoryManager(), Statics.CLEANER);
     }
 
@@ -167,14 +163,5 @@ public interface Allocator extends AutoCloseable {
 
     static Allocator pooledDirect() {
         return new SizeClassedMemoryPool(MemoryManager.getNativeMemoryManager());
-    }
-
-    static Allocator pooledDirectWithCleaner() {
-        return new SizeClassedMemoryPool(MemoryManager.getNativeMemoryManager()) {
-            @Override
-            protected Drop<Buf> getDrop() {
-                return new NativeMemoryCleanerDrop(this, getMemoryManager(), super.getDrop());
-            }
-        };
     }
 }
