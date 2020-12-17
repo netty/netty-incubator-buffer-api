@@ -15,17 +15,17 @@
  */
 package io.netty.buffer.api;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class ScopeTest {
     @Test
-    public void scopeMustCloseContainedRcsInReverseInsertOrder() {
+    void scopeMustCloseContainedRcsInReverseInsertOrder() {
         ArrayList<Integer> closeOrder = new ArrayList<>();
         try (Scope scope = new Scope()) {
             scope.add(new SomeRc(new OrderingDrop(1, closeOrder)));

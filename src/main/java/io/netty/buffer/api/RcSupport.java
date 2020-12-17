@@ -16,7 +16,6 @@
 package io.netty.buffer.api;
 
 import java.util.Objects;
-import java.util.function.Function;
 
 public abstract class RcSupport<I extends Rc<I>, T extends RcSupport<I, T>> implements Rc<I> {
     private int acquires; // Closed if negative.
@@ -83,6 +82,11 @@ public abstract class RcSupport<I extends Rc<I>, T extends RcSupport<I, T>> impl
         return new TransferSend<I, T>(owned, drop);
     }
 
+    /**
+     * Create an {@link IllegalStateException} with a custom message, tailored to this particular {@link Rc} instance,
+     * for when the object cannot be sent for some reason.
+     * @return An {@link IllegalStateException} to be thrown when this object cannot be sent.
+     */
     protected IllegalStateException notSendableException() {
         return new IllegalStateException(
                 "Cannot send() a reference counted object with " + acquires + " outstanding acquires: " + this + '.');
@@ -111,15 +115,21 @@ public abstract class RcSupport<I extends Rc<I>, T extends RcSupport<I, T>> impl
     /**
      * Get access to the underlying {@link Drop} object.
      * This method is unsafe because it open the possibility of bypassing and overriding resource lifetimes.
+     *
      * @return The {@link Drop} object used by this reference counted object.
      */
     protected Drop<T> unsafeGetDrop() {
         return drop;
     }
 
-    protected Drop<T> unsafeExchangeDrop(Drop<T> replacement) {
+    /**
+     * Replace the current underlying {@link Drop} object with the given one.
+     * This method is unsafe because it open the possibility of bypassing and overring resource lifetimes.
+     *
+     * @param replacement The new {@link Drop} object to use instead of the current one.
+     */
+    protected void unsafeSetDrop(Drop<T> replacement) {
         drop = Objects.requireNonNull(replacement, "Replacement drop cannot be null.");
-        return replacement;
     }
 
     @SuppressWarnings("unchecked")
