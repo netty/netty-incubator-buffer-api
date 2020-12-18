@@ -34,13 +34,15 @@ import java.util.concurrent.TimeUnit;
 
 import static java.util.concurrent.CompletableFuture.completedFuture;
 
-@Warmup(iterations = 30, time = 1)
-@Measurement(iterations = 30, time = 1)
+@Warmup(iterations = 15, time = 1)
+@Measurement(iterations = 15, time = 1)
 @Fork(value = 5, jvmArgsAppend = { "-XX:+UnlockDiagnosticVMOptions", "-XX:+DebugNonSafepoints" })
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
 @State(Scope.Benchmark)
 public class MemorySegmentClosedByCleanerBenchmark {
+    private static final Allocator heap = Allocator.heap();
+    private static final Allocator heapPooled = Allocator.pooledHeap();
     private static final Allocator direct = Allocator.direct();
     private static final Allocator directPooled = Allocator.pooledDirect();
 
@@ -60,14 +62,28 @@ public class MemorySegmentClosedByCleanerBenchmark {
     }
 
     @Benchmark
-    public Buf explicitClose() throws Exception {
+    public Buf explicitCloseHeap() throws Exception {
+        try (Buf buf = process(heap.allocate(256))) {
+            return buf;
+        }
+    }
+
+    @Benchmark
+    public Buf explicitPooledCloseHeap() throws Exception {
+        try (Buf buf = process(heapPooled.allocate(256))) {
+            return buf;
+        }
+    }
+
+    @Benchmark
+    public Buf explicitCloseDirect() throws Exception {
         try (Buf buf = process(direct.allocate(256))) {
             return buf;
         }
     }
 
     @Benchmark
-    public Buf explicitPooledClose() throws Exception {
+    public Buf explicitPooledCloseDirect() throws Exception {
         try (Buf buf = process(directPooled.allocate(256))) {
             return buf;
         }
