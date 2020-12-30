@@ -68,11 +68,9 @@ public class BufTest {
     static List<Fixture> initialAllocators() {
         return List.of(
                 new Fixture("heap", Allocator::heap, HEAP),
-                new Fixture("direct", Allocator::direct, DIRECT),
-                new Fixture("directWithCleaner", Allocator::directWithCleaner, DIRECT, CLEANER),
+                new Fixture("direct", Allocator::direct, DIRECT, CLEANER),
                 new Fixture("pooledHeap", Allocator::pooledHeap, POOLED, HEAP),
-                new Fixture("pooledDirect", Allocator::pooledDirect, POOLED, DIRECT),
-                new Fixture("pooledDirectWithCleaner", Allocator::pooledDirectWithCleaner, POOLED, DIRECT, CLEANER));
+                new Fixture("pooledDirect", Allocator::pooledDirect, POOLED, DIRECT, CLEANER));
     }
 
     static Stream<Fixture> nonSliceAllocators() {
@@ -87,16 +85,8 @@ public class BufTest {
         return fixtureCombinations().filter(Fixture::isDirect);
     }
 
-    static Stream<Fixture> directWithCleanerAllocators() {
-        return fixtureCombinations().filter(f -> f.isDirect() && f.isCleaner());
-    }
-
-    static Stream<Fixture> directPooledWithCleanerAllocators() {
+    static Stream<Fixture> directPooledAllocators() {
         return fixtureCombinations().filter(f -> f.isDirect() && f.isCleaner() && f.isPooled());
-    }
-
-    static Stream<Fixture> poolingAllocators() {
-        return fixtureCombinations().filter(f -> f.isPooled());
     }
 
     private static Stream<Fixture> fixtureCombinations() {
@@ -1496,7 +1486,7 @@ public class BufTest {
     class CleanerTests {
         @Disabled("Precise native memory accounting does not work since recent panama-foreign changes.")
         @ParameterizedTest
-        @MethodSource("io.netty.buffer.api.BufTest#directWithCleanerAllocators")
+        @MethodSource("io.netty.buffer.api.BufTest#directAllocators")
         public void bufferMustBeClosedByCleaner(Fixture fixture) throws InterruptedException {
             var allocator = fixture.createAllocator();
             allocator.close();
@@ -1518,7 +1508,7 @@ public class BufTest {
 
         @Disabled("Precise native memory accounting does not work since recent panama-foreign changes.")
         @ParameterizedTest
-        @MethodSource("io.netty.buffer.api.BufTest#directPooledWithCleanerAllocators")
+        @MethodSource("io.netty.buffer.api.BufTest#directPooledAllocators")
         public void buffersMustBeReusedByPoolingAllocatorEvenWhenDroppedByCleanerInsteadOfExplicitly(Fixture fixture)
                 throws InterruptedException {
             try (var allocator = fixture.createAllocator()) {

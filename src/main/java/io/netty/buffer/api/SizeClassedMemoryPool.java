@@ -59,7 +59,7 @@ class SizeClassedMemoryPool implements Allocator, AllocatorControl, Drop<Buf> {
     }
 
     protected Drop<Buf> getDrop() {
-        return this;
+        return new CleanerPooledDrop(this, getMemoryManager(), this);
     }
 
     @Override

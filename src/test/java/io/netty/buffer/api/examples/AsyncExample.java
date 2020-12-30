@@ -22,7 +22,7 @@ import static java.util.concurrent.CompletableFuture.completedFuture;
 
 public final class AsyncExample {
     public static void main(String[] args) throws Exception {
-        try (Allocator allocator = Allocator.pooledDirectWithCleaner();
+        try (Allocator allocator = Allocator.pooledDirect();
              Buf startBuf = allocator.allocate(16)) {
             startBuf.writeLong(threadId());
 

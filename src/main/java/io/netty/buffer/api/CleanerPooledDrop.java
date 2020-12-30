@@ -24,17 +24,17 @@ import static io.netty.buffer.api.Statics.CLEANER;
 import static io.netty.buffer.api.Statics.findVarHandle;
 import static java.lang.invoke.MethodHandles.lookup;
 
-class NativeMemoryCleanerDrop implements Drop<Buf> {
+class CleanerPooledDrop implements Drop<Buf> {
     private static final VarHandle CLEANABLE =
-            findVarHandle(lookup(), NativeMemoryCleanerDrop.class, "cleanable", GatedCleanable.class);
+            findVarHandle(lookup(), CleanerPooledDrop.class, "cleanable", GatedCleanable.class);
     private final SizeClassedMemoryPool pool;
     private final MemoryManager manager;
     private final Drop<Buf> delegate;
     @SuppressWarnings("unused")
     private volatile GatedCleanable cleanable;
 
-    NativeMemoryCleanerDrop(SizeClassedMemoryPool pool, MemoryManager manager,
-                            Drop<Buf> delegate) {
+    CleanerPooledDrop(SizeClassedMemoryPool pool, MemoryManager manager,
+                      Drop<Buf> delegate) {
         this.pool = pool;
         this.manager = manager;
         this.delegate = delegate;
