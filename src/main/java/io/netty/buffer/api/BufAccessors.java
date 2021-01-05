@@ -43,7 +43,7 @@ public interface BufAccessors {
      * @param roff The read offset, an absolute offset into this buffer, to read from.
      * @return The byte value at the given offset.
      * @throws IndexOutOfBoundsException if the given offset is out of bounds of the buffer, that is, less than 0 or
-     *                                   greater than or equal to {@link Buf#capacity()} minus {@link Byte#BYTES}.
+     *                                   greater than {@link Buf#capacity()} minus {@link Byte#BYTES}.
      */
     byte getByte(int roff);
 
@@ -67,7 +67,7 @@ public interface BufAccessors {
      * @param roff The read offset, an absolute offset into this buffer, to read from.
      * @return The unsigned byte value at the given offset.
      * @throws IndexOutOfBoundsException if the given offset is out of bounds of the buffer, that is, less than 0 or
-     *                                   greater than or equal to {@link Buf#capacity()} minus {@link Byte#BYTES}.
+     *                                   greater than {@link Buf#capacity()} minus {@link Byte#BYTES}.
      */
     int getUnsignedByte(int roff);
 
@@ -92,7 +92,7 @@ public interface BufAccessors {
      * @param value The byte value to write.
      * @return This Buf.
      * @throws IndexOutOfBoundsException if the given offset is out of bounds of the buffer, that is, less than 0 or
-     *                                   greater than or equal to {@link Buf#capacity()} minus {@link Byte#BYTES}.
+     *                                   greater than {@link Buf#capacity()} minus {@link Byte#BYTES}.
      */
     Buf setByte(int woff, byte value);
 
@@ -117,7 +117,7 @@ public interface BufAccessors {
      * @param value The int value to write.
      * @return This Buf.
      * @throws IndexOutOfBoundsException if the given offset is out of bounds of the buffer, that is, less than 0 or
-     *                                   greater than or equal to {@link Buf#capacity()} minus {@link Byte#BYTES}.
+     *                                   greater than {@link Buf#capacity()} minus {@link Byte#BYTES}.
      */
     Buf setUnsignedByte(int woff, int value);
 
@@ -141,7 +141,7 @@ public interface BufAccessors {
      * @param roff The read offset, an absolute offset into this buffer, to read from.
      * @return The char value at the given offset.
      * @throws IndexOutOfBoundsException if the given offset is out of bounds of the buffer, that is, less than 0 or
-     *                                   greater than or equal to {@link Buf#capacity()} minus 2.
+     *                                   greater than {@link Buf#capacity()} minus 2.
      */
     char getChar(int roff);
 
@@ -166,7 +166,7 @@ public interface BufAccessors {
      * @param value The char value to write.
      * @return This Buf.
      * @throws IndexOutOfBoundsException if the given offset is out of bounds of the buffer, that is, less than 0 or
-     *                                   greater than or equal to {@link Buf#capacity()} minus 2.
+     *                                   greater than {@link Buf#capacity()} minus 2.
      */
     Buf setChar(int woff, char value);
 
@@ -190,7 +190,7 @@ public interface BufAccessors {
      * @param roff The read offset, an absolute offset into this buffer, to read from.
      * @return The short value at the given offset.
      * @throws IndexOutOfBoundsException if the given offset is out of bounds of the buffer, that is, less than 0 or
-     *                                   greater than or equal to {@link Buf#capacity()} minus {@link Short#BYTES}.
+     *                                   greater than {@link Buf#capacity()} minus {@link Short#BYTES}.
      */
     short getShort(int roff);
 
@@ -214,7 +214,7 @@ public interface BufAccessors {
      * @param roff The read offset, an absolute offset into this buffer, to read from.
      * @return The unsigned short value at the given offset.
      * @throws IndexOutOfBoundsException if the given offset is out of bounds of the buffer, that is, less than 0 or
-     *                                   greater than or equal to {@link Buf#capacity()} minus {@link Short#BYTES}.
+     *                                   greater than {@link Buf#capacity()} minus {@link Short#BYTES}.
      */
     int getUnsignedShort(int roff);
 
@@ -239,7 +239,7 @@ public interface BufAccessors {
      * @param value The short value to write.
      * @return This Buf.
      * @throws IndexOutOfBoundsException if the given offset is out of bounds of the buffer, that is, less than 0 or
-     *                                   greater than or equal to {@link Buf#capacity()} minus {@link Short#BYTES}.
+     *                                   greater than {@link Buf#capacity()} minus {@link Short#BYTES}.
      */
     Buf setShort(int woff, short value);
 
@@ -264,7 +264,7 @@ public interface BufAccessors {
      * @param value The int value to write.
      * @return This Buf.
      * @throws IndexOutOfBoundsException if the given offset is out of bounds of the buffer, that is, less than 0 or
-     *                                   greater than or equal to {@link Buf#capacity()} minus {@link Short#BYTES}.
+     *                                   greater than {@link Buf#capacity()} minus {@link Short#BYTES}.
      */
     Buf setUnsignedShort(int woff, int value);
 
@@ -288,7 +288,7 @@ public interface BufAccessors {
      * @param roff The read offset, an absolute offset into this buffer, to read from.
      * @return The int value at the given offset.
      * @throws IndexOutOfBoundsException if the given offset is out of bounds of the buffer, that is, less than 0 or
-     *                                   greater than or equal to {@link Buf#capacity()} minus 3.
+     *                                   greater than {@link Buf#capacity()} minus 3.
      */
     int getMedium(int roff);
 
@@ -312,7 +312,7 @@ public interface BufAccessors {
      * @param roff The read offset, an absolute offset into this buffer, to read from.
      * @return The unsigned int value at the given offset.
      * @throws IndexOutOfBoundsException if the given offset is out of bounds of the buffer, that is, less than 0 or
-     *                                   greater than or equal to {@link Buf#capacity()} minus 3.
+     *                                   greater than {@link Buf#capacity()} minus 3.
      */
     int getUnsignedMedium(int roff);
 
@@ -337,7 +337,7 @@ public interface BufAccessors {
      * @param value The int value to write.
      * @return This Buf.
      * @throws IndexOutOfBoundsException if the given offset is out of bounds of the buffer, that is, less than 0 or
-     *                                   greater than or equal to {@link Buf#capacity()} minus 3.
+     *                                   greater than {@link Buf#capacity()} minus 3.
      */
     Buf setMedium(int woff, int value);
 
@@ -362,7 +362,7 @@ public interface BufAccessors {
      * @param value The int value to write.
      * @return This Buf.
      * @throws IndexOutOfBoundsException if the given offset is out of bounds of the buffer, that is, less than 0 or
-     *                                   greater than or equal to {@link Buf#capacity()} minus 3.
+     *                                   greater than {@link Buf#capacity()} minus 3.
      */
     Buf setUnsignedMedium(int woff, int value);
 
@@ -386,7 +386,7 @@ public interface BufAccessors {
      * @param roff The read offset, an absolute offset into this buffer, to read from.
      * @return The int value at the given offset.
      * @throws IndexOutOfBoundsException if the given offset is out of bounds of the buffer, that is, less than 0 or
-     *                                   greater than or equal to {@link Buf#capacity()} minus {@link Integer#BYTES}.
+     *                                   greater than {@link Buf#capacity()} minus {@link Integer#BYTES}.
      */
     int getInt(int roff);
 
@@ -410,7 +410,7 @@ public interface BufAccessors {
      * @param roff The read offset, an absolute offset into this buffer, to read from.
      * @return The unsigned int value at the given offset.
      * @throws IndexOutOfBoundsException if the given offset is out of bounds of the buffer, that is, less than 0 or
-     *                                   greater than or equal to {@link Buf#capacity()} minus {@link Integer#BYTES}.
+     *                                   greater than {@link Buf#capacity()} minus {@link Integer#BYTES}.
      */
     long getUnsignedInt(int roff);
 
@@ -435,7 +435,7 @@ public interface BufAccessors {
      * @param value The int value to write.
      * @return This Buf.
      * @throws IndexOutOfBoundsException if the given offset is out of bounds of the buffer, that is, less than 0 or
-     *                                   greater than or equal to {@link Buf#capacity()} minus {@link Integer#BYTES}.
+     *                                   greater than {@link Buf#capacity()} minus {@link Integer#BYTES}.
      */
     Buf setInt(int woff, int value);
 
@@ -460,7 +460,7 @@ public interface BufAccessors {
      * @param value The long value to write.
      * @return This Buf.
      * @throws IndexOutOfBoundsException if the given offset is out of bounds of the buffer, that is, less than 0 or
-     *                                   greater than or equal to {@link Buf#capacity()} minus {@link Integer#BYTES}.
+     *                                   greater than {@link Buf#capacity()} minus {@link Integer#BYTES}.
      */
     Buf setUnsignedInt(int woff, long value);
 
@@ -484,7 +484,7 @@ public interface BufAccessors {
      * @param roff The read offset, an absolute offset into this buffer, to read from.
      * @return The float value at the given offset.
      * @throws IndexOutOfBoundsException if the given offset is out of bounds of the buffer, that is, less than 0 or
-     *                                   greater than or equal to {@link Buf#capacity()} minus {@link Float#BYTES}.
+     *                                   greater than {@link Buf#capacity()} minus {@link Float#BYTES}.
      */
     float getFloat(int roff);
 
@@ -509,7 +509,7 @@ public interface BufAccessors {
      * @param value The float value to write.
      * @return This Buf.
      * @throws IndexOutOfBoundsException if the given offset is out of bounds of the buffer, that is, less than 0 or
-     *                                   greater than or equal to {@link Buf#capacity()} minus {@link Float#BYTES}.
+     *                                   greater than {@link Buf#capacity()} minus {@link Float#BYTES}.
      */
     Buf setFloat(int woff, float value);
 
@@ -533,7 +533,7 @@ public interface BufAccessors {
      * @param roff The read offset, an absolute offset into this buffer, to read from.
      * @return The long value at the given offset.
      * @throws IndexOutOfBoundsException if the given offset is out of bounds of the buffer, that is, less than 0 or
-     *                                   greater than or equal to {@link Buf#capacity()} minus {@link Long#BYTES}.
+     *                                   greater than {@link Buf#capacity()} minus {@link Long#BYTES}.
      */
     long getLong(int roff);
 
@@ -558,7 +558,7 @@ public interface BufAccessors {
      * @param value The long value to write.
      * @return This Buf.
      * @throws IndexOutOfBoundsException if the given offset is out of bounds of the buffer, that is, less than 0 or
-     *                                   greater than or equal to {@link Buf#capacity()} minus {@link Long#BYTES}.
+     *                                   greater than {@link Buf#capacity()} minus {@link Long#BYTES}.
      */
     Buf setLong(int woff, long value);
 
@@ -582,7 +582,7 @@ public interface BufAccessors {
      * @param roff The read offset, an absolute offset into this buffer, to read from.
      * @return The double value at the given offset.
      * @throws IndexOutOfBoundsException if the given offset is out of bounds of the buffer, that is, less than 0 or
-     *                                   greater than or equal to {@link Buf#capacity()} minus {@link Double#BYTES}.
+     *                                   greater than {@link Buf#capacity()} minus {@link Double#BYTES}.
      */
     double getDouble(int roff);
 
@@ -607,7 +607,7 @@ public interface BufAccessors {
      * @param value The double value to write.
      * @return This Buf.
      * @throws IndexOutOfBoundsException if the given offset is out of bounds of the buffer, that is, less than 0 or
-     *                                   greater than or equal to {@link Buf#capacity()} minus {@link Double#BYTES}.
+     *                                   greater than {@link Buf#capacity()} minus {@link Double#BYTES}.
      */
     Buf setDouble(int woff, double value);
     // </editor-fold>
