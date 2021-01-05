@@ -59,6 +59,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
     private final AllocatorControl alloc;
     private final boolean isSendable;
     private MemorySegment seg;
+    private MemorySegment wseg;
     private ByteOrder order;
     private int roff;
     private int woff;
@@ -71,6 +72,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
         super(drop);
         this.alloc = alloc;
         seg = segment;
+        wseg = segment;
         this.isSendable = isSendable;
         order = ByteOrder.nativeOrder();
     }
@@ -122,6 +124,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
 
     @Override
     public Buf fill(byte value) {
+        checkWrite(0, capacity());
         seg.fill(value);
         return this;
     }
@@ -136,6 +139,17 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
     }
 
     @Override
+    public Buf readOnly(boolean readOnly) {
+        wseg = readOnly? CLOSED_SEGMENT : seg;
+        return this;
+    }
+
+    @Override
+    public boolean readOnly() {
+        return wseg == CLOSED_SEGMENT && seg != CLOSED_SEGMENT;
+    }
+
+    @Override
     public Buf slice(int offset, int length) {
         if (length < 0) {
             throw new IllegalArgumentException("Length cannot be negative: " + length + '.');
@@ -147,7 +161,10 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
             b.makeInaccessible();
         };
         var sendable = false; // Sending implies ownership change, which we can't do for slices.
-        return new MemSegBuf(slice, drop, alloc, sendable).writerOffset(length).order(order());
+        return new MemSegBuf(slice, drop, alloc, sendable)
+                .writerOffset(length)
+                .order(order())
+                .readOnly(readOnly());
     }
 
     @Override
@@ -165,12 +182,31 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
     }
 
     private void copyInto(int srcPos, MemorySegment dest, int destPos, int length) {
+        if (seg == CLOSED_SEGMENT) {
+            throw bufferIsClosed();
+        }
+        if (srcPos < 0) {
+            throw new IllegalArgumentException("The srcPos cannot be negative: " + srcPos + '.');
+        }
+        if (length < 0) {
+            throw new IllegalArgumentException("The length cannot be negative: " + length + '.');
+        }
+        if (seg.byteSize() < srcPos + length) {
+            throw new IllegalArgumentException("The srcPos + length is beyond the end of the buffer: " +
+                                               "srcPos = " + srcPos + ", length = " + length + '.');
+        }
         dest.asSlice(destPos, length).copyFrom(seg.asSlice(srcPos, length));
     }
 
     @Override
     public void copyInto(int srcPos, Buf dest, int destPos, int length) {
-        // todo optimise: specialise for MemSegBuf.
+        if (dest instanceof MemSegBuf) {
+            var memSegBuf = (MemSegBuf) dest;
+            memSegBuf.checkWrite(destPos, length);
+            copyInto(srcPos, memSegBuf.seg, destPos, length);
+            return;
+        }
+
         // Iterate in reverse to account for src and dest buffer overlap.
         var itr = openReverseCursor(srcPos + length - 1, length);
         ByteOrder prevOrder = dest.order();
@@ -202,8 +238,8 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
             throw new IllegalArgumentException("The length cannot be negative: " + length + '.');
         }
         if (seg.byteSize() < fromOffset + length) {
-            throw new IllegalArgumentException("The fromOffset+length is beyond the end of the buffer: " +
-                                               "fromOffset=" + fromOffset + ", length=" + length + '.');
+            throw new IllegalArgumentException("The fromOffset + length is beyond the end of the buffer: " +
+                                               "fromOffset = " + fromOffset + ", length = " + length + '.');
         }
         return new ByteCursor() {
             final MemorySegment segment = seg;
@@ -269,8 +305,8 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
             throw new IllegalArgumentException("The fromOffset is beyond the end of the buffer: " + fromOffset + '.');
         }
         if (fromOffset - length < -1) {
-            throw new IllegalArgumentException("The fromOffset-length would underflow the buffer: " +
-                                               "fromOffset=" + fromOffset + ", length=" + length + '.');
+            throw new IllegalArgumentException("The fromOffset - length would underflow the buffer: " +
+                                               "fromOffset = " + fromOffset + ", length = " + length + '.');
         }
         return new ByteCursor() {
             final MemorySegment segment = seg;
@@ -330,6 +366,9 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
         if (size < 0) {
             throw new IllegalArgumentException("Cannot ensure writable for a negative size: " + size + '.');
         }
+        if (seg != wseg) {
+            throw bufferIsReadOnly();
+        }
         if (writableBytes() >= size) {
             // We already have enough space.
             return;
@@ -366,6 +405,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
         }
 
         seg = newSegment;
+        wseg = newSegment;
         drop.attach(this);
     }
 
@@ -390,7 +430,12 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
         bifurcatedBuf.woff = woff;
         bifurcatedBuf.roff = roff;
         bifurcatedBuf.order(order);
+        boolean readOnly = readOnly();
+        bifurcatedBuf.readOnly(readOnly);
         seg = seg.asSlice(woff, seg.byteSize() - woff);
+        if (!readOnly) {
+            wseg = seg;
+        }
         woff = 0;
         roff = 0;
         return bifurcatedBuf;
@@ -400,6 +445,9 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
     public void compact() {
         if (!isOwned()) {
             throw new IllegalStateException("Buffer must be owned in order to compact.");
+        }
+        if (readOnly()) {
+            throw new IllegalStateException("Buffer must be writable in order to compact, but was read-only.");
         }
         int distance = roff;
         if (distance == 0) {
@@ -442,7 +490,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
     @Override
     public Buf writeByte(byte value) {
         try {
-            setByteAtOffset(seg, woff, value);
+            setByteAtOffset(wseg, woff, value);
             woff += Byte.BYTES;
             return this;
         } catch (IndexOutOfBoundsException e) {
@@ -453,7 +501,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
     @Override
     public Buf setByte(int woff, byte value) {
         try {
-            setByteAtOffset(seg, woff, value);
+            setByteAtOffset(wseg, woff, value);
             return this;
         } catch (IndexOutOfBoundsException e) {
             throw checkWriteState(e);
@@ -463,7 +511,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
     @Override
     public Buf writeUnsignedByte(int value) {
         try {
-            setByteAtOffset(seg, woff, (byte) (value & 0xFF));
+            setByteAtOffset(wseg, woff, (byte) (value & 0xFF));
             woff += Byte.BYTES;
             return this;
         } catch (IndexOutOfBoundsException e) {
@@ -474,7 +522,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
     @Override
     public Buf setUnsignedByte(int woff, int value) {
         try {
-            setByteAtOffset(seg, woff, (byte) (value & 0xFF));
+            setByteAtOffset(wseg, woff, (byte) (value & 0xFF));
             return this;
         } catch (IndexOutOfBoundsException e) {
             throw checkWriteState(e);
@@ -498,7 +546,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
     @Override
     public Buf writeChar(char value) {
         try {
-            setCharAtOffset(seg, woff, order, value);
+            setCharAtOffset(wseg, woff, order, value);
             woff += 2;
             return this;
         } catch (IndexOutOfBoundsException e) {
@@ -509,7 +557,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
     @Override
     public Buf setChar(int woff, char value) {
         try {
-            setCharAtOffset(seg, woff, order, value);
+            setCharAtOffset(wseg, woff, order, value);
             return this;
         } catch (IndexOutOfBoundsException e) {
             throw checkWriteState(e);
@@ -547,7 +595,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
     @Override
     public Buf writeShort(short value) {
         try {
-            setShortAtOffset(seg, woff, order, value);
+            setShortAtOffset(wseg, woff, order, value);
             woff += Short.BYTES;
             return this;
         } catch (IndexOutOfBoundsException e) {
@@ -558,7 +606,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
     @Override
     public Buf setShort(int woff, short value) {
         try {
-            setShortAtOffset(seg, woff, order, value);
+            setShortAtOffset(wseg, woff, order, value);
             return this;
         } catch (IndexOutOfBoundsException e) {
             throw checkWriteState(e);
@@ -568,7 +616,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
     @Override
     public Buf writeUnsignedShort(int value) {
         try {
-            setShortAtOffset(seg, woff, order, (short) (value & 0xFFFF));
+            setShortAtOffset(wseg, woff, order, (short) (value & 0xFFFF));
             woff += Short.BYTES;
             return this;
         } catch (IndexOutOfBoundsException e) {
@@ -579,7 +627,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
     @Override
     public Buf setUnsignedShort(int woff, int value) {
         try {
-            setShortAtOffset(seg, woff, order, (short) (value & 0xFFFF));
+            setShortAtOffset(wseg, woff, order, (short) (value & 0xFFFF));
             return this;
         } catch (IndexOutOfBoundsException e) {
             throw checkWriteState(e);
@@ -642,13 +690,13 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
     public Buf writeMedium(int value) {
         checkWrite(woff, 3);
         if (order == ByteOrder.BIG_ENDIAN) {
-            setByteAtOffset(seg, woff, (byte) (value >> 16));
-            setByteAtOffset(seg, woff + 1, (byte) (value >> 8 & 0xFF));
-            setByteAtOffset(seg, woff + 2, (byte) (value & 0xFF));
+            setByteAtOffset(wseg, woff, (byte) (value >> 16));
+            setByteAtOffset(wseg, woff + 1, (byte) (value >> 8 & 0xFF));
+            setByteAtOffset(wseg, woff + 2, (byte) (value & 0xFF));
         } else {
-            setByteAtOffset(seg, woff, (byte) (value & 0xFF));
-            setByteAtOffset(seg, woff + 1, (byte) (value >> 8 & 0xFF));
-            setByteAtOffset(seg, woff + 2, (byte) (value >> 16 & 0xFF));
+            setByteAtOffset(wseg, woff, (byte) (value & 0xFF));
+            setByteAtOffset(wseg, woff + 1, (byte) (value >> 8 & 0xFF));
+            setByteAtOffset(wseg, woff + 2, (byte) (value >> 16 & 0xFF));
         }
         woff += 3;
         return this;
@@ -658,13 +706,13 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
     public Buf setMedium(int woff, int value) {
         checkWrite(woff, 3);
         if (order == ByteOrder.BIG_ENDIAN) {
-            setByteAtOffset(seg, woff, (byte) (value >> 16));
-            setByteAtOffset(seg, woff + 1, (byte) (value >> 8 & 0xFF));
-            setByteAtOffset(seg, woff + 2, (byte) (value & 0xFF));
+            setByteAtOffset(wseg, woff, (byte) (value >> 16));
+            setByteAtOffset(wseg, woff + 1, (byte) (value >> 8 & 0xFF));
+            setByteAtOffset(wseg, woff + 2, (byte) (value & 0xFF));
         } else {
-            setByteAtOffset(seg, woff, (byte) (value & 0xFF));
-            setByteAtOffset(seg, woff + 1, (byte) (value >> 8 & 0xFF));
-            setByteAtOffset(seg, woff + 2, (byte) (value >> 16 & 0xFF));
+            setByteAtOffset(wseg, woff, (byte) (value & 0xFF));
+            setByteAtOffset(wseg, woff + 1, (byte) (value >> 8 & 0xFF));
+            setByteAtOffset(wseg, woff + 2, (byte) (value >> 16 & 0xFF));
         }
         return this;
     }
@@ -673,13 +721,13 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
     public Buf writeUnsignedMedium(int value) {
         checkWrite(woff, 3);
         if (order == ByteOrder.BIG_ENDIAN) {
-            setByteAtOffset(seg, woff, (byte) (value >> 16));
-            setByteAtOffset(seg, woff + 1, (byte) (value >> 8 & 0xFF));
-            setByteAtOffset(seg, woff + 2, (byte) (value & 0xFF));
+            setByteAtOffset(wseg, woff, (byte) (value >> 16));
+            setByteAtOffset(wseg, woff + 1, (byte) (value >> 8 & 0xFF));
+            setByteAtOffset(wseg, woff + 2, (byte) (value & 0xFF));
         } else {
-            setByteAtOffset(seg, woff, (byte) (value & 0xFF));
-            setByteAtOffset(seg, woff + 1, (byte) (value >> 8 & 0xFF));
-            setByteAtOffset(seg, woff + 2, (byte) (value >> 16 & 0xFF));
+            setByteAtOffset(wseg, woff, (byte) (value & 0xFF));
+            setByteAtOffset(wseg, woff + 1, (byte) (value >> 8 & 0xFF));
+            setByteAtOffset(wseg, woff + 2, (byte) (value >> 16 & 0xFF));
         }
         woff += 3;
         return this;
@@ -689,13 +737,13 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
     public Buf setUnsignedMedium(int woff, int value) {
         checkWrite(woff, 3);
         if (order == ByteOrder.BIG_ENDIAN) {
-            setByteAtOffset(seg, woff, (byte) (value >> 16));
-            setByteAtOffset(seg, woff + 1, (byte) (value >> 8 & 0xFF));
-            setByteAtOffset(seg, woff + 2, (byte) (value & 0xFF));
+            setByteAtOffset(wseg, woff, (byte) (value >> 16));
+            setByteAtOffset(wseg, woff + 1, (byte) (value >> 8 & 0xFF));
+            setByteAtOffset(wseg, woff + 2, (byte) (value & 0xFF));
         } else {
-            setByteAtOffset(seg, woff, (byte) (value & 0xFF));
-            setByteAtOffset(seg, woff + 1, (byte) (value >> 8 & 0xFF));
-            setByteAtOffset(seg, woff + 2, (byte) (value >> 16 & 0xFF));
+            setByteAtOffset(wseg, woff, (byte) (value & 0xFF));
+            setByteAtOffset(wseg, woff + 1, (byte) (value >> 8 & 0xFF));
+            setByteAtOffset(wseg, woff + 2, (byte) (value >> 16 & 0xFF));
         }
         return this;
     }
@@ -731,7 +779,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
     @Override
     public Buf writeInt(int value) {
         try {
-            setIntAtOffset(seg, woff, order, value);
+            setIntAtOffset(wseg, woff, order, value);
             woff += Integer.BYTES;
             return this;
         } catch (IndexOutOfBoundsException e) {
@@ -742,7 +790,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
     @Override
     public Buf setInt(int woff, int value) {
         try {
-            setIntAtOffset(seg, woff, order, value);
+            setIntAtOffset(wseg, woff, order, value);
             return this;
         } catch (IndexOutOfBoundsException e) {
             throw checkWriteState(e);
@@ -752,7 +800,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
     @Override
     public Buf writeUnsignedInt(long value) {
         try {
-            setIntAtOffset(seg, woff, order, (int) (value & 0xFFFFFFFFL));
+            setIntAtOffset(wseg, woff, order, (int) (value & 0xFFFFFFFFL));
             woff += Integer.BYTES;
             return this;
         } catch (IndexOutOfBoundsException e) {
@@ -763,7 +811,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
     @Override
     public Buf setUnsignedInt(int woff, long value) {
         try {
-            setIntAtOffset(seg, woff, order, (int) (value & 0xFFFFFFFFL));
+            setIntAtOffset(wseg, woff, order, (int) (value & 0xFFFFFFFFL));
             return this;
         } catch (IndexOutOfBoundsException e) {
             throw checkWriteState(e);
@@ -787,7 +835,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
     @Override
     public Buf writeFloat(float value) {
         try {
-            setFloatAtOffset(seg, woff, order, value);
+            setFloatAtOffset(wseg, woff, order, value);
             woff += Float.BYTES;
             return this;
         } catch (IndexOutOfBoundsException e) {
@@ -798,7 +846,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
     @Override
     public Buf setFloat(int woff, float value) {
         try {
-            setFloatAtOffset(seg, woff, order, value);
+            setFloatAtOffset(wseg, woff, order, value);
             return this;
         } catch (IndexOutOfBoundsException e) {
             throw checkWriteState(e);
@@ -822,7 +870,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
     @Override
     public Buf writeLong(long value) {
         try {
-            setLongAtOffset(seg, woff, order, value);
+            setLongAtOffset(wseg, woff, order, value);
             woff += Long.BYTES;
             return this;
         } catch (IndexOutOfBoundsException e) {
@@ -833,7 +881,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
     @Override
     public Buf setLong(int woff, long value) {
         try {
-            setLongAtOffset(seg, woff, order, value);
+            setLongAtOffset(wseg, woff, order, value);
             return this;
         } catch (IndexOutOfBoundsException e) {
             throw checkWriteState(e);
@@ -857,7 +905,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
     @Override
     public Buf writeDouble(double value) {
         try {
-            setDoubleAtOffset(seg, woff, order, value);
+            setDoubleAtOffset(wseg, woff, order, value);
             woff += Double.BYTES;
             return this;
         } catch (IndexOutOfBoundsException e) {
@@ -868,7 +916,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
     @Override
     public Buf setDouble(int woff, double value) {
         try {
-            setDoubleAtOffset(seg, woff, order, value);
+            setDoubleAtOffset(wseg, woff, order, value);
             return this;
         } catch (IndexOutOfBoundsException e) {
             throw checkWriteState(e);
@@ -881,6 +929,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
         var order = this.order;
         var roff = this.roff;
         var woff = this.woff;
+        var readOnly = readOnly();
         boolean isConfined = seg.ownerThread() == null;
         MemorySegment transferSegment = isConfined? seg : seg.share();
         makeInaccessible();
@@ -891,6 +940,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
                 copy.order = order;
                 copy.roff = roff;
                 copy.woff = woff;
+                copy.readOnly(readOnly);
                 return copy;
             }
         };
@@ -898,6 +948,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
 
     void makeInaccessible() {
         seg = CLOSED_SEGMENT;
+        wseg = CLOSED_SEGMENT;
         roff = 0;
         woff = 0;
     }
@@ -923,7 +974,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
     }
 
     private void checkWrite(int index, int size) {
-        if (index < 0 || seg.byteSize() < index + size) {
+        if (index < 0 || wseg.byteSize() < index + size) {
             throw accessCheckException(index);
         }
     }
@@ -932,6 +983,9 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
         if (seg == CLOSED_SEGMENT) {
             return bufferIsClosed();
         }
+        if (wseg != seg) {
+            return bufferIsReadOnly();
+        }
         return ioobe;
     }
 
@@ -939,13 +993,20 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
         if (seg == CLOSED_SEGMENT) {
             throw bufferIsClosed();
         }
+        if (wseg != seg) {
+            return bufferIsReadOnly();
+        }
         return new IndexOutOfBoundsException(
                 "Index " + index + " is out of bounds: [read 0 to " + woff + ", write 0 to " +
                 (seg.byteSize() - 1) + "].");
     }
 
-    private IllegalStateException bufferIsClosed() {
+    private static IllegalStateException bufferIsClosed() {
         return new IllegalStateException("This buffer is closed.");
+    }
+
+    private static IllegalStateException bufferIsReadOnly() {
+        return new IllegalStateException("This buffer is read-only.");
     }
 
     Object recoverableMemory() {

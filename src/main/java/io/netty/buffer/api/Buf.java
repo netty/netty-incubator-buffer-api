@@ -154,6 +154,7 @@ public interface Buf extends Rc<Buf>, BufAccessors {
      * @return This Buf.
      * @throws IndexOutOfBoundsException if the specified {@code offset} is less than the current
      * {@link #readerOffset()} or greater than {@link #capacity()}.
+     * @throws IllegalStateException if this buffer is {@linkplain #readOnly() read-only}.
      */
     Buf writerOffset(int offset);
 
@@ -178,6 +179,7 @@ public interface Buf extends Rc<Buf>, BufAccessors {
      *
      * @param value The byte value to write at every position in the buffer.
      * @return This Buf.
+     * @throws IllegalStateException if this buffer is {@linkplain #readOnly() read-only}.
      */
     Buf fill(byte value);
 
@@ -186,6 +188,20 @@ public interface Buf extends Rc<Buf>, BufAccessors {
      * @return The native memory address, if any, otherwise 0.
      */
     long getNativeAddress();
+
+    /**
+     * Set the read-only state of this buffer.
+     *
+     * @return this buffer.
+     */
+    Buf readOnly(boolean readOnly);
+
+    /**
+     * Query if this buffer is read-only or not.
+     *
+     * @return {@code true} if this buffer is read-only, {@code false} otherwise.
+     */
+    boolean readOnly();
 
     /**
      * Returns a slice of this buffer's readable bytes.
@@ -371,8 +387,8 @@ public interface Buf extends Rc<Buf>, BufAccessors {
      * {@code false}.
      *
      * @param size The requested number of bytes of space that should be available for writing.
-     * @throws IllegalStateException if this buffer is not in an owned state.
-     * That is, if {@link #isOwned()} is {@code false}.
+     * @throws IllegalStateException if this buffer is not in an {@linkplain #isOwned() owned} state,
+     * or is {@linkplain #readOnly() read-only}.
      */
     default void ensureWritable(int size) {
         ensureWritable(size, true);
@@ -410,8 +426,8 @@ public interface Buf extends Rc<Buf>, BufAccessors {
      * @param allowCompaction {@code true} if the method is allowed to modify the
      *                                   {@linkplain #readerOffset() reader offset} and
      *                                   {@linkplain #writerOffset() writer offset}, otherwise {@code false}.
-     * @throws IllegalStateException if this buffer is not in an owned state.
-     * That is, if {@link #isOwned()} is {@code false}.
+     * @throws IllegalStateException if this buffer is not in an {@linkplain #isOwned() owned} state,
+     *      * or is {@linkplain #readOnly() read-only}.
      */
     void ensureWritable(int size, boolean allowCompaction);
 
@@ -462,7 +478,8 @@ public interface Buf extends Rc<Buf>, BufAccessors {
     /**
      * Discards the read bytes, and moves the buffer contents to the beginning of the buffer.
      *
-     * The buffer must be {@linkplain #isOwned() owned}, or an exception will be thrown.
+     * @throws IllegalStateException if this buffer is not in an {@linkplain #isOwned() owned} state,
+     * or is {@linkplain #readOnly() read-only}.
      */
     void compact();
 }

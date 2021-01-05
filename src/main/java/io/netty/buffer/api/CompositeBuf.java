@@ -20,9 +20,6 @@ import java.nio.ByteOrder;
 import java.util.Arrays;
 import java.util.Objects;
 
-import static jdk.incubator.foreign.MemoryAccess.setByteAtOffset;
-import static jdk.incubator.foreign.MemoryAccess.setLongAtOffset;
-
 final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
     /**
      * The max array size is JVM implementation dependant, but most seem to settle on {@code Integer.MAX_VALUE - 8}.
@@ -48,6 +45,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
     private int subOffset; // The next offset *within* a consituent buffer to read from or write to.
     private ByteOrder order;
     private boolean closed;
+    private boolean readOnly;
 
     CompositeBuf(Allocator allocator, Buf[] bufs) {
         this(allocator, true, bufs.clone(), COMPOSITE_DROP); // Clone prevents external modification of array.
@@ -68,6 +66,14 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
                 }
             }
             order = bufs[0].order();
+
+            boolean targetReadOnly = bufs[0].readOnly();
+            for (Buf buf : bufs) {
+                if (buf.readOnly() != targetReadOnly) {
+                    throw new IllegalArgumentException("Constituent buffers have inconsistent read-only state.");
+                }
+            }
+            readOnly = targetReadOnly;
         } else {
             order = ByteOrder.nativeOrder();
         }
@@ -202,6 +208,20 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
     }
 
     @Override
+    public Buf readOnly(boolean readOnly) {
+        for (Buf buf : bufs) {
+            buf.readOnly(readOnly);
+        }
+        this.readOnly = readOnly;
+        return this;
+    }
+
+    @Override
+    public boolean readOnly() {
+        return readOnly;
+    }
+
+    @Override
     public Buf slice(int offset, int length) {
         checkWriteBounds(offset, length);
         if (offset < 0 || length < 0) {
@@ -236,7 +256,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
                 slices = new Buf[] { choice.slice(subOffset, 0) };
             }
 
-            return new CompositeBuf(allocator, false, slices, drop).writerOffset(length);
+            return new CompositeBuf(allocator, false, slices, drop);
         } catch (Throwable throwable) {
             // We called acquire prior to the try-clause. We need to undo that if we're not creating a composite buffer:
             close();
@@ -267,10 +287,10 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
             throw new IndexOutOfBoundsException("Length cannot be negative: " + length + '.');
         }
         if (srcPos < 0) {
-            throw indexOutOfBounds(srcPos);
+            throw indexOutOfBounds(srcPos, false);
         }
         if (srcPos + length > capacity) {
-            throw indexOutOfBounds(srcPos + length);
+            throw indexOutOfBounds(srcPos + length, false);
         }
         while (length > 0) {
             var buf = (Buf) chooseBuffer(srcPos, 0);
@@ -293,10 +313,10 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
             throw new IndexOutOfBoundsException("Length cannot be negative: " + length + '.');
         }
         if (srcPos < 0) {
-            throw indexOutOfBounds(srcPos);
+            throw indexOutOfBounds(srcPos, false);
         }
         if (srcPos + length > capacity) {
-            throw indexOutOfBounds(srcPos + length);
+            throw indexOutOfBounds(srcPos + length, false);
         }
 
         // Iterate in reverse to account for src and dest buffer overlap.
@@ -530,6 +550,9 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
         if (size < 0) {
             throw new IllegalArgumentException("Cannot ensure writable for a negative size: " + size + '.');
         }
+        if (readOnly) {
+            throw bufferIsReadOnly();
+        }
         if (writableBytes() >= size) {
             // We already have enough space.
             return;
@@ -586,15 +609,23 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
                     "This buffer uses " + order() + " byte order, and cannot be extended with " +
                     "a buffer that uses " + extension.order() + " byte order.");
         }
-        if (bufs.length == 0) {
-            order = extension.order();
+        if (bufs.length > 0 && extension.readOnly() != readOnly()) {
+            throw new IllegalArgumentException(
+                    "This buffer is " + (readOnly? "read-only" : "writable") + ", " +
+                    "and cannot be extended with a buffer that is " +
+                    (extension.readOnly()? "read-only." : "writable."));
         }
+
         long newSize = capacity() + (long) extension.capacity();
         Allocator.checkSize(newSize);
 
         Buf[] restoreTemp = bufs; // We need this to restore our buffer array, in case offset computations fail.
         try {
             unsafeExtendWith(extension.acquire());
+            if (restoreTemp.length == 0) {
+                order = extension.order();
+                readOnly = extension.readOnly();
+            }
         } catch (Exception e) {
             bufs = restoreTemp;
             throw e;
@@ -641,6 +672,9 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
     public void compact() {
         if (!isOwned()) {
             throw new IllegalStateException("Buffer must be owned in order to compact.");
+        }
+        if (readOnly()) {
+            throw new IllegalStateException("Buffer must be writable in order to compact, but was read-only.");
         }
         int distance = roff;
         if (distance == 0) {
@@ -962,6 +996,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
                     received[i] = sends[i].receive();
                 }
                 var composite = new CompositeBuf(allocator, true, received, drop);
+                composite.readOnly = readOnly;
                 drop.attach(composite);
                 return composite;
             }
@@ -1034,7 +1069,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
 
     private void checkReadBounds(int index, int size) {
         if (index < 0 || woff < index + size) {
-            throw indexOutOfBounds(index);
+            throw indexOutOfBounds(index, false);
         }
     }
 
@@ -1051,17 +1086,28 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
 
     private void checkWriteBounds(int index, int size) {
         if (index < 0 || capacity < index + size) {
-            throw indexOutOfBounds(index);
+            throw indexOutOfBounds(index, true);
         }
     }
 
-    private RuntimeException indexOutOfBounds(int index) {
+    private RuntimeException indexOutOfBounds(int index, boolean write) {
         if (closed) {
-            return new IllegalStateException("This buffer is closed.");
+            return bufferIsClosed();
+        }
+        if (write && readOnly) {
+            return bufferIsReadOnly();
         }
         return new IndexOutOfBoundsException(
                 "Index " + index + " is out of bounds: [read 0 to " + woff + ", write 0 to " +
                 (capacity - 1) + "].");
+    }
+
+    private static IllegalStateException bufferIsClosed() {
+        return new IllegalStateException("This buffer is closed.");
+    }
+
+    private static IllegalStateException bufferIsReadOnly() {
+        return new IllegalStateException("This buffer is read-only.");
     }
 
     private BufAccessors chooseBuffer(int index, int size) {
