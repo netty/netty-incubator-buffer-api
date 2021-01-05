@@ -15,6 +15,8 @@
  */
 package io.netty.buffer.api.memseg;
 
+import io.netty.buffer.api.Buf;
+import io.netty.buffer.api.Drop;
 import jdk.incubator.foreign.MemorySegment;
 
 public class HeapMemorySegmentManager extends AbstractMemorySegmentManager {
@@ -26,5 +28,16 @@ public class HeapMemorySegmentManager extends AbstractMemorySegmentManager {
     @Override
     protected MemorySegment createSegment(long size) {
         return MemorySegment.ofArray(new byte[Math.toIntExact(size)]);
+    }
+
+    @Override
+    public Drop<Buf> drop() {
+        return convert(buf -> buf.makeInaccessible());
+    }
+
+    @SuppressWarnings({ "unchecked", "UnnecessaryLocalVariable" })
+    private static Drop<Buf> convert(Drop<MemSegBuf> drop) {
+        Drop<?> tmp = drop;
+        return (Drop<Buf>) tmp;
     }
 }

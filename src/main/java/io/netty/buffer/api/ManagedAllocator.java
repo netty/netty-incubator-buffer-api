@@ -31,13 +31,13 @@ class ManagedAllocator implements Allocator, AllocatorControl {
     @Override
     public Buf allocate(int size) {
         Allocator.checkSize(size);
-        return manager.allocateConfined(this, size, manager.drop(), cleaner);
+        return manager.allocateShared(this, size, manager.drop(), cleaner);
     }
 
     @Override
     public Object allocateUntethered(Buf originator, int size) {
         Allocator.checkSize(size);
-        var buf = manager.allocateConfined(this, size, NO_OP_DROP, null);
+        var buf = manager.allocateShared(this, size, NO_OP_DROP, null);
         return manager.unwrapRecoverableMemory(buf);
     }
 
