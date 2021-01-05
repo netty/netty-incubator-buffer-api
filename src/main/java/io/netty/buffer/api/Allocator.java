@@ -70,7 +70,7 @@ public interface Allocator extends AutoCloseable {
      * <pre>{@code
      *     try (Buf a = allocator.allocate(size);
      *          Buf b = allocator.allocate(size)) {
-     *         return Buf.compose(a, b); // Reference counts for 'a' and 'b' incremented here.
+     *         return allocator.compose(a, b); // Reference counts for 'a' and 'b' incremented here.
      *     } // Reference count for 'a' and 'b' decremented here; composite buffer now holds the last references.
      * }</pre>
      * <p>

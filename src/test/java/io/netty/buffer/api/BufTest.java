@@ -33,7 +33,6 @@ import java.text.ParseException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -88,6 +87,10 @@ public class BufTest {
 
     static Stream<Fixture> directPooledAllocators() {
         return fixtureCombinations().filter(f -> f.isDirect() && f.isCleaner() && f.isPooled());
+    }
+
+    static Stream<Fixture> pooledAllocators() {
+        return fixtureCombinations().filter(Fixture::isPooled);
     }
 
     private static Stream<Fixture> fixtureCombinations() {
@@ -187,7 +190,10 @@ public class BufTest {
             }, COMPOSITE));
         }
 
-        return builder.build().flatMap(BufTest::injectBifurcations).flatMap(BufTest::injectSlices);
+        var stream = builder.build();
+        return stream.flatMap(BufTest::injectBifurcations)
+                     .flatMap(BufTest::injectSlices)
+                     .flatMap(BufTest::injectReadOnlyToggling);
     }
 
     private static Stream<Fixture> injectBifurcations(Fixture f) {
@@ -248,6 +254,26 @@ public class BufTest {
                 }
             };
         }, Properties.SLICE));
+        return builder.build();
+    }
+
+    private static Stream<Fixture> injectReadOnlyToggling(Fixture f) {
+        Builder<Fixture> builder = Stream.builder();
+        builder.add(f);
+        builder.add(new Fixture(f + ".readOnly(true/false)", () -> {
+            var allocatorBase = f.get();
+            return new Allocator() {
+                @Override
+                public Buf allocate(int size) {
+                    return allocatorBase.allocate(size).readOnly(true).readOnly(false);
+                }
+
+                @Override
+                public void close() {
+                    allocatorBase.close();
+                }
+            };
+        }, f.getProperties()));
         return builder.build();
     }
 
@@ -375,6 +401,31 @@ public class BufTest {
     }
 
     private static void verifyInaccessible(Buf buf) {
+        verifyReadInaccessible(buf);
+
+        verifyWriteInaccessible(buf);
+
+        try (Allocator allocator = Allocator.heap();
+             Buf target = allocator.allocate(24)) {
+            assertThrows(IllegalStateException.class, () -> buf.copyInto(0, target, 0, 1));
+            assertThrows(IllegalStateException.class, () -> buf.copyInto(0, new byte[1], 0, 1));
+            assertThrows(IllegalStateException.class, () -> buf.copyInto(0, ByteBuffer.allocate(1), 0, 1));
+            if (Allocator.isComposite(buf)) {
+                assertThrows(IllegalStateException.class, () -> Allocator.extend(buf, target));
+            }
+        }
+
+        assertThrows(IllegalStateException.class, () -> buf.bifurcate());
+        assertThrows(IllegalStateException.class, () -> buf.send());
+        assertThrows(IllegalStateException.class, () -> buf.acquire());
+        assertThrows(IllegalStateException.class, () -> buf.slice());
+        assertThrows(IllegalStateException.class, () -> buf.openCursor());
+        assertThrows(IllegalStateException.class, () -> buf.openCursor(0, 0));
+        assertThrows(IllegalStateException.class, () -> buf.openReverseCursor());
+        assertThrows(IllegalStateException.class, () -> buf.openReverseCursor(0, 0));
+    }
+
+    private static void verifyReadInaccessible(Buf buf) {
         assertThrows(IllegalStateException.class, () -> buf.readByte());
         assertThrows(IllegalStateException.class, () -> buf.readUnsignedByte());
         assertThrows(IllegalStateException.class, () -> buf.readChar());
@@ -387,6 +438,7 @@ public class BufTest {
         assertThrows(IllegalStateException.class, () -> buf.readFloat());
         assertThrows(IllegalStateException.class, () -> buf.readLong());
         assertThrows(IllegalStateException.class, () -> buf.readDouble());
+
         assertThrows(IllegalStateException.class, () -> buf.getByte(0));
         assertThrows(IllegalStateException.class, () -> buf.getUnsignedByte(0));
         assertThrows(IllegalStateException.class, () -> buf.getChar(0));
@@ -399,6 +451,9 @@ public class BufTest {
         assertThrows(IllegalStateException.class, () -> buf.getFloat(0));
         assertThrows(IllegalStateException.class, () -> buf.getLong(0));
         assertThrows(IllegalStateException.class, () -> buf.getDouble(0));
+    }
+
+    private static void verifyWriteInaccessible(Buf buf) {
         assertThrows(IllegalStateException.class, () -> buf.writeByte((byte) 32));
         assertThrows(IllegalStateException.class, () -> buf.writeUnsignedByte(32));
         assertThrows(IllegalStateException.class, () -> buf.writeChar('3'));
@@ -411,6 +466,7 @@ public class BufTest {
         assertThrows(IllegalStateException.class, () -> buf.writeFloat(3.2f));
         assertThrows(IllegalStateException.class, () -> buf.writeLong(32));
         assertThrows(IllegalStateException.class, () -> buf.writeDouble(32));
+
         assertThrows(IllegalStateException.class, () -> buf.setByte(0, (byte) 32));
         assertThrows(IllegalStateException.class, () -> buf.setUnsignedByte(0, 32));
         assertThrows(IllegalStateException.class, () -> buf.setChar(0, '3'));
@@ -425,22 +481,11 @@ public class BufTest {
         assertThrows(IllegalStateException.class, () -> buf.setDouble(0, 32));
 
         assertThrows(IllegalStateException.class, () -> buf.ensureWritable(1));
-        try (Allocator allocator = Allocator.heap();
-             Buf target = allocator.allocate(24)) {
-            assertThrows(IllegalStateException.class, () -> buf.copyInto(0, target, 0, 1));
-            if (Allocator.isComposite(buf)) {
-                assertThrows(IllegalStateException.class, () -> Allocator.extend(buf, target));
-            }
-        }
-        assertThrows(IllegalStateException.class, () -> buf.bifurcate());
-        assertThrows(IllegalStateException.class, () -> buf.send());
-        assertThrows(IllegalStateException.class, () -> buf.acquire());
-        assertThrows(IllegalStateException.class, () -> buf.slice());
         assertThrows(IllegalStateException.class, () -> buf.fill((byte) 0));
-        assertThrows(IllegalStateException.class, () -> buf.openCursor());
-        assertThrows(IllegalStateException.class, () -> buf.openCursor(0, 0));
-        assertThrows(IllegalStateException.class, () -> buf.openReverseCursor());
-        assertThrows(IllegalStateException.class, () -> buf.openReverseCursor(0, 0));
+        try (Allocator allocator = Allocator.heap();
+             Buf source = allocator.allocate(8)) {
+            assertThrows(IllegalStateException.class, () -> source.copyInto(0, buf, 0, 1));
+        }
     }
 
     @ParameterizedTest
@@ -1894,6 +1939,18 @@ public class BufTest {
     }
 
     @Test
+    public void emptyCompositeBufferMustAllowExtendingWithReadOnlyBuffer() {
+        try (Allocator allocator = Allocator.heap()) {
+            try (Buf composite = allocator.compose()) {
+                try (Buf b = allocator.allocate(8).readOnly(true)) {
+                    Allocator.extend(composite, b);
+                    assertTrue(composite.readOnly());
+                }
+            }
+        }
+    }
+
+    @Test
     public void whenExtendingCompositeBufferWithWriteOffsetAtCapacityExtensionWriteOffsetCanBeNonZero() {
         try (Allocator allocator = Allocator.heap()) {
             Buf composite;
@@ -2259,6 +2316,255 @@ public class BufTest {
                 assertEquals(1, buf.readerOffset());
             }
             assertEquals((byte) 0x02, buf.readByte());
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    public void readOnlyBufferMustPreventWriteAccess(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(8)) {
+            var b = buf.readOnly(true);
+            assertThat(b).isSameAs(buf);
+            verifyWriteInaccessible(buf);
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    public void readOnlyBufferMustBecomeWritableAgainAfterTogglingReadOnlyOff(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(8)) {
+            assertFalse(buf.readOnly());
+            buf.readOnly(true);
+            assertTrue(buf.readOnly());
+            verifyWriteInaccessible(buf);
+
+            buf.readOnly(false);
+            assertFalse(buf.readOnly());
+
+            verifyWriteAccessible(buf);
+        }
+    }
+
+    private static void verifyWriteAccessible(Buf buf) {
+        buf.writerOffset(0).writeByte((byte) 32);
+        assertThat(buf.readerOffset(0).readByte()).isEqualTo((byte) 32);
+        buf.writerOffset(0).writeUnsignedByte(32);
+        assertThat(buf.readerOffset(0).readUnsignedByte()).isEqualTo(32);
+        buf.writerOffset(0).writeChar('3');
+        assertThat(buf.readerOffset(0).readChar()).isEqualTo('3');
+        buf.writerOffset(0).writeShort((short) 32);
+        assertThat(buf.readerOffset(0).readShort()).isEqualTo((short) 32);
+        buf.writerOffset(0).writeUnsignedShort(32);
+        assertThat(buf.readerOffset(0).readUnsignedShort()).isEqualTo(32);
+        buf.writerOffset(0).writeMedium(32);
+        assertThat(buf.readerOffset(0).readMedium()).isEqualTo(32);
+        buf.writerOffset(0).writeUnsignedMedium(32);
+        assertThat(buf.readerOffset(0).readUnsignedMedium()).isEqualTo(32);
+        buf.writerOffset(0).writeInt(32);
+        assertThat(buf.readerOffset(0).readInt()).isEqualTo(32);
+        buf.writerOffset(0).writeUnsignedInt(32);
+        assertThat(buf.readerOffset(0).readUnsignedInt()).isEqualTo(32L);
+        buf.writerOffset(0).writeFloat(3.2f);
+        assertThat(buf.readerOffset(0).readFloat()).isEqualTo(3.2f);
+        buf.writerOffset(0).writeLong(32);
+        assertThat(buf.readerOffset(0).readLong()).isEqualTo(32L);
+        buf.writerOffset(0).writeDouble(3.2);
+        assertThat(buf.readerOffset(0).readDouble()).isEqualTo(3.2);
+
+        buf.setByte(0, (byte) 32);
+        assertThat(buf.getByte(0)).isEqualTo((byte) 32);
+        buf.setUnsignedByte(0, 32);
+        assertThat(buf.getUnsignedByte(0)).isEqualTo(32);
+        buf.setChar(0, '3');
+        assertThat(buf.getChar(0)).isEqualTo('3');
+        buf.setShort(0, (short) 32);
+        assertThat(buf.getShort(0)).isEqualTo((short) 32);
+        buf.setUnsignedShort(0, 32);
+        assertThat(buf.getUnsignedShort(0)).isEqualTo(32);
+        buf.setMedium(0, 32);
+        assertThat(buf.getMedium(0)).isEqualTo(32);
+        buf.setUnsignedMedium(0, 32);
+        assertThat(buf.getUnsignedMedium(0)).isEqualTo(32);
+        buf.setInt(0, 32);
+        assertThat(buf.getInt(0)).isEqualTo(32);
+        buf.setUnsignedInt(0, 32);
+        assertThat(buf.getUnsignedInt(0)).isEqualTo(32L);
+        buf.setFloat(0, 3.2f);
+        assertThat(buf.getFloat(0)).isEqualTo(3.2f);
+        buf.setLong(0, 32);
+        assertThat(buf.getLong(0)).isEqualTo(32L);
+        buf.setDouble(0, 3.2);
+        assertThat(buf.getDouble(0)).isEqualTo(3.2);
+
+        if (buf.isOwned()) {
+            buf.ensureWritable(1);
+        }
+        buf.fill((byte) 0);
+        try (Allocator allocator = Allocator.heap();
+             Buf source = allocator.allocate(8)) {
+            source.copyInto(0, buf, 0, 1);
+        }
+    }
+
+    @Test
+    public void composingReadOnlyBuffersMustCreateReadOnlyCompositeBuffer() {
+        try (Allocator allocator = Allocator.heap();
+             Buf a = allocator.allocate(4).readOnly(true);
+             Buf b = allocator.allocate(4).readOnly(true);
+             Buf composite = allocator.compose(a, b)) {
+            assertTrue(composite.readOnly());
+            verifyWriteInaccessible(composite);
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("nonSliceAllocators")
+    public void readOnlyBufferMustRemainReadOnlyAfterSend(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(8)) {
+            buf.readOnly(true);
+            var send = buf.send();
+            try (Buf receive = send.receive()) {
+                assertTrue(receive.readOnly());
+                verifyWriteInaccessible(receive);
+            }
+        }
+    }
+
+    @Test
+    public void readOnlyBufferMustRemainReadOnlyAfterSendForEmptyCompositeBuffer() {
+        try (Allocator allocator = Allocator.heap();
+             Buf buf = allocator.compose()) {
+            buf.readOnly(true);
+            var send = buf.send();
+            try (Buf receive = send.receive()) {
+                assertTrue(receive.readOnly());
+            }
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("pooledAllocators")
+    public void readOnlyBufferMustNotBeReadOnlyAfterBeingReusedFromPool(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator()) {
+            for (int i = 0; i < 1000; i++) {
+                try (Buf buf = allocator.allocate(8)) {
+                    assertFalse(buf.readOnly());
+                    buf.readOnly(true);
+                    assertTrue(buf.readOnly());
+                }
+            }
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    public void acquireOfReadOnlyBufferMustBeReadOnly(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(8)) {
+            buf.readOnly(true);
+            try (Buf acquire = buf.acquire()) {
+                assertTrue(acquire.readOnly());
+            }
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    public void sliceOfReadOnlyBufferMustBeReadOnly(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(8)) {
+            buf.writeLong(0x0102030405060708L);
+            buf.readOnly(true);
+            try (Buf slice = buf.slice()) {
+                assertTrue(slice.readOnly());
+            }
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("nonSliceAllocators")
+    public void bifurcateOfReadOnlyBufferMustBeReadOnly(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(16)) {
+            buf.writeLong(0x0102030405060708L);
+            buf.readOnly(true);
+            try (Buf bifurcate = buf.bifurcate()) {
+                assertTrue(bifurcate.readOnly());
+                assertTrue(buf.readOnly());
+            }
+        }
+    }
+
+    @Test
+    public void composingReadOnlyAndWritableBuffersMustThrow() {
+        try (Allocator allocator = Allocator.heap();
+             Buf a = allocator.allocate(8).readOnly(true);
+             Buf b = allocator.allocate(8)) {
+            assertThrows(IllegalArgumentException.class, () -> allocator.compose(a, b));
+            assertThrows(IllegalArgumentException.class, () -> allocator.compose(b, a));
+            assertThrows(IllegalArgumentException.class, () -> allocator.compose(a, b, a));
+            assertThrows(IllegalArgumentException.class, () -> allocator.compose(b, a, b));
+        }
+    }
+
+    @Test
+    public void compositeWritableBufferCannotBeExtendedWithReadOnlyBuffer() {
+        try (Allocator allocator = Allocator.heap()) {
+            Buf composite;
+            try (Buf a = allocator.allocate(8)) {
+                composite = allocator.compose(a);
+            }
+            try (composite; Buf b = allocator.allocate(8).readOnly(true)) {
+                assertThrows(IllegalArgumentException.class, () -> Allocator.extend(composite, b));
+            }
+        }
+    }
+
+    @Test
+    public void compositeReadOnlyBufferCannotBeExtendedWithWritableBuffer() {
+        try (Allocator allocator = Allocator.heap()) {
+            Buf composite;
+            try (Buf a = allocator.allocate(8).readOnly(true)) {
+                composite = allocator.compose(a);
+            }
+            try (composite; Buf b = allocator.allocate(8)) {
+                assertThrows(IllegalArgumentException.class, () -> Allocator.extend(composite, b));
+            }
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("nonSliceAllocators")
+    public void compactOnReadOnlyBufferMustThrow(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(8)) {
+            buf.readOnly(true);
+            assertThrows(IllegalStateException.class, () -> buf.compact());
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("nonSliceAllocators")
+    public void ensureWritableOnReadOnlyBufferMustThrow(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(8)) {
+            buf.readOnly(true);
+            assertThrows(IllegalStateException.class, () -> buf.ensureWritable(1));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("nonSliceAllocators")
+    public void copyIntoOnReadOnlyBufferMustThrow(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf dest = allocator.allocate(8)) {
+            dest.readOnly(true);
+            try (Buf src = allocator.allocate(8)) {
+                assertThrows(IllegalStateException.class, () -> src.copyInto(0, dest, 0, 1));
+            }
         }
     }
 

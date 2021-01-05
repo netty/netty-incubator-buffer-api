@@ -43,7 +43,11 @@ class SizeClassedMemoryPool implements Allocator, AllocatorControl, Drop<Buf> {
         var sizeClassPool = getSizeClassPool(size);
         Send<Buf> send = sizeClassPool.poll();
         if (send != null) {
-            return send.receive().reset().fill((byte) 0).order(ByteOrder.nativeOrder());
+            return send.receive()
+                       .reset()
+                       .readOnly(false)
+                       .fill((byte) 0)
+                       .order(ByteOrder.nativeOrder());
         }
         return createBuf(size, getDrop());
     }
