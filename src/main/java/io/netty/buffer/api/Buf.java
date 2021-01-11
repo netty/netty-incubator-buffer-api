@@ -17,6 +17,7 @@ package io.netty.buffer.api;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.util.function.Consumer;
 
 /**
  * A reference counted buffer of memory, with separate reader and writer offsets.
@@ -187,7 +188,7 @@ public interface Buf extends Rc<Buf>, BufAccessors {
      * Give the native memory address backing this buffer, or return 0 if this buffer has no native memory address.
      * @return The native memory address, if any, otherwise 0.
      */
-    long getNativeAddress();
+    long nativeAddress();
 
     /**
      * Set the read-only state of this buffer.
@@ -482,4 +483,26 @@ public interface Buf extends Rc<Buf>, BufAccessors {
      * or is {@linkplain #readOnly() read-only}.
      */
     void compact();
+
+    /**
+     * Get the number of "components" in this buffer. For composite buffers, this is the number of transitive
+     * constituent buffers, while non-composite buffers only have one component.
+     *
+     * @return The number of components in this buffer.
+     */
+    int componentCount();
+
+    /**
+     * Process all readable components of this buffer, and return the number of components consumed.
+     * <p>
+     * The number of components consumed may be less than the {@linkplain #componentCount() component count} if not all
+     * of them have readable data.
+     *
+     * <strong>Note</strong> that the {@link Component} instance passed to the consumer could be reused for multiple
+     * calls, so the data must be extracted from the component in the context of the iteration.
+     *
+     * @param consumer The consumer that will be used to process the buffer components.
+     * @return The number of readable components processed, which may be less than {@link #componentCount()}.
+     */
+    int forEachReadable(Consumer<Component> consumer);
 }

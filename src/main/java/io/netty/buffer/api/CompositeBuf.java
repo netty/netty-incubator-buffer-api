@@ -19,6 +19,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Arrays;
 import java.util.Objects;
+import java.util.function.Consumer;
 
 final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
     /**
@@ -203,7 +204,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
     }
 
     @Override
-    public long getNativeAddress() {
+    public long nativeAddress() {
         return 0;
     }
 
@@ -698,6 +699,27 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
         }
         readerOffset(0);
         writerOffset(woff - distance);
+    }
+
+    @Override
+    public int componentCount() {
+        int sum = 0;
+        for (Buf buf : bufs) {
+            sum += buf.componentCount();
+        }
+        return sum;
+    }
+
+    @Override
+    public int forEachReadable(Consumer<Component> consumer) {
+        checkReadBounds(readerOffset(), Math.max(1, readableBytes()));
+        int visited = 0;
+        for (Buf buf : bufs) {
+            if (buf.readableBytes() > 0) {
+                visited += buf.forEachReadable(consumer);
+            }
+        }
+        return visited;
     }
 
     // <editor-fold defaultstate="collapsed" desc="Primitive accessors.">

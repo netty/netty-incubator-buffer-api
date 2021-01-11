@@ -29,8 +29,10 @@ import org.junit.jupiter.params.provider.MethodSource;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.ReadOnlyBufferException;
 import java.text.ParseException;
 import java.util.Arrays;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ExecutorService;
@@ -47,6 +49,8 @@ import static io.netty.buffer.api.Fixture.Properties.COMPOSITE;
 import static io.netty.buffer.api.Fixture.Properties.DIRECT;
 import static io.netty.buffer.api.Fixture.Properties.HEAP;
 import static io.netty.buffer.api.Fixture.Properties.POOLED;
+import static java.nio.ByteOrder.BIG_ENDIAN;
+import static java.nio.ByteOrder.LITTLE_ENDIAN;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -75,6 +79,10 @@ public class BufTest {
 
     static Stream<Fixture> nonSliceAllocators() {
         return fixtureCombinations().filter(f -> !f.isSlice());
+    }
+
+    static Stream<Fixture> nonCompositeAllocators() {
+        return fixtureCombinations().filter(f -> !f.isComposite());
     }
 
     static Stream<Fixture> heapAllocators() {
@@ -222,6 +230,7 @@ public class BufTest {
     private static Stream<Fixture> injectSlices(Fixture f) {
         Builder<Fixture> builder = Stream.builder();
         builder.add(f);
+        var props = concat(f.getProperties(), Properties.SLICE);
         builder.add(new Fixture(f + ".slice(0, capacity())", () -> {
             var allocatorBase = f.get();
             return new Allocator() {
@@ -237,7 +246,7 @@ public class BufTest {
                     allocatorBase.close();
                 }
             };
-        }, Properties.SLICE));
+        }, props));
         builder.add(new Fixture(f + ".slice(1, capacity() - 2)", () -> {
             var allocatorBase = f.get();
             return new Allocator() {
@@ -253,7 +262,7 @@ public class BufTest {
                     allocatorBase.close();
                 }
             };
-        }, Properties.SLICE));
+        }, props));
         return builder.build();
     }
 
@@ -275,6 +284,12 @@ public class BufTest {
             };
         }, f.getProperties()));
         return builder.build();
+    }
+
+    private static Properties[] concat(Properties[] props, Properties prop) {
+        props = Arrays.copyOf(props, props.length + 1);
+        props[props.length - 1] = prop;
+        return props;
     }
 
     @BeforeAll
@@ -754,12 +769,12 @@ public class BufTest {
     void sliceWithoutOffsetAndSizeHasSameEndianAsParent(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            buf.order(ByteOrder.BIG_ENDIAN);
+            buf.order(BIG_ENDIAN);
             buf.writeLong(0x0102030405060708L);
             try (Buf slice = buf.slice()) {
                 assertEquals(0x0102030405060708L, slice.readLong());
             }
-            buf.order(ByteOrder.LITTLE_ENDIAN);
+            buf.order(LITTLE_ENDIAN);
             try (Buf slice = buf.slice()) {
                 assertEquals(0x0807060504030201L, slice.readLong());
             }
@@ -771,12 +786,12 @@ public class BufTest {
     void sliceWithOffsetAndSizeHasSameEndianAsParent(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            buf.order(ByteOrder.BIG_ENDIAN);
+            buf.order(BIG_ENDIAN);
             buf.writeLong(0x0102030405060708L);
             try (Buf slice = buf.slice(0, 8)) {
                 assertEquals(0x0102030405060708L, slice.readLong());
             }
-            buf.order(ByteOrder.LITTLE_ENDIAN);
+            buf.order(LITTLE_ENDIAN);
             try (Buf slice = buf.slice(0, 8)) {
                 assertEquals(0x0807060504030201L, slice.readLong());
             }
@@ -888,12 +903,12 @@ public class BufTest {
     void copyIntoByteArray(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            buf.order(ByteOrder.BIG_ENDIAN).writeLong(0x0102030405060708L);
+            buf.order(BIG_ENDIAN).writeLong(0x0102030405060708L);
             byte[] array = new byte[8];
             buf.copyInto(0, array, 0, array.length);
             assertThat(array).containsExactly(0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08);
 
-            buf.writerOffset(0).order(ByteOrder.LITTLE_ENDIAN).writeLong(0x0102030405060708L);
+            buf.writerOffset(0).order(LITTLE_ENDIAN).writeLong(0x0102030405060708L);
             buf.copyInto(0, array, 0, array.length);
             assertThat(array).containsExactly(0x08, 0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01);
 
@@ -918,7 +933,7 @@ public class BufTest {
     private static void testCopyIntoByteBuffer(Fixture fixture, Function<Integer, ByteBuffer> bbAlloc) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            buf.order(ByteOrder.BIG_ENDIAN).writeLong(0x0102030405060708L);
+            buf.order(BIG_ENDIAN).writeLong(0x0102030405060708L);
             ByteBuffer buffer = bbAlloc.apply(8);
             buf.copyInto(0, buffer, 0, buffer.capacity());
             assertEquals((byte) 0x01, buffer.get());
@@ -931,7 +946,7 @@ public class BufTest {
             assertEquals((byte) 0x08, buffer.get());
             buffer.clear();
 
-            buf.writerOffset(0).order(ByteOrder.LITTLE_ENDIAN).writeLong(0x0102030405060708L);
+            buf.writerOffset(0).order(LITTLE_ENDIAN).writeLong(0x0102030405060708L);
             buf.copyInto(0, buffer, 0, buffer.capacity());
             assertEquals((byte) 0x08, buffer.get());
             assertEquals((byte) 0x07, buffer.get());
@@ -1131,7 +1146,7 @@ public class BufTest {
     private static void testCopyIntoBuf(Fixture fixture, Function<Integer, Buf> bbAlloc) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            buf.order(ByteOrder.BIG_ENDIAN).writeLong(0x0102030405060708L);
+            buf.order(BIG_ENDIAN).writeLong(0x0102030405060708L);
             Buf buffer = bbAlloc.apply(8);
             buffer.writerOffset(8);
             buf.copyInto(0, buffer, 0, buffer.capacity());
@@ -1145,7 +1160,7 @@ public class BufTest {
             assertEquals((byte) 0x08, buffer.readByte());
             buffer.reset();
 
-            buf.writerOffset(0).order(ByteOrder.LITTLE_ENDIAN).writeLong(0x0102030405060708L);
+            buf.writerOffset(0).order(LITTLE_ENDIAN).writeLong(0x0102030405060708L);
             buf.copyInto(0, buffer, 0, buffer.capacity());
             buffer.writerOffset(8);
             assertEquals((byte) 0x08, buffer.readByte());
@@ -1186,7 +1201,7 @@ public class BufTest {
             buffer.close();
 
             buf.reset();
-            buf.order(ByteOrder.BIG_ENDIAN).writeLong(0x0102030405060708L);
+            buf.order(BIG_ENDIAN).writeLong(0x0102030405060708L);
             // Testing copyInto for overlapping writes:
             //
             //          0x0102030405060708
@@ -1216,7 +1231,7 @@ public class BufTest {
     void byteIterationOfBigEndianBuffers(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(0x28)) {
-            buf.order(ByteOrder.BIG_ENDIAN); // The byte order should have no impact.
+            buf.order(BIG_ENDIAN); // The byte order should have no impact.
             checkByteIteration(buf);
             buf.reset();
             checkByteIterationOfRegion(buf);
@@ -1228,7 +1243,7 @@ public class BufTest {
     void byteIterationOfLittleEndianBuffers(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(0x28)) {
-            buf.order(ByteOrder.LITTLE_ENDIAN); // The byte order should have no impact.
+            buf.order(LITTLE_ENDIAN); // The byte order should have no impact.
             checkByteIteration(buf);
             buf.reset();
             checkByteIterationOfRegion(buf);
@@ -1373,7 +1388,7 @@ public class BufTest {
     void reverseByteIterationOfBigEndianBuffers(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(0x28)) {
-            buf.order(ByteOrder.BIG_ENDIAN); // The byte order should have no impact.
+            buf.order(BIG_ENDIAN); // The byte order should have no impact.
             checkReverseByteIteration(buf);
             buf.reset();
             checkReverseByteIterationOfRegion(buf);
@@ -1385,7 +1400,7 @@ public class BufTest {
     void reverseByteIterationOfLittleEndianBuffers(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(0x28)) {
-            buf.order(ByteOrder.LITTLE_ENDIAN); // The byte order should have no impact.
+            buf.order(LITTLE_ENDIAN); // The byte order should have no impact.
             checkReverseByteIteration(buf);
             buf.reset();
             checkReverseByteIterationOfRegion(buf);
@@ -1530,7 +1545,7 @@ public class BufTest {
     public void heapBufferMustHaveZeroAddress(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            assertThat(buf.getNativeAddress()).isZero();
+            assertThat(buf.nativeAddress()).isZero();
         }
     }
 
@@ -1539,7 +1554,7 @@ public class BufTest {
     public void directBufferMustHaveNonZeroAddress(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            assertThat(buf.getNativeAddress()).isNotZero();
+            assertThat(buf.nativeAddress()).isNotZero();
         }
     }
 
@@ -1712,7 +1727,7 @@ public class BufTest {
     public void ensureWritableOnCompositeBuffersMustRespectExistingBigEndianByteOrder(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator()) {
             Buf composite;
-            try (Buf a = allocator.allocate(4, ByteOrder.BIG_ENDIAN)) {
+            try (Buf a = allocator.allocate(4, BIG_ENDIAN)) {
                 composite = allocator.compose(a);
             }
             try (composite) {
@@ -1729,7 +1744,7 @@ public class BufTest {
     public void ensureWritableOnCompositeBuffersMustRespectExistingLittleEndianByteOrder(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator()) {
             Buf composite;
-            try (Buf a = allocator.allocate(4, ByteOrder.LITTLE_ENDIAN)) {
+            try (Buf a = allocator.allocate(4, LITTLE_ENDIAN)) {
                 composite = allocator.compose(a);
             }
             try (composite) {
@@ -1782,7 +1797,7 @@ public class BufTest {
                     assertThat(bytes).containsExactly(0, 0, 0, 0, 0, 0, 0, 0);
 
                     var tlr = ThreadLocalRandom.current();
-                    buf.order(tlr.nextBoolean()? ByteOrder.LITTLE_ENDIAN : ByteOrder.BIG_ENDIAN);
+                    buf.order(tlr.nextBoolean()? LITTLE_ENDIAN : BIG_ENDIAN);
                     for (int j = 0; j < tlr.nextInt(0, 8); j++) {
                         buf.writeByte((byte) 1);
                     }
@@ -1859,7 +1874,7 @@ public class BufTest {
         try (Allocator allocator = Allocator.heap();
              Buf composite = allocator.compose()) {
             assertThat(composite.capacity()).isZero();
-            try (Buf buf = allocator.allocate(8, ByteOrder.BIG_ENDIAN)) {
+            try (Buf buf = allocator.allocate(8, BIG_ENDIAN)) {
                 Allocator.extend(composite, buf);
             }
             assertThat(composite.capacity()).isEqualTo(8);
@@ -1873,7 +1888,7 @@ public class BufTest {
         try (Allocator allocator = Allocator.heap();
              Buf composite = allocator.compose()) {
             assertThat(composite.capacity()).isZero();
-            try (Buf buf = allocator.allocate(8, ByteOrder.LITTLE_ENDIAN)) {
+            try (Buf buf = allocator.allocate(8, LITTLE_ENDIAN)) {
                 Allocator.extend(composite, buf);
             }
             assertThat(composite.capacity()).isEqualTo(8);
@@ -1886,11 +1901,11 @@ public class BufTest {
     public void extendingBigEndianCompositeBufferMustThrowIfExtensionIsLittleEndian() {
         try (Allocator allocator = Allocator.heap()) {
             Buf composite;
-            try (Buf a = allocator.allocate(8, ByteOrder.BIG_ENDIAN)) {
+            try (Buf a = allocator.allocate(8, BIG_ENDIAN)) {
                 composite = allocator.compose(a);
             }
             try (composite) {
-                try (Buf b = allocator.allocate(8, ByteOrder.LITTLE_ENDIAN)) {
+                try (Buf b = allocator.allocate(8, LITTLE_ENDIAN)) {
                     var exc = assertThrows(IllegalArgumentException.class, () -> Allocator.extend(composite, b));
                     assertThat(exc).hasMessageContaining("byte order");
                 }
@@ -1902,11 +1917,11 @@ public class BufTest {
     public void extendingLittleEndianCompositeBufferMustThrowIfExtensionIsBigEndian() {
         try (Allocator allocator = Allocator.heap()) {
             Buf composite;
-            try (Buf a = allocator.allocate(8, ByteOrder.LITTLE_ENDIAN)) {
+            try (Buf a = allocator.allocate(8, LITTLE_ENDIAN)) {
                 composite = allocator.compose(a);
             }
             try (composite) {
-                try (Buf b = allocator.allocate(8, ByteOrder.BIG_ENDIAN)) {
+                try (Buf b = allocator.allocate(8, BIG_ENDIAN)) {
                     var exc = assertThrows(IllegalArgumentException.class, () -> Allocator.extend(composite, b));
                     assertThat(exc).hasMessageContaining("byte order");
                 }
@@ -1918,9 +1933,9 @@ public class BufTest {
     public void emptyCompositeBufferMustAllowExtendingWithBufferWithBigEndianByteOrder() {
         try (Allocator allocator = Allocator.heap()) {
             try (Buf composite = allocator.compose()) {
-                try (Buf b = allocator.allocate(8, ByteOrder.BIG_ENDIAN)) {
+                try (Buf b = allocator.allocate(8, BIG_ENDIAN)) {
                     Allocator.extend(composite, b);
-                    assertThat(composite.order()).isEqualTo(ByteOrder.BIG_ENDIAN);
+                    assertThat(composite.order()).isEqualTo(BIG_ENDIAN);
                 }
             }
         }
@@ -1930,9 +1945,9 @@ public class BufTest {
     public void emptyCompositeBufferMustAllowExtendingWithBufferWithLittleEndianByteOrder() {
         try (Allocator allocator = Allocator.heap()) {
             try (Buf composite = allocator.compose()) {
-                try (Buf b = allocator.allocate(8, ByteOrder.LITTLE_ENDIAN)) {
+                try (Buf b = allocator.allocate(8, LITTLE_ENDIAN)) {
                     Allocator.extend(composite, b);
-                    assertThat(composite.order()).isEqualTo(ByteOrder.LITTLE_ENDIAN);
+                    assertThat(composite.order()).isEqualTo(LITTLE_ENDIAN);
                 }
             }
         }
@@ -2040,8 +2055,8 @@ public class BufTest {
     @Test
     public void composeMustThrowWhenBuffersHaveMismatchedByteOrder() {
         try (Allocator allocator = Allocator.heap();
-             Buf a = allocator.allocate(4, ByteOrder.BIG_ENDIAN);
-             Buf b = allocator.allocate(4, ByteOrder.LITTLE_ENDIAN)) {
+             Buf a = allocator.allocate(4, BIG_ENDIAN);
+             Buf b = allocator.allocate(4, LITTLE_ENDIAN)) {
             assertThrows(IllegalArgumentException.class, () -> allocator.compose(a, b));
         }
     }
@@ -2063,7 +2078,7 @@ public class BufTest {
     @MethodSource("nonSliceAllocators")
     public void bifurcatedPartMustContainFirstHalfOfBuffer(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
-             Buf buf = allocator.allocate(16).order(ByteOrder.BIG_ENDIAN)) {
+             Buf buf = allocator.allocate(16).order(BIG_ENDIAN)) {
             buf.writeLong(0x0102030405060708L);
             assertThat(buf.readByte()).isEqualTo((byte) 0x01);
             try (Buf bif = buf.bifurcate()) {
@@ -2099,7 +2114,7 @@ public class BufTest {
     @MethodSource("nonSliceAllocators")
     public void bifurcatedPartsMustBeIndividuallySendable(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
-             Buf buf = allocator.allocate(16).order(ByteOrder.BIG_ENDIAN)) {
+             Buf buf = allocator.allocate(16).order(BIG_ENDIAN)) {
             buf.writeLong(0x0102030405060708L);
             assertThat(buf.readByte()).isEqualTo((byte) 0x01);
             try (Buf sentBif = buf.bifurcate().send().receive()) {
@@ -2128,7 +2143,7 @@ public class BufTest {
     @MethodSource("nonSliceAllocators")
     public void mustBePossibleToBifurcateMoreThanOnce(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
-             Buf buf = allocator.allocate(16).order(ByteOrder.BIG_ENDIAN)) {
+             Buf buf = allocator.allocate(16).order(BIG_ENDIAN)) {
             buf.writeLong(0x0102030405060708L);
             try (Buf a = buf.bifurcate()) {
                 a.writerOffset(4);
@@ -2156,15 +2171,15 @@ public class BufTest {
     @MethodSource("nonSliceAllocators")
     public void bifurcatedBufferMustHaveSameByteOrderAsParent(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
-             Buf buf = allocator.allocate(8).order(ByteOrder.BIG_ENDIAN)) {
+             Buf buf = allocator.allocate(8).order(BIG_ENDIAN)) {
             buf.writeLong(0x0102030405060708L);
             try (Buf a = buf.bifurcate()) {
-                assertThat(a.order()).isEqualTo(ByteOrder.BIG_ENDIAN);
-                a.order(ByteOrder.LITTLE_ENDIAN);
+                assertThat(a.order()).isEqualTo(BIG_ENDIAN);
+                a.order(LITTLE_ENDIAN);
                 a.writerOffset(4);
                 try (Buf b = a.bifurcate()) {
-                    assertThat(b.order()).isEqualTo(ByteOrder.LITTLE_ENDIAN);
-                    assertThat(buf.order()).isEqualTo(ByteOrder.BIG_ENDIAN);
+                    assertThat(b.order()).isEqualTo(LITTLE_ENDIAN);
+                    assertThat(buf.order()).isEqualTo(BIG_ENDIAN);
                 }
             }
         }
@@ -2193,7 +2208,7 @@ public class BufTest {
     @MethodSource("nonSliceAllocators")
     public void ensureWritableOnBifurcatedBuffersWithOddOffsets(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
-             Buf buf = allocator.allocate(10).order(ByteOrder.BIG_ENDIAN)) {
+             Buf buf = allocator.allocate(10).order(BIG_ENDIAN)) {
             buf.writeLong(0x0102030405060708L);
             buf.writeByte((byte) 0x09);
             buf.readByte();
@@ -2213,7 +2228,7 @@ public class BufTest {
     @Test
     public void bifurcateOnEmptyBigEndianCompositeBuffer() {
         try (Allocator allocator = Allocator.heap();
-             Buf buf = allocator.compose().order(ByteOrder.BIG_ENDIAN)) {
+             Buf buf = allocator.compose().order(BIG_ENDIAN)) {
             verifyBifurcateEmptyCompositeBuffer(buf);
         }
     }
@@ -2221,7 +2236,7 @@ public class BufTest {
     @Test
     public void bifurcateOnEmptyLittleEndianCompositeBuffer() {
         try (Allocator allocator = Allocator.heap();
-             Buf buf = allocator.compose().order(ByteOrder.LITTLE_ENDIAN)) {
+             Buf buf = allocator.compose().order(LITTLE_ENDIAN)) {
             verifyBifurcateEmptyCompositeBuffer(buf);
         }
     }
@@ -2286,7 +2301,7 @@ public class BufTest {
     @MethodSource("nonSliceAllocators")
     public void compactMustDiscardReadBytes(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
-             Buf buf = allocator.allocate(16, ByteOrder.BIG_ENDIAN)) {
+             Buf buf = allocator.allocate(16, BIG_ENDIAN)) {
             buf.writeLong(0x0102030405060708L).writeInt(0x090A0B0C);
             assertEquals(0x01020304, buf.readInt());
             assertEquals(12, buf.writerOffset());
@@ -2308,7 +2323,7 @@ public class BufTest {
     @MethodSource("nonSliceAllocators")
     public void compactMustThrowForUnownedBuffer(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
-             Buf buf = allocator.allocate(8, ByteOrder.BIG_ENDIAN)) {
+             Buf buf = allocator.allocate(8, BIG_ENDIAN)) {
             buf.writeLong(0x0102030405060708L);
             assertEquals((byte) 0x01, buf.readByte());
             try (Buf ignore = buf.acquire()) {
@@ -2568,6 +2583,106 @@ public class BufTest {
         }
     }
 
+    @ParameterizedTest
+    @MethodSource("nonCompositeAllocators")
+    public void componentCountOfNonCompositeBufferMustBeOne(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(8)) {
+            assertThat(buf.componentCount()).isOne();
+        }
+    }
+
+    @Test
+    public void compositeBufferComponentCountMustBeTransitiveSum() {
+        try (Allocator allocator = Allocator.heap()) {
+            Buf buf;
+            try (Buf a = allocator.allocate(8);
+                 Buf b = allocator.allocate(8);
+                 Buf c = allocator.allocate(8);
+                 Buf x = allocator.compose(b, c)) {
+                buf = allocator.compose(a, x);
+            }
+            assertThat(buf.componentCount()).isEqualTo(3);
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("nonCompositeAllocators")
+    public void forEachReadableMustVisitBuffer(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf bufBERW = allocator.allocate(8).order(BIG_ENDIAN).writeLong(0x0102030405060708L);
+             Buf bufLERW = allocator.allocate(8).order(LITTLE_ENDIAN).writeLong(0x0102030405060708L);
+             Buf bufBERO = allocator.allocate(8).order(BIG_ENDIAN).writeLong(0x0102030405060708L).readOnly(true);
+             Buf bufLERO = allocator.allocate(8).order(LITTLE_ENDIAN).writeLong(0x0102030405060708L).readOnly(true)) {
+            verifyForEachReadableSignleComponent(fixture, bufBERW);
+            verifyForEachReadableSignleComponent(fixture, bufLERW);
+            verifyForEachReadableSignleComponent(fixture, bufBERO);
+            verifyForEachReadableSignleComponent(fixture, bufLERO);
+        }
+    }
+
+    private static void verifyForEachReadableSignleComponent(Fixture fixture, Buf buf) {
+        buf.forEachReadable(component -> {
+            var buffer = component.byteBuffer();
+            assertThat(buffer.position()).isZero();
+            assertThat(buffer.limit()).isEqualTo(8);
+            assertThat(buffer.capacity()).isEqualTo(8);
+            assertEquals(0x0102030405060708L, buffer.getLong());
+
+            if (fixture.isDirect()) {
+                assertThat(component.nativeAddress()).isNotZero();
+            } else {
+                assertThat(component.nativeAddress()).isZero();
+            }
+
+            byte[] array = component.array();
+            if (buffer.order() == BIG_ENDIAN) {
+                assertThat(array).containsExactly(0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08);
+            } else {
+                assertThat(array).containsExactly(0x08, 0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01);
+            }
+
+            if (buf.readOnly()) {
+                assertTrue(buffer.isReadOnly());
+                assertThrows(ReadOnlyBufferException.class, () -> buffer.put(0, (byte) 0xFF));
+            } else {
+                assertFalse(buffer.isReadOnly());
+                buffer.put(0, (byte) 0xFF);
+                assertEquals((byte) 0xFF, buffer.get(0));
+            }
+        });
+    }
+
+    @Test
+    public void forEachReadableMustVisitAllReadableConstituentBuffersInOrder() {
+        try (Allocator allocator = Allocator.heap()) {
+            Buf composite;
+            try (Buf a = allocator.allocate(4);
+                 Buf b = allocator.allocate(4);
+                 Buf c = allocator.allocate(4)) {
+                a.writeInt(1);
+                b.writeInt(2);
+                c.writeInt(3);
+                composite = allocator.compose(a, b, c);
+            }
+            var list = new LinkedList<Integer>(List.of(1, 2, 3));
+            composite.forEachReadable(component -> {
+                assertEquals(list.pollFirst().intValue(), component.byteBuffer().getInt());
+            });
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    public void forEachReadableOnClosedBufferMustThrow(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator()) {
+            var buf = allocator.allocate(8);
+            buf.writeLong(0);
+            buf.close();
+            assertThrows(IllegalStateException.class, () -> buf.forEachReadable(component -> { }));
+        }
+    }
+
     // <editor-fold defaultstate="collapsed" desc="Primitive accessors tests.">
     @ParameterizedTest
     @MethodSource("allocators")
@@ -2590,7 +2705,7 @@ public class BufTest {
     void relativeReadOfByteMustReadWithDefaultEndianByteOrder(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            buf.order(ByteOrder.BIG_ENDIAN);
+            buf.order(BIG_ENDIAN);
             assertEquals(0, buf.readableBytes());
             assertEquals(Long.BYTES, buf.writableBytes());
             byte value = 0x01;
@@ -2631,6 +2746,15 @@ public class BufTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
+    void offsettedGetOfByteReadOnlyMustBoundsCheckOnNegativeOffset(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(8)) {
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getByte(-1));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
     void offsettedGetOfByteMustNotBoundsCheckWhenReadOffsetAndSizeIsEqualToWriteOffset(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
@@ -2645,7 +2769,7 @@ public class BufTest {
     void offsettedGetOfByteMustReadWithDefaultEndianByteOrder(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            buf.order(ByteOrder.BIG_ENDIAN);
+            buf.order(BIG_ENDIAN);
             byte value = 0x01;
             buf.writeByte(value);
             buf.setByte(0, (byte) 0x10);
@@ -2666,10 +2790,30 @@ public class BufTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
+    void offsettedGetOfByteReadOnlyMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanWriteOffset(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(8)) {
+            byte value = 0x01;
+            buf.writeByte(value);
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getByte(-1));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
     void offsettedGetOfByteMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             assertThrows(IndexOutOfBoundsException.class, () -> buf.getByte(0));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    void offsettedGetOfByteReadOnlyMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(8)) {
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getByte(0));
         }
     }
 
@@ -2694,7 +2838,7 @@ public class BufTest {
     void relativeReadOfUnsignedByteMustReadWithDefaultEndianByteOrder(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            buf.order(ByteOrder.BIG_ENDIAN);
+            buf.order(BIG_ENDIAN);
             assertEquals(0, buf.readableBytes());
             assertEquals(Long.BYTES, buf.writableBytes());
             int value = 0x01;
@@ -2726,10 +2870,36 @@ public class BufTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
+    void relativeReadOfUnsignedByteReadOnlyMustBoundsCheckWhenReadOffsetAndSizeIsBeyondWriteOffset(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(8)) {
+            assertEquals(0, buf.readableBytes());
+            assertEquals(Long.BYTES, buf.writableBytes());
+            int value = 0x01;
+            buf.writeUnsignedByte(value);
+            buf.readerOffset(1);
+            assertEquals(0, buf.readableBytes());
+            assertEquals(7, buf.writableBytes());
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).readUnsignedByte());
+            assertEquals(0, buf.readableBytes());
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
     void offsettedGetOfUnsignedByteMustBoundsCheckOnNegativeOffset(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             assertThrows(IndexOutOfBoundsException.class, () -> buf.getUnsignedByte(-1));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    void offsettedGetOfUnsignedByteReadOnlyMustBoundsCheckOnNegativeOffset(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(8)) {
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getUnsignedByte(-1));
         }
     }
 
@@ -2749,7 +2919,7 @@ public class BufTest {
     void offsettedGetOfUnsignedByteMustReadWithDefaultEndianByteOrder(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            buf.order(ByteOrder.BIG_ENDIAN);
+            buf.order(BIG_ENDIAN);
             int value = 0x01;
             buf.writeUnsignedByte(value);
             buf.setByte(0, (byte) 0x10);
@@ -2770,10 +2940,31 @@ public class BufTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
+    void offsettedGetOfUnsignedByteReadOnlyMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanWriteOffset(
+            Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(8)) {
+            int value = 0x01;
+            buf.writeUnsignedByte(value);
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getUnsignedByte(1));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
     void offsettedGetOfUnsignedByteMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             assertThrows(IndexOutOfBoundsException.class, () -> buf.getUnsignedByte(0));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    void offsettedGetOfUnsignedByteReadOnlyMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(8)) {
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getUnsignedByte(0));
         }
     }
 
@@ -2797,7 +2988,7 @@ public class BufTest {
     void relativeWriteOfByteMustHaveDefaultEndianByteOrder(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            buf.order(ByteOrder.BIG_ENDIAN);
+            buf.order(BIG_ENDIAN);
             byte value = 0x01;
             buf.writeByte(value);
             buf.writerOffset(Long.BYTES);
@@ -2845,7 +3036,7 @@ public class BufTest {
     void offsettedSetOfByteMustHaveDefaultEndianByteOrder(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            buf.order(ByteOrder.BIG_ENDIAN);
+            buf.order(BIG_ENDIAN);
             byte value = 0x01;
             buf.setByte(0, value);
             buf.writerOffset(Long.BYTES);
@@ -2880,7 +3071,7 @@ public class BufTest {
     void relativeWriteOfUnsignedByteMustHaveDefaultEndianByteOrder(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            buf.order(ByteOrder.BIG_ENDIAN);
+            buf.order(BIG_ENDIAN);
             int value = 0x01;
             buf.writeUnsignedByte(value);
             buf.writerOffset(Long.BYTES);
@@ -2928,7 +3119,7 @@ public class BufTest {
     void offsettedSetOfUnsignedByteMustHaveDefaultEndianByteOrder(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            buf.order(ByteOrder.BIG_ENDIAN);
+            buf.order(BIG_ENDIAN);
             int value = 0x01;
             buf.setUnsignedByte(0, value);
             buf.writerOffset(Long.BYTES);
@@ -2964,7 +3155,7 @@ public class BufTest {
     void relativeReadOfCharMustReadWithDefaultEndianByteOrder(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            buf.order(ByteOrder.BIG_ENDIAN);
+            buf.order(BIG_ENDIAN);
             assertEquals(0, buf.readableBytes());
             assertEquals(Long.BYTES, buf.writableBytes());
             char value = 0x0102;
@@ -2996,10 +3187,36 @@ public class BufTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
+    void relativeReadOfCharReadOnlyMustBoundsCheckWhenReadOffsetAndSizeIsBeyondWriteOffset(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(8)) {
+            assertEquals(0, buf.readableBytes());
+            assertEquals(Long.BYTES, buf.writableBytes());
+            char value = 0x0102;
+            buf.writeChar(value);
+            buf.readerOffset(1);
+            assertEquals(1, buf.readableBytes());
+            assertEquals(6, buf.writableBytes());
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).readChar());
+            assertEquals(1, buf.readableBytes());
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
     void offsettedGetOfCharMustBoundsCheckOnNegativeOffset(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             assertThrows(IndexOutOfBoundsException.class, () -> buf.getChar(-1));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    void offsettedGetOfCharReadOnlyMustBoundsCheckOnNegativeOffset(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(8)) {
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getChar(-1));
         }
     }
 
@@ -3019,7 +3236,7 @@ public class BufTest {
     void offsettedGetOfCharMustReadWithDefaultEndianByteOrder(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            buf.order(ByteOrder.BIG_ENDIAN);
+            buf.order(BIG_ENDIAN);
             char value = 0x0102;
             buf.writeChar(value);
             buf.setByte(0, (byte) 0x10);
@@ -3040,10 +3257,30 @@ public class BufTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
+    void offsettedGetOfCharReadOnlyMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanWriteOffset(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(8)) {
+            char value = 0x0102;
+            buf.writeChar(value);
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getChar(1));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
     void offsettedGetOfCharMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             assertThrows(IndexOutOfBoundsException.class, () -> buf.getChar(0));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    void offsettedGetOfCharReadOnlyMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(8)) {
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getChar(0));
         }
     }
 
@@ -3067,7 +3304,7 @@ public class BufTest {
     void relativeWriteOfCharMustHaveDefaultEndianByteOrder(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            buf.order(ByteOrder.BIG_ENDIAN);
+            buf.order(BIG_ENDIAN);
             char value = 0x0102;
             buf.writeChar(value);
             buf.writerOffset(Long.BYTES);
@@ -3115,7 +3352,7 @@ public class BufTest {
     void offsettedSetOfCharMustHaveDefaultEndianByteOrder(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            buf.order(ByteOrder.BIG_ENDIAN);
+            buf.order(BIG_ENDIAN);
             char value = 0x0102;
             buf.setChar(0, value);
             buf.writerOffset(Long.BYTES);
@@ -3151,7 +3388,7 @@ public class BufTest {
     void relativeReadOfShortMustReadWithDefaultEndianByteOrder(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            buf.order(ByteOrder.BIG_ENDIAN);
+            buf.order(BIG_ENDIAN);
             assertEquals(0, buf.readableBytes());
             assertEquals(Long.BYTES, buf.writableBytes());
             short value = 0x0102;
@@ -3183,10 +3420,36 @@ public class BufTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
+    void relativeReadOfShortReadOnlyMustBoundsCheckWhenReadOffsetAndSizeIsBeyondWriteOffset(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(8)) {
+            assertEquals(0, buf.readableBytes());
+            assertEquals(Long.BYTES, buf.writableBytes());
+            short value = 0x0102;
+            buf.writeShort(value);
+            buf.readerOffset(1);
+            assertEquals(1, buf.readableBytes());
+            assertEquals(6, buf.writableBytes());
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).readShort());
+            assertEquals(1, buf.readableBytes());
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
     void offsettedGetOfShortMustBoundsCheckOnNegativeOffset(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             assertThrows(IndexOutOfBoundsException.class, () -> buf.getShort(-1));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    void offsettedGetOfShortReadOnlyMustBoundsCheckOnNegativeOffset(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(8)) {
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getShort(-1));
         }
     }
 
@@ -3206,7 +3469,7 @@ public class BufTest {
     void offsettedGetOfShortMustReadWithDefaultEndianByteOrder(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            buf.order(ByteOrder.BIG_ENDIAN);
+            buf.order(BIG_ENDIAN);
             short value = 0x0102;
             buf.writeShort(value);
             buf.setByte(0, (byte) 0x10);
@@ -3227,10 +3490,30 @@ public class BufTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
+    void offsettedGetOfShortReadOnlyMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanWriteOffset(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(8)) {
+            short value = 0x0102;
+            buf.writeShort(value);
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getShort(1));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
     void offsettedGetOfShortMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             assertThrows(IndexOutOfBoundsException.class, () -> buf.getShort(0));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    void offsettedGetOfShortReadOnlyMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(8)) {
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getShort(0));
         }
     }
 
@@ -3255,7 +3538,7 @@ public class BufTest {
     void relativeReadOfUnsignedShortMustReadWithDefaultEndianByteOrder(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            buf.order(ByteOrder.BIG_ENDIAN);
+            buf.order(BIG_ENDIAN);
             assertEquals(0, buf.readableBytes());
             assertEquals(Long.BYTES, buf.writableBytes());
             int value = 0x0102;
@@ -3287,10 +3570,36 @@ public class BufTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
+    void relativeReadOfUnsignedShortReadOnlyMustBoundsCheckWhenReadOffsetAndSizeIsBeyondWriteOffset(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(8)) {
+            assertEquals(0, buf.readableBytes());
+            assertEquals(Long.BYTES, buf.writableBytes());
+            int value = 0x0102;
+            buf.writeUnsignedShort(value);
+            buf.readerOffset(1);
+            assertEquals(1, buf.readableBytes());
+            assertEquals(6, buf.writableBytes());
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).readUnsignedShort());
+            assertEquals(1, buf.readableBytes());
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
     void offsettedGetOfUnsignedShortMustBoundsCheckOnNegativeOffset(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             assertThrows(IndexOutOfBoundsException.class, () -> buf.getUnsignedShort(-1));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    void offsettedGetOfUnsignedShortReadOnlyMustBoundsCheckOnNegativeOffset(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(8)) {
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getUnsignedShort(-1));
         }
     }
 
@@ -3310,7 +3619,7 @@ public class BufTest {
     void offsettedGetOfUnsignedShortMustReadWithDefaultEndianByteOrder(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            buf.order(ByteOrder.BIG_ENDIAN);
+            buf.order(BIG_ENDIAN);
             int value = 0x0102;
             buf.writeUnsignedShort(value);
             buf.setByte(0, (byte) 0x10);
@@ -3331,10 +3640,31 @@ public class BufTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
+    void offsettedGetOfUnsignedShortReadOnlyMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanWriteOffset(
+            Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(8)) {
+            int value = 0x0102;
+            buf.writeUnsignedShort(value);
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getUnsignedShort(1));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
     void offsettedGetOfUnsignedShortMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             assertThrows(IndexOutOfBoundsException.class, () -> buf.getUnsignedShort(0));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    void offsettedGetOfUnsignedShortReadOnlyMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(8)) {
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getUnsignedShort(0));
         }
     }
 
@@ -3358,7 +3688,7 @@ public class BufTest {
     void relativeWriteOfShortMustHaveDefaultEndianByteOrder(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            buf.order(ByteOrder.BIG_ENDIAN);
+            buf.order(BIG_ENDIAN);
             short value = 0x0102;
             buf.writeShort(value);
             buf.writerOffset(Long.BYTES);
@@ -3406,7 +3736,7 @@ public class BufTest {
     void offsettedSetOfShortMustHaveDefaultEndianByteOrder(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            buf.order(ByteOrder.BIG_ENDIAN);
+            buf.order(BIG_ENDIAN);
             short value = 0x0102;
             buf.setShort(0, value);
             buf.writerOffset(Long.BYTES);
@@ -3441,7 +3771,7 @@ public class BufTest {
     void relativeWriteOfUnsignedShortMustHaveDefaultEndianByteOrder(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            buf.order(ByteOrder.BIG_ENDIAN);
+            buf.order(BIG_ENDIAN);
             int value = 0x0102;
             buf.writeUnsignedShort(value);
             buf.writerOffset(Long.BYTES);
@@ -3489,7 +3819,7 @@ public class BufTest {
     void offsettedSetOfUnsignedShortMustHaveDefaultEndianByteOrder(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            buf.order(ByteOrder.BIG_ENDIAN);
+            buf.order(BIG_ENDIAN);
             int value = 0x0102;
             buf.setUnsignedShort(0, value);
             buf.writerOffset(Long.BYTES);
@@ -3525,7 +3855,7 @@ public class BufTest {
     void relativeReadOfMediumMustReadWithDefaultEndianByteOrder(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            buf.order(ByteOrder.BIG_ENDIAN);
+            buf.order(BIG_ENDIAN);
             assertEquals(0, buf.readableBytes());
             assertEquals(Long.BYTES, buf.writableBytes());
             int value = 0x010203;
@@ -3557,10 +3887,36 @@ public class BufTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
+    void relativeReadOfMediumReadOnlyMustBoundsCheckWhenReadOffsetAndSizeIsBeyondWriteOffset(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(8)) {
+            assertEquals(0, buf.readableBytes());
+            assertEquals(Long.BYTES, buf.writableBytes());
+            int value = 0x010203;
+            buf.writeMedium(value);
+            buf.readerOffset(1);
+            assertEquals(2, buf.readableBytes());
+            assertEquals(5, buf.writableBytes());
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).readMedium());
+            assertEquals(2, buf.readableBytes());
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
     void offsettedGetOfMediumMustBoundsCheckOnNegativeOffset(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             assertThrows(IndexOutOfBoundsException.class, () -> buf.getMedium(-1));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    void offsettedGetOfMediumReadOnlyMustBoundsCheckOnNegativeOffset(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(8)) {
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getMedium(-1));
         }
     }
 
@@ -3580,7 +3936,7 @@ public class BufTest {
     void offsettedGetOfMediumMustReadWithDefaultEndianByteOrder(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            buf.order(ByteOrder.BIG_ENDIAN);
+            buf.order(BIG_ENDIAN);
             int value = 0x010203;
             buf.writeMedium(value);
             buf.setByte(0, (byte) 0x10);
@@ -3601,10 +3957,30 @@ public class BufTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
+    void offsettedGetOfMediumReadOnlyMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanWriteOffset(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(8)) {
+            int value = 0x010203;
+            buf.writeMedium(value);
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getMedium(1));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
     void offsettedGetOfMediumMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             assertThrows(IndexOutOfBoundsException.class, () -> buf.getMedium(0));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    void offsettedGetOfMediumReadOnlyMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(8)) {
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getMedium(0));
         }
     }
 
@@ -3629,7 +4005,7 @@ public class BufTest {
     void relativeReadOfUnsignedMediumMustReadWithDefaultEndianByteOrder(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            buf.order(ByteOrder.BIG_ENDIAN);
+            buf.order(BIG_ENDIAN);
             assertEquals(0, buf.readableBytes());
             assertEquals(Long.BYTES, buf.writableBytes());
             int value = 0x010203;
@@ -3661,10 +4037,36 @@ public class BufTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
+    void relativeReadOfUnsignedMediumReadOnlyMustBoundsCheckWhenReadOffsetAndSizeIsBeyondWriteOffset(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(8)) {
+            assertEquals(0, buf.readableBytes());
+            assertEquals(Long.BYTES, buf.writableBytes());
+            int value = 0x010203;
+            buf.writeUnsignedMedium(value);
+            buf.readerOffset(1);
+            assertEquals(2, buf.readableBytes());
+            assertEquals(5, buf.writableBytes());
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).readUnsignedMedium());
+            assertEquals(2, buf.readableBytes());
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
     void offsettedGetOfUnsignedMediumMustBoundsCheckOnNegativeOffset(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             assertThrows(IndexOutOfBoundsException.class, () -> buf.getUnsignedMedium(-1));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    void offsettedGetOfUnsignedMediumReadOnlyMustBoundsCheckOnNegativeOffset(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(8)) {
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getUnsignedMedium(-1));
         }
     }
 
@@ -3684,7 +4086,7 @@ public class BufTest {
     void offsettedGetOfUnsignedMediumMustReadWithDefaultEndianByteOrder(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            buf.order(ByteOrder.BIG_ENDIAN);
+            buf.order(BIG_ENDIAN);
             int value = 0x010203;
             buf.writeUnsignedMedium(value);
             buf.setByte(0, (byte) 0x10);
@@ -3705,10 +4107,31 @@ public class BufTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
+    void offsettedGetOfUnsignedMediumReadOnlyMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanWriteOffset(
+            Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(8)) {
+            int value = 0x010203;
+            buf.writeUnsignedMedium(value);
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getUnsignedMedium(1));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
     void offsettedGetOfUnsignedMediumMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             assertThrows(IndexOutOfBoundsException.class, () -> buf.getUnsignedMedium(0));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    void offsettedGetOfUnsignedMediumReadOnlyMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(8)) {
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getUnsignedMedium(0));
         }
     }
 
@@ -3732,7 +4155,7 @@ public class BufTest {
     void relativeWriteOfMediumMustHaveDefaultEndianByteOrder(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            buf.order(ByteOrder.BIG_ENDIAN);
+            buf.order(BIG_ENDIAN);
             int value = 0x010203;
             buf.writeMedium(value);
             buf.writerOffset(Long.BYTES);
@@ -3780,7 +4203,7 @@ public class BufTest {
     void offsettedSetOfMediumMustHaveDefaultEndianByteOrder(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            buf.order(ByteOrder.BIG_ENDIAN);
+            buf.order(BIG_ENDIAN);
             int value = 0x010203;
             buf.setMedium(0, value);
             buf.writerOffset(Long.BYTES);
@@ -3815,7 +4238,7 @@ public class BufTest {
     void relativeWriteOfUnsignedMediumMustHaveDefaultEndianByteOrder(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            buf.order(ByteOrder.BIG_ENDIAN);
+            buf.order(BIG_ENDIAN);
             int value = 0x010203;
             buf.writeUnsignedMedium(value);
             buf.writerOffset(Long.BYTES);
@@ -3863,7 +4286,7 @@ public class BufTest {
     void offsettedSetOfUnsignedMediumMustHaveDefaultEndianByteOrder(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            buf.order(ByteOrder.BIG_ENDIAN);
+            buf.order(BIG_ENDIAN);
             int value = 0x010203;
             buf.setUnsignedMedium(0, value);
             buf.writerOffset(Long.BYTES);
@@ -3899,7 +4322,7 @@ public class BufTest {
     void relativeReadOfIntMustReadWithDefaultEndianByteOrder(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            buf.order(ByteOrder.BIG_ENDIAN);
+            buf.order(BIG_ENDIAN);
             assertEquals(0, buf.readableBytes());
             assertEquals(Long.BYTES, buf.writableBytes());
             int value = 0x01020304;
@@ -3931,10 +4354,36 @@ public class BufTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
+    void relativeReadOfIntReadOnlyMustBoundsCheckWhenReadOffsetAndSizeIsBeyondWriteOffset(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(8)) {
+            assertEquals(0, buf.readableBytes());
+            assertEquals(Long.BYTES, buf.writableBytes());
+            int value = 0x01020304;
+            buf.writeInt(value);
+            buf.readerOffset(1);
+            assertEquals(3, buf.readableBytes());
+            assertEquals(4, buf.writableBytes());
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).readInt());
+            assertEquals(3, buf.readableBytes());
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
     void offsettedGetOfIntMustBoundsCheckOnNegativeOffset(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             assertThrows(IndexOutOfBoundsException.class, () -> buf.getInt(-1));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    void offsettedGetOfIntReadOnlyMustBoundsCheckOnNegativeOffset(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(8)) {
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getInt(-1));
         }
     }
 
@@ -3954,7 +4403,7 @@ public class BufTest {
     void offsettedGetOfIntMustReadWithDefaultEndianByteOrder(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            buf.order(ByteOrder.BIG_ENDIAN);
+            buf.order(BIG_ENDIAN);
             int value = 0x01020304;
             buf.writeInt(value);
             buf.setByte(0, (byte) 0x10);
@@ -3975,10 +4424,30 @@ public class BufTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
+    void offsettedGetOfIntReadOnlyMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanWriteOffset(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(8)) {
+            int value = 0x01020304;
+            buf.writeInt(value);
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getInt(-1));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
     void offsettedGetOfIntMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             assertThrows(IndexOutOfBoundsException.class, () -> buf.getInt(0));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    void offsettedGetOfIntReadOnlyMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(8)) {
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getInt(0));
         }
     }
 
@@ -4003,7 +4472,7 @@ public class BufTest {
     void relativeReadOfUnsignedIntMustReadWithDefaultEndianByteOrder(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            buf.order(ByteOrder.BIG_ENDIAN);
+            buf.order(BIG_ENDIAN);
             assertEquals(0, buf.readableBytes());
             assertEquals(Long.BYTES, buf.writableBytes());
             long value = 0x01020304;
@@ -4035,10 +4504,36 @@ public class BufTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
+    void relativeReadOfUnsignedIntReadOnlyMustBoundsCheckWhenReadOffsetAndSizeIsBeyondWriteOffset(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(8)) {
+            assertEquals(0, buf.readableBytes());
+            assertEquals(Long.BYTES, buf.writableBytes());
+            long value = 0x01020304;
+            buf.writeUnsignedInt(value);
+            buf.readerOffset(1);
+            assertEquals(3, buf.readableBytes());
+            assertEquals(4, buf.writableBytes());
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).readUnsignedInt());
+            assertEquals(3, buf.readableBytes());
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
     void offsettedGetOfUnsignedIntMustBoundsCheckOnNegativeOffset(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             assertThrows(IndexOutOfBoundsException.class, () -> buf.getUnsignedInt(-1));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    void offsettedGetOfUnsignedIntReadOnlyMustBoundsCheckOnNegativeOffset(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(8)) {
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getUnsignedInt(-1));
         }
     }
 
@@ -4058,7 +4553,7 @@ public class BufTest {
     void offsettedGetOfUnsignedIntMustReadWithDefaultEndianByteOrder(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            buf.order(ByteOrder.BIG_ENDIAN);
+            buf.order(BIG_ENDIAN);
             long value = 0x01020304;
             buf.writeUnsignedInt(value);
             buf.setByte(0, (byte) 0x10);
@@ -4079,10 +4574,31 @@ public class BufTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
+    void offsettedGetOfUnsignedIntReadOnlyMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanWriteOffset(
+            Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(8)) {
+            long value = 0x01020304;
+            buf.writeUnsignedInt(value);
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getUnsignedInt(1));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
     void offsettedGetOfUnsignedIntMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             assertThrows(IndexOutOfBoundsException.class, () -> buf.getUnsignedInt(0));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    void offsettedGetOfUnsignedIntReadOnlyMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(8)) {
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getUnsignedInt(0));
         }
     }
 
@@ -4106,7 +4622,7 @@ public class BufTest {
     void relativeWriteOfIntMustHaveDefaultEndianByteOrder(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            buf.order(ByteOrder.BIG_ENDIAN);
+            buf.order(BIG_ENDIAN);
             int value = 0x01020304;
             buf.writeInt(value);
             buf.writerOffset(Long.BYTES);
@@ -4154,7 +4670,7 @@ public class BufTest {
     void offsettedSetOfIntMustHaveDefaultEndianByteOrder(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            buf.order(ByteOrder.BIG_ENDIAN);
+            buf.order(BIG_ENDIAN);
             int value = 0x01020304;
             buf.setInt(0, value);
             buf.writerOffset(Long.BYTES);
@@ -4189,7 +4705,7 @@ public class BufTest {
     void relativeWriteOfUnsignedIntMustHaveDefaultEndianByteOrder(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            buf.order(ByteOrder.BIG_ENDIAN);
+            buf.order(BIG_ENDIAN);
             long value = 0x01020304;
             buf.writeUnsignedInt(value);
             buf.writerOffset(Long.BYTES);
@@ -4237,7 +4753,7 @@ public class BufTest {
     void offsettedSetOfUnsignedIntMustHaveDefaultEndianByteOrder(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            buf.order(ByteOrder.BIG_ENDIAN);
+            buf.order(BIG_ENDIAN);
             long value = 0x01020304;
             buf.setUnsignedInt(0, value);
             buf.writerOffset(Long.BYTES);
@@ -4273,7 +4789,7 @@ public class BufTest {
     void relativeReadOfFloatMustReadWithDefaultEndianByteOrder(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            buf.order(ByteOrder.BIG_ENDIAN);
+            buf.order(BIG_ENDIAN);
             assertEquals(0, buf.readableBytes());
             assertEquals(Long.BYTES, buf.writableBytes());
             float value = Float.intBitsToFloat(0x01020304);
@@ -4305,10 +4821,36 @@ public class BufTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
+    void relativeReadOfFloatReadOnlyMustBoundsCheckWhenReadOffsetAndSizeIsBeyondWriteOffset(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(8)) {
+            assertEquals(0, buf.readableBytes());
+            assertEquals(Long.BYTES, buf.writableBytes());
+            float value = Float.intBitsToFloat(0x01020304);
+            buf.writeFloat(value);
+            buf.readerOffset(1);
+            assertEquals(3, buf.readableBytes());
+            assertEquals(4, buf.writableBytes());
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).readFloat());
+            assertEquals(3, buf.readableBytes());
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
     void offsettedGetOfFloatMustBoundsCheckOnNegativeOffset(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             assertThrows(IndexOutOfBoundsException.class, () -> buf.getFloat(-1));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    void offsettedGetOfFloatReadOnlyMustBoundsCheckOnNegativeOffset(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(8)) {
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getFloat(-1));
         }
     }
 
@@ -4328,7 +4870,7 @@ public class BufTest {
     void offsettedGetOfFloatMustReadWithDefaultEndianByteOrder(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            buf.order(ByteOrder.BIG_ENDIAN);
+            buf.order(BIG_ENDIAN);
             float value = Float.intBitsToFloat(0x01020304);
             buf.writeFloat(value);
             buf.setByte(0, (byte) 0x10);
@@ -4349,10 +4891,30 @@ public class BufTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
+    void offsettedGetOfFloatReadOnlyMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanWriteOffset(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(8)) {
+            float value = Float.intBitsToFloat(0x01020304);
+            buf.writeFloat(value);
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getFloat(1));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
     void offsettedGetOfFloatMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             assertThrows(IndexOutOfBoundsException.class, () -> buf.getFloat(0));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    void offsettedGetOfFloatReadOnlyMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(8)) {
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getFloat(0));
         }
     }
 
@@ -4376,7 +4938,7 @@ public class BufTest {
     void relativeWriteOfFloatMustHaveDefaultEndianByteOrder(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            buf.order(ByteOrder.BIG_ENDIAN);
+            buf.order(BIG_ENDIAN);
             float value = Float.intBitsToFloat(0x01020304);
             buf.writeFloat(value);
             buf.writerOffset(Long.BYTES);
@@ -4424,7 +4986,7 @@ public class BufTest {
     void offsettedSetOfFloatMustHaveDefaultEndianByteOrder(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            buf.order(ByteOrder.BIG_ENDIAN);
+            buf.order(BIG_ENDIAN);
             float value = Float.intBitsToFloat(0x01020304);
             buf.setFloat(0, value);
             buf.writerOffset(Long.BYTES);
@@ -4460,7 +5022,7 @@ public class BufTest {
     void relativeReadOfLongMustReadWithDefaultEndianByteOrder(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            buf.order(ByteOrder.BIG_ENDIAN);
+            buf.order(BIG_ENDIAN);
             assertEquals(0, buf.readableBytes());
             assertEquals(Long.BYTES, buf.writableBytes());
             long value = 0x0102030405060708L;
@@ -4492,10 +5054,36 @@ public class BufTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
+    void relativeReadOfLongReadOnlyMustBoundsCheckWhenReadOffsetAndSizeIsBeyondWriteOffset(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(8)) {
+            assertEquals(0, buf.readableBytes());
+            assertEquals(Long.BYTES, buf.writableBytes());
+            long value = 0x0102030405060708L;
+            buf.writeLong(value);
+            buf.readerOffset(1);
+            assertEquals(7, buf.readableBytes());
+            assertEquals(0, buf.writableBytes());
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).readLong());
+            assertEquals(7, buf.readableBytes());
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
     void offsettedGetOfLongMustBoundsCheckOnNegativeOffset(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             assertThrows(IndexOutOfBoundsException.class, () -> buf.getLong(-1));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    void offsettedGetOfLongReadOnlyMustBoundsCheckOnNegativeOffset(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(8)) {
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getLong(-1));
         }
     }
 
@@ -4515,7 +5103,7 @@ public class BufTest {
     void offsettedGetOfLongMustReadWithDefaultEndianByteOrder(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            buf.order(ByteOrder.BIG_ENDIAN);
+            buf.order(BIG_ENDIAN);
             long value = 0x0102030405060708L;
             buf.writeLong(value);
             buf.setByte(0, (byte) 0x10);
@@ -4536,10 +5124,30 @@ public class BufTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
+    void offsettedGetOfLongReadOnlyMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanWriteOffset(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(8)) {
+            long value = 0x0102030405060708L;
+            buf.writeLong(value);
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getLong(1));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
     void offsettedGetOfLongMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             assertThrows(IndexOutOfBoundsException.class, () -> buf.getLong(0));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    void offsettedGetOfLongReadOnlyMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(8)) {
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getLong(0));
         }
     }
 
@@ -4563,7 +5171,7 @@ public class BufTest {
     void relativeWriteOfLongMustHaveDefaultEndianByteOrder(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            buf.order(ByteOrder.BIG_ENDIAN);
+            buf.order(BIG_ENDIAN);
             long value = 0x0102030405060708L;
             buf.writeLong(value);
             buf.writerOffset(Long.BYTES);
@@ -4611,7 +5219,7 @@ public class BufTest {
     void offsettedSetOfLongMustHaveDefaultEndianByteOrder(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            buf.order(ByteOrder.BIG_ENDIAN);
+            buf.order(BIG_ENDIAN);
             long value = 0x0102030405060708L;
             buf.setLong(0, value);
             buf.writerOffset(Long.BYTES);
@@ -4647,7 +5255,7 @@ public class BufTest {
     void relativeReadOfDoubleMustReadWithDefaultEndianByteOrder(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            buf.order(ByteOrder.BIG_ENDIAN);
+            buf.order(BIG_ENDIAN);
             assertEquals(0, buf.readableBytes());
             assertEquals(Long.BYTES, buf.writableBytes());
             double value = Double.longBitsToDouble(0x0102030405060708L);
@@ -4679,10 +5287,36 @@ public class BufTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
+    void relativeReadOfDoubleReadOnllyMustBoundsCheckWhenReadOffsetAndSizeIsBeyondWriteOffset(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(8)) {
+            assertEquals(0, buf.readableBytes());
+            assertEquals(Long.BYTES, buf.writableBytes());
+            double value = Double.longBitsToDouble(0x0102030405060708L);
+            buf.writeDouble(value);
+            buf.readerOffset(1);
+            assertEquals(7, buf.readableBytes());
+            assertEquals(0, buf.writableBytes());
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).readDouble());
+            assertEquals(7, buf.readableBytes());
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
     void offsettedGetOfDoubleMustBoundsCheckOnNegativeOffset(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             assertThrows(IndexOutOfBoundsException.class, () -> buf.getDouble(-1));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    void offsettedGetOfDoubleReadOnlyMustBoundsCheckOnNegativeOffset(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(8)) {
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getDouble(-1));
         }
     }
 
@@ -4702,7 +5336,7 @@ public class BufTest {
     void offsettedGetOfDoubleMustReadWithDefaultEndianByteOrder(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            buf.order(ByteOrder.BIG_ENDIAN);
+            buf.order(BIG_ENDIAN);
             double value = Double.longBitsToDouble(0x0102030405060708L);
             buf.writeDouble(value);
             buf.setByte(0, (byte) 0x10);
@@ -4723,10 +5357,30 @@ public class BufTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
+    void offsettedGetOfDoubleReadOnlyMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanWriteOffset(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(8)) {
+            double value = Double.longBitsToDouble(0x0102030405060708L);
+            buf.writeDouble(value);
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getDouble(1));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
     void offsettedGetOfDoubleMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
             assertThrows(IndexOutOfBoundsException.class, () -> buf.getDouble(0));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    void offsettedGetOfDoubleReadOnlyMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(8)) {
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getDouble(0));
         }
     }
 
@@ -4750,7 +5404,7 @@ public class BufTest {
     void relativeWriteOfDoubleMustHaveDefaultEndianByteOrder(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            buf.order(ByteOrder.BIG_ENDIAN);
+            buf.order(BIG_ENDIAN);
             double value = Double.longBitsToDouble(0x0102030405060708L);
             buf.writeDouble(value);
             buf.writerOffset(Long.BYTES);
@@ -4798,7 +5452,7 @@ public class BufTest {
     void offsettedSetOfDoubleMustHaveDefaultEndianByteOrder(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            buf.order(ByteOrder.BIG_ENDIAN);
+            buf.order(BIG_ENDIAN);
             double value = Double.longBitsToDouble(0x0102030405060708L);
             buf.setDouble(0, value);
             buf.writerOffset(Long.BYTES);

@@ -19,6 +19,7 @@ import io.netty.buffer.api.Allocator;
 import io.netty.buffer.api.AllocatorControl;
 import io.netty.buffer.api.Buf;
 import io.netty.buffer.api.ByteCursor;
+import io.netty.buffer.api.Component;
 import io.netty.buffer.api.Drop;
 import io.netty.buffer.api.Owned;
 import io.netty.buffer.api.RcSupport;
@@ -26,6 +27,7 @@ import jdk.incubator.foreign.MemorySegment;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.util.function.Consumer;
 
 import static jdk.incubator.foreign.MemoryAccess.getByteAtOffset;
 import static jdk.incubator.foreign.MemoryAccess.getCharAtOffset;
@@ -42,7 +44,7 @@ import static jdk.incubator.foreign.MemoryAccess.setIntAtOffset;
 import static jdk.incubator.foreign.MemoryAccess.setLongAtOffset;
 import static jdk.incubator.foreign.MemoryAccess.setShortAtOffset;
 
-class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
+class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf, Component {
     private static final MemorySegment CLOSED_SEGMENT;
     static final Drop<MemSegBuf> SEGMENT_CLOSE;
 
@@ -58,6 +60,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
 
     private final AllocatorControl alloc;
     private final boolean isSendable;
+    private final int baseOffset; // TODO remove this when JDK bug is fixed (slices of heap buffers)
     private MemorySegment seg;
     private MemorySegment wseg;
     private ByteOrder order;
@@ -65,15 +68,17 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
     private int woff;
 
     MemSegBuf(MemorySegment segmet, Drop<MemSegBuf> drop, AllocatorControl alloc) {
-        this(segmet, drop, alloc, true);
+        this(segmet, drop, alloc, true, 0);
     }
 
-    private MemSegBuf(MemorySegment segment, Drop<MemSegBuf> drop, AllocatorControl alloc, boolean isSendable) {
+    private MemSegBuf(MemorySegment segment, Drop<MemSegBuf> drop, AllocatorControl alloc, boolean isSendable,
+                      int baseOffset) {
         super(drop);
         this.alloc = alloc;
         seg = segment;
         wseg = segment;
         this.isSendable = isSendable;
+        this.baseOffset = baseOffset;
         order = ByteOrder.nativeOrder();
     }
 
@@ -130,12 +135,40 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
     }
 
     @Override
-    public long getNativeAddress() {
+    public boolean hasCachedArray() {
+        return false;
+    }
+
+    @Override
+    public byte[] array() {
+        return seg.toByteArray();
+    }
+
+    @Override
+    public long nativeAddress() {
         try {
             return seg.address().toRawLongValue();
         } catch (UnsupportedOperationException e) {
             return 0; // This is a heap segment.
         }
+    }
+
+    @Override
+    public ByteBuffer byteBuffer() {
+        var buffer = seg.asByteBuffer();
+        int base = baseOffset;
+        if (buffer.isDirect()) {
+            // TODO Remove this when JDK bug is fixed.
+            ByteBuffer tmp = ByteBuffer.allocateDirect(buffer.capacity());
+            tmp.put(buffer);
+            buffer = tmp.position(0);
+            base = 0; // TODO native memory segments do not have the buffer-of-slice bug.
+        }
+        if (readOnly()) {
+            buffer = buffer.asReadOnlyBuffer();
+        }
+        // TODO avoid slicing and just set position+limit when JDK bug is fixed.
+        return buffer.slice(base + readerOffset(), readableBytes()).order(order);
     }
 
     @Override
@@ -161,7 +194,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
             b.makeInaccessible();
         };
         var sendable = false; // Sending implies ownership change, which we can't do for slices.
-        return new MemSegBuf(slice, drop, alloc, sendable)
+        return new MemSegBuf(slice, drop, alloc, sendable, baseOffset + offset)
                 .writerOffset(length)
                 .order(order())
                 .readOnly(readOnly());
@@ -456,6 +489,18 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
         seg.copyFrom(seg.asSlice(roff, woff - roff));
         roff -= distance;
         woff -= distance;
+    }
+
+    @Override
+    public int componentCount() {
+        return 1;
+    }
+
+    @Override
+    public int forEachReadable(Consumer<Component> consumer) {
+        checkRead(readerOffset(), Math.max(1, readableBytes()));
+        consumer.accept(this);
+        return 1;
     }
 
     // <editor-fold defaultstate="collapsed" desc="Primitive accessors implementation.">
@@ -969,13 +1014,13 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
 
     private void checkRead(int index, int size) {
         if (index < 0 || woff < index + size) {
-            throw accessCheckException(index);
+            throw readAccessCheckException(index);
         }
     }
 
     private void checkWrite(int index, int size) {
         if (index < 0 || wseg.byteSize() < index + size) {
-            throw accessCheckException(index);
+            throw writeAccessCheckException(index);
         }
     }
 
@@ -989,16 +1034,21 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
         return ioobe;
     }
 
-    private RuntimeException accessCheckException(int index) {
+    private RuntimeException readAccessCheckException(int index) {
+        if (seg == CLOSED_SEGMENT) {
+            throw bufferIsClosed();
+        }
+        return outOfBounds(index);
+    }
+
+    private RuntimeException writeAccessCheckException(int index) {
         if (seg == CLOSED_SEGMENT) {
             throw bufferIsClosed();
         }
         if (wseg != seg) {
             return bufferIsReadOnly();
         }
-        return new IndexOutOfBoundsException(
-                "Index " + index + " is out of bounds: [read 0 to " + woff + ", write 0 to " +
-                (seg.byteSize() - 1) + "].");
+        return outOfBounds(index);
     }
 
     private static IllegalStateException bufferIsClosed() {
@@ -1007,6 +1057,12 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
 
     private static IllegalStateException bufferIsReadOnly() {
         return new IllegalStateException("This buffer is read-only.");
+    }
+
+    private IndexOutOfBoundsException outOfBounds(int index) {
+        return new IndexOutOfBoundsException(
+                "Index " + index + " is out of bounds: [read 0 to " + woff + ", write 0 to " +
+                (seg.byteSize() - 1) + "].");
     }
 
     Object recoverableMemory() {
