@@ -19,7 +19,6 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Arrays;
 import java.util.Objects;
-import java.util.function.Consumer;
 
 final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
     /**
@@ -49,7 +48,12 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
     private boolean readOnly;
 
     CompositeBuf(Allocator allocator, Buf[] bufs) {
-        this(allocator, true, bufs.clone(), COMPOSITE_DROP); // Clone prevents external modification of array.
+        this(allocator, true, filterExternalBufs(bufs), COMPOSITE_DROP);
+    }
+
+    private static Buf[] filterExternalBufs(Buf[] bufs) {
+        // Allocating a new array unconditionally also prevents external modification of the array.
+        return Arrays.stream(bufs).filter(b -> b.capacity() > 0).toArray(Buf[]::new);
     }
 
     private CompositeBuf(Allocator allocator, boolean isSendable, Buf[] bufs, Drop<CompositeBuf> drop) {
@@ -617,7 +621,14 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
                     (extension.readOnly()? "read-only." : "writable."));
         }
 
-        long newSize = capacity() + (long) extension.capacity();
+        long extensionCapacity = extension.capacity();
+        if (extensionCapacity == 0) {
+            // Extending by a zero-sized buffer makes no difference. Especially since it's not allowed to change the
+            // capacity of buffers that are constiuents of composite buffers.
+            return;
+        }
+
+        long newSize = capacity() + extensionCapacity;
         Allocator.checkSize(newSize);
 
         Buf[] restoreTemp = bufs; // We need this to restore our buffer array, in case offset computations fail.
@@ -702,21 +713,63 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
     }
 
     @Override
-    public int componentCount() {
+    public int countComponents() {
         int sum = 0;
         for (Buf buf : bufs) {
-            sum += buf.componentCount();
+            sum += buf.countComponents();
         }
         return sum;
     }
 
     @Override
-    public int forEachReadable(Consumer<Component> consumer) {
+    public int countReadableComponents() {
+        int sum = 0;
+        for (Buf buf : bufs) {
+            sum += buf.countReadableComponents();
+        }
+        return sum;
+    }
+
+    @Override
+    public int countWritableComponents() {
+        int sum = 0;
+        for (Buf buf : bufs) {
+            sum += buf.countWritableComponents();
+        }
+        return sum;
+    }
+
+    @Override
+    public int forEachReadable(int initialIndex, ComponentProcessor processor) {
         checkReadBounds(readerOffset(), Math.max(1, readableBytes()));
         int visited = 0;
         for (Buf buf : bufs) {
             if (buf.readableBytes() > 0) {
-                visited += buf.forEachReadable(consumer);
+                int count = buf.forEachReadable(visited + initialIndex, processor);
+                if (count > 0) {
+                    visited += count;
+                } else {
+                    visited = -visited + count;
+                    break;
+                }
+            }
+        }
+        return visited;
+    }
+
+    @Override
+    public int forEachWritable(int initialIndex, ComponentProcessor processor) {
+        checkWriteBounds(writerOffset(), Math.max(1, writableBytes()));
+        int visited = 0;
+        for (Buf buf : bufs) {
+            if (buf.writableBytes() > 0) {
+                int count = buf.forEachWritable(visited + initialIndex, processor);
+                if (count > 0) {
+                    visited += count;
+                } else {
+                    visited = -visited + count;
+                    break;
+                }
             }
         }
         return visited;

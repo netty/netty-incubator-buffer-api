@@ -17,7 +17,6 @@ package io.netty.buffer.api;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.util.function.Consumer;
 
 /**
  * A reference counted buffer of memory, with separate reader and writer offsets.
@@ -490,19 +489,74 @@ public interface Buf extends Rc<Buf>, BufAccessors {
      *
      * @return The number of components in this buffer.
      */
-    int componentCount();
+    int countComponents();
 
     /**
-     * Process all readable components of this buffer, and return the number of components consumed.
+     * Get the number of "components" in this buffer, that are readable. These are the components that would be
+     * processed by {@link #forEachReadable(int, ComponentProcessor)}. For composite buffers, this is the number of
+     * transitive constituent buffers that are readable, while non-composite buffers only have at most one readable
+     * component.
      * <p>
-     * The number of components consumed may be less than the {@linkplain #componentCount() component count} if not all
-     * of them have readable data.
+     * The number of readable components may be less than the {@link #countComponents() component count}, if not all of
+     * them have readable data.
      *
+     * @return The number of readable components in this buffer.
+     */
+    int countReadableComponents();
+
+    /**
+     * Get the number of "components" in this buffer, that are writable. These are the components that would be
+     * processed by {@link #forEachWritable(int, ComponentProcessor)}. For composite buffers, this is the number of
+     * transitive constituent buffers that are writable, while non-composite buffers only have at most one writable
+     * component.
+     * <p>
+     * The number of writable components may be less than the {@link #countComponents() component count}, if not all of
+     * them have space for writing.
+     *
+     * @return The number of writable components in this buffer.
+     */
+    int countWritableComponents();
+
+    /**
+     * Process all readable components of this buffer, and return the number of components processed.
+     * <p>
+     * The given {@linkplain ComponentProcessor processor} is called for each component in this buffer, and passed a
+     * component index, for the given component in the iteration, and a {@link Component} object for accessing the data
+     * within the given component.
+     * <p>
+     * The component index is specific to the particular invokation of this method, and may change. The first call to
+     * the consumer will be passed the given initial index, and the next call will be passed the initial index plus one,
+     * and so on.
+     * <p>
+     * The {@link ComponentProcessor} may stop the iteration at any time by returning {@code false}. This may cause the
+     * number of components processed to be returned as a negative number (to signal early return), and the number of
+     * components processed may then be less than the {@linkplain #countReadableComponents() readable component count}.
+     * <p>
      * <strong>Note</strong> that the {@link Component} instance passed to the consumer could be reused for multiple
      * calls, so the data must be extracted from the component in the context of the iteration.
+     * <p>
+     * The {@link ByteBuffer} instances obtained from the component, share life time with that internal component.
+     * This means they can be accessed as long as the internal memory store remain unchanged. Methods that may cause
+     * such changes, are any method that requires the buffer to be {@linkplain #isOwned() owned}.
+     * <p>
+     * The best way to ensure this doesn't cause any trouble, is to use the buffers directly as part of the iteration,
+     * or immediately after the iteration.
+     * <p>
+     * <strong>Note</strong> that the arrays, memory addresses, and byte buffers exposed as components by this method,
+     * should not be used for changing the buffer contents. Doing so may cause undefined behaviour.
+     * <p>
+     * Changes to position and limit of the byte buffers exposed via the processed components, are not reflected back to
+     * this buffer instance.
      *
-     * @param consumer The consumer that will be used to process the buffer components.
-     * @return The number of readable components processed, which may be less than {@link #componentCount()}.
+     * @param initialIndex The initial index of the iteration, and the index that will be passed to the first call to
+     *                    the {@linkplain ComponentProcessor#process(int, Component) processor}.
+     * @param processor The processor that will be used to process the buffer components.
+     * @return The number of readable components processed, as a positive number of all readable components were
+     * processed, or as a negative number if the iteration was stopped because
+     * {@link ComponentProcessor#process(int, Component)} returned {@code false}.
+     * In any case, the number of components processed may be less than {@link #countComponents()}.
      */
-    int forEachReadable(Consumer<Component> consumer);
+    int forEachReadable(int initialIndex, ComponentProcessor processor);
+
+    int forEachWritable(int initialIndex, ComponentProcessor processor);
 }

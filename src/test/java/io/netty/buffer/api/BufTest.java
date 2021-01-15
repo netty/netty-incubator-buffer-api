@@ -17,6 +17,7 @@ package io.netty.buffer.api;
 
 import io.netty.buffer.api.Fixture.Properties;
 import io.netty.buffer.api.memseg.NativeMemorySegmentManager;
+import org.assertj.core.api.AtomicIntegerArrayAssert;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Disabled;
@@ -40,6 +41,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.stream.Stream;
 import java.util.stream.Stream.Builder;
@@ -2588,7 +2590,29 @@ public class BufTest {
     public void componentCountOfNonCompositeBufferMustBeOne(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
-            assertThat(buf.componentCount()).isOne();
+            assertThat(buf.countComponents()).isOne();
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("nonCompositeAllocators")
+    public void readableComponentCountMustBeOneIfThereAreReadableBytes(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(8)) {
+            assertThat(buf.countReadableComponents()).isZero();
+            buf.writeByte((byte) 1);
+            assertThat(buf.countReadableComponents()).isOne();
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("nonCompositeAllocators")
+    public void writableComponentCountMustBeOneIfThereAreWritableBytes(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(8)) {
+            assertThat(buf.countWritableComponents()).isOne();
+            buf.writeLong(1);
+            assertThat(buf.countWritableComponents()).isZero();
         }
     }
 
@@ -2602,7 +2626,27 @@ public class BufTest {
                  Buf x = allocator.compose(b, c)) {
                 buf = allocator.compose(a, x);
             }
-            assertThat(buf.componentCount()).isEqualTo(3);
+            assertThat(buf.countComponents()).isEqualTo(3);
+            assertThat(buf.countReadableComponents()).isZero();
+            assertThat(buf.countWritableComponents()).isEqualTo(3);
+            buf.writeInt(1);
+            assertThat(buf.countReadableComponents()).isOne();
+            assertThat(buf.countWritableComponents()).isEqualTo(3);
+            buf.writeInt(1);
+            assertThat(buf.countReadableComponents()).isOne();
+            assertThat(buf.countWritableComponents()).isEqualTo(2);
+            buf.writeInt(1);
+            assertThat(buf.countReadableComponents()).isEqualTo(2);
+            assertThat(buf.countWritableComponents()).isEqualTo(2);
+            buf.writeInt(1);
+            assertThat(buf.countReadableComponents()).isEqualTo(2);
+            assertThat(buf.countWritableComponents()).isOne();
+            buf.writeInt(1);
+            assertThat(buf.countReadableComponents()).isEqualTo(3);
+            assertThat(buf.countWritableComponents()).isOne();
+            buf.writeInt(1);
+            assertThat(buf.countReadableComponents()).isEqualTo(3);
+            assertThat(buf.countWritableComponents()).isZero();
         }
     }
 
@@ -2614,16 +2658,16 @@ public class BufTest {
              Buf bufLERW = allocator.allocate(8).order(LITTLE_ENDIAN).writeLong(0x0102030405060708L);
              Buf bufBERO = allocator.allocate(8).order(BIG_ENDIAN).writeLong(0x0102030405060708L).readOnly(true);
              Buf bufLERO = allocator.allocate(8).order(LITTLE_ENDIAN).writeLong(0x0102030405060708L).readOnly(true)) {
-            verifyForEachReadableSignleComponent(fixture, bufBERW);
-            verifyForEachReadableSignleComponent(fixture, bufLERW);
-            verifyForEachReadableSignleComponent(fixture, bufBERO);
-            verifyForEachReadableSignleComponent(fixture, bufLERO);
+            verifyForEachReadableSingleComponent(fixture, bufBERW);
+            verifyForEachReadableSingleComponent(fixture, bufLERW);
+            verifyForEachReadableSingleComponent(fixture, bufBERO);
+            verifyForEachReadableSingleComponent(fixture, bufLERO);
         }
     }
 
-    private static void verifyForEachReadableSignleComponent(Fixture fixture, Buf buf) {
-        buf.forEachReadable(component -> {
-            var buffer = component.byteBuffer();
+    private static void verifyForEachReadableSingleComponent(Fixture fixture, Buf buf) {
+        buf.forEachReadable(0, (index, component) -> {
+            var buffer = component.buffer();
             assertThat(buffer.position()).isZero();
             assertThat(buffer.limit()).isEqualTo(8);
             assertThat(buffer.capacity()).isEqualTo(8);
@@ -2635,21 +2679,17 @@ public class BufTest {
                 assertThat(component.nativeAddress()).isZero();
             }
 
-            byte[] array = component.array();
-            if (buffer.order() == BIG_ENDIAN) {
-                assertThat(array).containsExactly(0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08);
-            } else {
-                assertThat(array).containsExactly(0x08, 0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01);
+            if (component.hasArray()) {
+                byte[] array = component.array();
+                if (buffer.order() == BIG_ENDIAN) {
+                    assertThat(array).containsExactly(0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08);
+                } else {
+                    assertThat(array).containsExactly(0x08, 0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01);
+                }
             }
 
-            if (buf.readOnly()) {
-                assertTrue(buffer.isReadOnly());
-                assertThrows(ReadOnlyBufferException.class, () -> buffer.put(0, (byte) 0xFF));
-            } else {
-                assertFalse(buffer.isReadOnly());
-                buffer.put(0, (byte) 0xFF);
-                assertEquals((byte) 0xFF, buffer.get(0));
-            }
+            assertThrows(ReadOnlyBufferException.class, () -> buffer.put(0, (byte) 0xFF));
+            return true;
         });
     }
 
@@ -2666,9 +2706,56 @@ public class BufTest {
                 composite = allocator.compose(a, b, c);
             }
             var list = new LinkedList<Integer>(List.of(1, 2, 3));
-            composite.forEachReadable(component -> {
-                assertEquals(list.pollFirst().intValue(), component.byteBuffer().getInt());
+            int count = composite.forEachReadable(0, (index, component) -> {
+                var buffer = component.buffer();
+                int bufferValue = buffer.getInt();
+                assertEquals(list.pollFirst().intValue(), bufferValue);
+                assertEquals(bufferValue, index + 1);
+                assertThrows(ReadOnlyBufferException.class, () -> buffer.put(0, (byte) 0xFF));
+                return true;
             });
+            assertEquals(3, count);
+            assertThat(list).isEmpty();
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    public void forEachReadableMustReturnNegativeCountWhenProcessorReturnsFalse(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(8)) {
+            buf.writeLong(0x0102030405060708L);
+            int count = buf.forEachReadable(0, (index, component) -> false);
+            assertEquals(-1, count);
+        }
+    }
+
+    @Test
+    public void forEachReadableMustStopIterationWhenProcessorReturnsFalse() {
+        try (Allocator allocator = Allocator.heap()) {
+            Buf composite;
+            try (Buf a = allocator.allocate(4);
+                 Buf b = allocator.allocate(4);
+                 Buf c = allocator.allocate(4)) {
+                a.writeInt(1);
+                b.writeInt(2);
+                c.writeInt(3);
+                composite = allocator.compose(a, b, c);
+            }
+            int readPos = composite.readerOffset();
+            int writePos = composite.writerOffset();
+            var list = new LinkedList<Integer>(List.of(1, 2, 3));
+            int count = composite.forEachReadable(0, (index, component) -> {
+                var buffer = component.buffer();
+                int bufferValue = buffer.getInt();
+                assertEquals(list.pollFirst().intValue(), bufferValue);
+                assertEquals(bufferValue, index + 1);
+                return false;
+            });
+            assertEquals(-1, count);
+            assertThat(list).containsExactly(2, 3);
+            assertEquals(readPos, composite.readerOffset());
+            assertEquals(writePos, composite.writerOffset());
         }
     }
 
@@ -2679,7 +2766,210 @@ public class BufTest {
             var buf = allocator.allocate(8);
             buf.writeLong(0);
             buf.close();
-            assertThrows(IllegalStateException.class, () -> buf.forEachReadable(component -> { }));
+            assertThrows(IllegalStateException.class, () -> buf.forEachReadable(0, (component, index) -> true));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    public void forEachReadableMustAllowCollectingBuffersInArray(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator()) {
+            Buf buf;
+            try (Buf a = allocator.allocate(4);
+                 Buf b = allocator.allocate(4);
+                 Buf c = allocator.allocate(4)) {
+                buf = allocator.compose(a, b, c);
+            }
+            int i = 1;
+            while (buf.writableBytes() > 0) {
+                buf.writeByte((byte) i++);
+            }
+            ByteBuffer[] buffers = new ByteBuffer[buf.countReadableComponents()];
+            buf.forEachReadable(0, (index, component) -> {
+                buffers[index] = component.buffer();
+                return true;
+            });
+            i = 1;
+            assertThat(buffers.length).isGreaterThanOrEqualTo(1);
+            for (ByteBuffer buffer : buffers) {
+                while (buffer.hasRemaining()) {
+                    assertEquals((byte) i++, buffer.get());
+                }
+            }
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("nonCompositeAllocators")
+    public void forEachWritableMustVisitBuffer(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf bufBERW = allocator.allocate(8).order(BIG_ENDIAN);
+             Buf bufLERW = allocator.allocate(8).order(LITTLE_ENDIAN)) {
+            verifyForEachWritableSingleComponent(fixture, bufBERW);
+            verifyForEachWritableSingleComponent(fixture, bufLERW);
+        }
+    }
+
+    private static void verifyForEachWritableSingleComponent(Fixture fixture, Buf buf) {
+        buf.forEachWritable(0, (index, component) -> {
+            var buffer = component.buffer();
+            assertThat(buffer.position()).isZero();
+            assertThat(buffer.limit()).isEqualTo(8);
+            assertThat(buffer.capacity()).isEqualTo(8);
+            buffer.putLong(0x0102030405060708L);
+            buffer.flip();
+            assertEquals(0x0102030405060708L, buffer.getLong());
+            buf.writerOffset(8);
+            assertEquals(0x0102030405060708L, buf.getLong(0));
+
+            if (fixture.isDirect()) {
+                assertThat(component.nativeAddress()).isNotZero();
+            } else {
+                assertThat(component.nativeAddress()).isZero();
+            }
+
+            if (component.hasArray()) {
+                byte[] array = component.array();
+                if (buffer.order() == BIG_ENDIAN) {
+                    assertThat(array).containsExactly(0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08);
+                } else {
+                    assertThat(array).containsExactly(0x08, 0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01);
+                }
+            }
+
+            buffer.put(0, (byte) 0xFF);
+            assertEquals((byte) 0xFF, buffer.get(0));
+            assertEquals((byte) 0xFF, buf.getByte(0));
+            return true;
+        });
+    }
+
+    @Test
+    public void forEachWritableMustVisitAllWritableConstituentBuffersInOrder() {
+        try (Allocator allocator = Allocator.heap()) {
+            Buf buf;
+            try (Buf a = allocator.allocate(8);
+                 Buf b = allocator.allocate(8);
+                 Buf c = allocator.allocate(8)) {
+                buf = allocator.compose(a, b, c);
+            }
+            buf.order(BIG_ENDIAN);
+            buf.forEachWritable(0, (index, component) -> {
+                component.buffer().putLong(0x0102030405060708L + 0x1010101010101010L * index);
+                return true;
+            });
+            buf.writerOffset(3 * 8);
+            assertEquals(0x0102030405060708L, buf.readLong());
+            assertEquals(0x1112131415161718L, buf.readLong());
+            assertEquals(0x2122232425262728L, buf.readLong());
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    public void forEachWritableMustReturnNegativeCountWhenProcessorReturnsFalse(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(8)) {
+            int count = buf.forEachWritable(0, (index, component) -> false);
+            assertEquals(-1, count);
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    public void forEachWritableMustStopIterationWhenProcessorRetursFalse(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(8)) {
+            AtomicInteger counter = new AtomicInteger();
+            buf.forEachWritable(0, (index, component) -> {
+                counter.incrementAndGet();
+                return false;
+            });
+            assertEquals(1, counter.get());
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    public void forEachWritableChangesMadeToByteBufferComponentMustBeReflectedInBuffer(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(9).order(BIG_ENDIAN)) {
+            buf.writeByte((byte) 0xFF);
+            AtomicInteger writtenCounter = new AtomicInteger();
+            buf.forEachWritable(0, (index, component) -> {
+                var buffer = component.buffer();
+                while (buffer.hasRemaining()) {
+                    buffer.put((byte) writtenCounter.incrementAndGet());
+                }
+                return true;
+            });
+            buf.writerOffset(9);
+            assertEquals((byte) 0xFF, buf.readByte());
+            assertEquals(0x0102030405060708L, buf.readLong());
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    public void changesMadeToByteBufferComponentsShouldBeReflectedInBuffer(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(8)) {
+            AtomicInteger counter = new AtomicInteger();
+            buf.forEachWritable(0, (index, component) -> {
+                var buffer = component.buffer();
+                while (buffer.hasRemaining()) {
+                    buffer.put((byte) counter.incrementAndGet());
+                }
+                return true;
+            });
+            buf.writerOffset(buf.capacity());
+            for (int i = 0; i < 8; i++) {
+                assertEquals((byte) i + 1, buf.getByte(i));
+            }
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    public void forEachWritableOnClosedBufferMustThrow(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator()) {
+            Buf buf = allocator.allocate(8);
+            buf.close();
+            assertThrows(IllegalStateException.class, () -> buf.forEachWritable(0, (index, component) -> true));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    public void forEachWritableOnReadOnlyBufferMustThrow(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(8).readOnly(true)) {
+            assertThrows(IllegalStateException.class, () -> buf.forEachWritable(0, (index, component) -> true));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    public void forEachWritableMustAllowCollectingBuffersInArray(Fixture fixture) {
+        try (Allocator allocator = fixture.createAllocator();
+             Buf buf = allocator.allocate(8)) {
+            ByteBuffer[] buffers = new ByteBuffer[buf.countWritableComponents()];
+            buf.forEachWritable(0, (index, component) -> {
+                buffers[index] = component.buffer();
+                return true;
+            });
+            assertThat(buffers.length).isGreaterThanOrEqualTo(1);
+            int i = 1;
+            for (ByteBuffer buffer : buffers) {
+                while (buffer.hasRemaining()) {
+                    buffer.put((byte) i++);
+                }
+            }
+            buf.writerOffset(buf.capacity());
+            i = 1;
+            while (buf.readableBytes() > 0) {
+                assertEquals((byte) i++, buf.readByte());
+            }
         }
     }
 

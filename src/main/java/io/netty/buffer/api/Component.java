@@ -16,10 +16,10 @@
 package io.netty.buffer.api;
 
 import java.nio.ByteBuffer;
-import java.util.function.Consumer;
 
 /**
- * A view onto the buffer component being processed in a given iteration of {@link Buf#forEachReadable(Consumer)}.
+ * A view onto the buffer component being processed in a given iteration of
+ * {@link Buf#forEachReadable(int, ComponentProcessor)}, or {@link Buf#forEachWritable(int, ComponentProcessor)}.
  * <p>
  * Instances of this interface are allowed to be mutable behind the scenes, and the data is only guaranteed to be
  * consistent within the given iteration.
@@ -28,30 +28,44 @@ public interface Component {
 
     /**
      * Check if this component is backed by a cached byte array than can be accessed cheaply.
+     * <p>
+     * <strong>Note</strong> that regardless of what this method returns, the array should not be used to modify the
+     * contents of this buffer component.
      *
      * @return {@code true} if {@link #array()} is a cheap operation, otherwise {@code false}.
      */
-    boolean hasCachedArray();
+    boolean hasArray();
 
     /**
      * Get a byte array of the contents of this component.
      * <p>
      * <strong>Note</strong> that the array is meant to be read-only. It may either be a direct reference to the
      * concrete array instance that is backing this component, or it is a fresh copy.
+     * Writing to the array may produce undefined behaviour.
      *
      * @return A byte array of the contents of this component.
      */
     byte[] array();
 
+    int arrayOffset();
+
     /**
      * Give the native memory address backing this buffer, or return 0 if this buffer has no native memory address.
+     * <p>
+     * <strong>Note</strong> that the address should not be used for writing to the buffer memory, and doing so may
+     * produce undefined behaviour.
+     *
      * @return The native memory address, if any, otherwise 0.
      */
     long nativeAddress();
 
     /**
-     * Build a {@link ByteBuffer} instance for this memory component.
+     * Get a {@link ByteBuffer} instance for this memory component.
+     * <p>
+     * <strong>Note</strong> that the {@link ByteBuffer} is read-only, to prevent write accesses to the memory,
+     * when the buffer component is obtained through {@link Buf#forEachReadable(int, ComponentProcessor)}.
+     *
      * @return A new {@link ByteBuffer} for this memory component.
      */
-    ByteBuffer byteBuffer();
+    ByteBuffer buffer();
 }

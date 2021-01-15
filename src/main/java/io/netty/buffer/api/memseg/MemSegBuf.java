@@ -20,6 +20,7 @@ import io.netty.buffer.api.AllocatorControl;
 import io.netty.buffer.api.Buf;
 import io.netty.buffer.api.ByteCursor;
 import io.netty.buffer.api.Component;
+import io.netty.buffer.api.ComponentProcessor;
 import io.netty.buffer.api.Drop;
 import io.netty.buffer.api.Owned;
 import io.netty.buffer.api.RcSupport;
@@ -27,7 +28,6 @@ import jdk.incubator.foreign.MemorySegment;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.util.function.Consumer;
 
 import static jdk.incubator.foreign.MemoryAccess.getByteAtOffset;
 import static jdk.incubator.foreign.MemoryAccess.getCharAtOffset;
@@ -135,13 +135,18 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf, Component {
     }
 
     @Override
-    public boolean hasCachedArray() {
+    public boolean hasArray() {
         return false;
     }
 
     @Override
     public byte[] array() {
-        return seg.toByteArray();
+        return null;
+    }
+
+    @Override
+    public int arrayOffset() {
+        return 0;
     }
 
     @Override
@@ -154,19 +159,17 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf, Component {
     }
 
     @Override
-    public ByteBuffer byteBuffer() {
+    public ByteBuffer buffer() {
         var buffer = seg.asByteBuffer();
         int base = baseOffset;
         if (buffer.isDirect()) {
-            // TODO Remove this when JDK bug is fixed.
+            // TODO Remove this when the slicing of shared, native segments JDK bug is fixed.
             ByteBuffer tmp = ByteBuffer.allocateDirect(buffer.capacity());
             tmp.put(buffer);
             buffer = tmp.position(0);
             base = 0; // TODO native memory segments do not have the buffer-of-slice bug.
         }
-        if (readOnly()) {
-            buffer = buffer.asReadOnlyBuffer();
-        }
+        buffer = buffer.asReadOnlyBuffer();
         // TODO avoid slicing and just set position+limit when JDK bug is fixed.
         return buffer.slice(base + readerOffset(), readableBytes()).order(order);
     }
@@ -492,15 +495,75 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf, Component {
     }
 
     @Override
-    public int componentCount() {
+    public int countComponents() {
         return 1;
     }
 
     @Override
-    public int forEachReadable(Consumer<Component> consumer) {
+    public int countReadableComponents() {
+        return readableBytes() > 0? 1 : 0;
+    }
+
+    @Override
+    public int countWritableComponents() {
+        return writableBytes() > 0? 1 : 0;
+    }
+
+    @Override
+    public int forEachReadable(int initialIndex, ComponentProcessor processor) {
         checkRead(readerOffset(), Math.max(1, readableBytes()));
-        consumer.accept(this);
-        return 1;
+        return processor.process(initialIndex, this)? 1 : -1;
+    }
+
+    @Override
+    public int forEachWritable(int initialIndex, ComponentProcessor processor) {
+        checkWrite(writerOffset(), Math.max(1, writableBytes()));
+
+        var buffer = wseg.asByteBuffer();
+
+        if (buffer.isDirect()) {
+            buffer = buffer.position(writerOffset()).limit(writerOffset() + writableBytes());
+        } else {
+            // TODO avoid slicing and just set position when JDK bug is fixed.
+            buffer = buffer.slice(baseOffset + writerOffset(), writableBytes());
+        }
+        buffer = buffer.order(order);
+        return processor.process(initialIndex, new WritableComponent(wseg, buffer))? 1 : -1;
+    }
+
+    private static final class WritableComponent implements Component {
+        private final MemorySegment segment;
+        private final ByteBuffer buffer;
+
+        private WritableComponent(MemorySegment segment, ByteBuffer buffer) {
+            this.segment = segment;
+            this.buffer = buffer;
+        }
+
+        @Override
+        public boolean hasArray() {
+            return false;
+        }
+
+        @Override
+        public byte[] array() {
+            return null;
+        }
+
+        @Override
+        public int arrayOffset() {
+            return 0;
+        }
+
+        @Override
+        public long nativeAddress() {
+            return buffer.isDirect()? segment.address().toRawLongValue() : 0;
+        }
+
+        @Override
+        public ByteBuffer buffer() {
+            return buffer;
+        }
     }
 
     // <editor-fold defaultstate="collapsed" desc="Primitive accessors implementation.">
