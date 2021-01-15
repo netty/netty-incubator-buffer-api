@@ -19,8 +19,9 @@ import io.netty.buffer.api.Allocator;
 import io.netty.buffer.api.AllocatorControl;
 import io.netty.buffer.api.Buf;
 import io.netty.buffer.api.ByteCursor;
-import io.netty.buffer.api.Component;
 import io.netty.buffer.api.ComponentProcessor;
+import io.netty.buffer.api.ComponentProcessor.ReadableComponent;
+import io.netty.buffer.api.ComponentProcessor.WritableComponent;
 import io.netty.buffer.api.Drop;
 import io.netty.buffer.api.Owned;
 import io.netty.buffer.api.RcSupport;
@@ -44,7 +45,7 @@ import static jdk.incubator.foreign.MemoryAccess.setIntAtOffset;
 import static jdk.incubator.foreign.MemoryAccess.setLongAtOffset;
 import static jdk.incubator.foreign.MemoryAccess.setShortAtOffset;
 
-class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf, Component {
+class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf, ReadableComponent, WritableComponent {
     private static final MemorySegment CLOSED_SEGMENT;
     static final Drop<MemSegBuf> SEGMENT_CLOSE;
 
@@ -134,32 +135,29 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf, Component {
         return this;
     }
 
+    // <editor-fold defaultstate="collapsed" desc="Readable/WritableComponent implementation.">
     @Override
-    public boolean hasArray() {
+    public boolean hasReadableArray() {
         return false;
     }
 
     @Override
-    public byte[] array() {
-        return null;
+    public byte[] readableArray() {
+        throw new UnsupportedOperationException("This component has no backing array.");
     }
 
     @Override
-    public int arrayOffset() {
-        return 0;
+    public int readableArrayOffset() {
+        throw new UnsupportedOperationException("This component has no backing array.");
     }
 
     @Override
-    public long nativeAddress() {
-        try {
-            return seg.address().toRawLongValue();
-        } catch (UnsupportedOperationException e) {
-            return 0; // This is a heap segment.
-        }
+    public long readableNativeAddress() {
+        return nativeAddress();
     }
 
     @Override
-    public ByteBuffer buffer() {
+    public ByteBuffer readableBuffer() {
         var buffer = seg.asByteBuffer();
         int base = baseOffset;
         if (buffer.isDirect()) {
@@ -172,6 +170,49 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf, Component {
         buffer = buffer.asReadOnlyBuffer();
         // TODO avoid slicing and just set position+limit when JDK bug is fixed.
         return buffer.slice(base + readerOffset(), readableBytes()).order(order);
+    }
+
+    @Override
+    public boolean hasWritableArray() {
+        return false;
+    }
+
+    @Override
+    public byte[] writableArray() {
+        throw new UnsupportedOperationException("This component has no backing array.");
+    }
+
+    @Override
+    public int writableArrayOffset() {
+        throw new UnsupportedOperationException("This component has no backing array.");
+    }
+
+    @Override
+    public long writableNativeAddress() {
+        return nativeAddress();
+    }
+
+    @Override
+    public ByteBuffer writableBuffer() {
+        var buffer = wseg.asByteBuffer();
+
+        if (buffer.isDirect()) {
+            buffer = buffer.position(writerOffset()).limit(writerOffset() + writableBytes());
+        } else {
+            // TODO avoid slicing and just set position when JDK bug is fixed.
+            buffer = buffer.slice(baseOffset + writerOffset(), writableBytes());
+        }
+        return buffer.order(order);
+    }
+    // </editor-fold>
+
+    @Override
+    public long nativeAddress() {
+        try {
+            return seg.address().toRawLongValue();
+        } catch (UnsupportedOperationException e) {
+            return 0; // This is a heap segment.
+        }
     }
 
     @Override
@@ -510,60 +551,15 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf, Component {
     }
 
     @Override
-    public int forEachReadable(int initialIndex, ComponentProcessor processor) {
+    public int forEachReadable(int initialIndex, ComponentProcessor.OfReadable processor) {
         checkRead(readerOffset(), Math.max(1, readableBytes()));
         return processor.process(initialIndex, this)? 1 : -1;
     }
 
     @Override
-    public int forEachWritable(int initialIndex, ComponentProcessor processor) {
+    public int forEachWritable(int initialIndex, ComponentProcessor.OfWritable processor) {
         checkWrite(writerOffset(), Math.max(1, writableBytes()));
-
-        var buffer = wseg.asByteBuffer();
-
-        if (buffer.isDirect()) {
-            buffer = buffer.position(writerOffset()).limit(writerOffset() + writableBytes());
-        } else {
-            // TODO avoid slicing and just set position when JDK bug is fixed.
-            buffer = buffer.slice(baseOffset + writerOffset(), writableBytes());
-        }
-        buffer = buffer.order(order);
-        return processor.process(initialIndex, new WritableComponent(wseg, buffer))? 1 : -1;
-    }
-
-    private static final class WritableComponent implements Component {
-        private final MemorySegment segment;
-        private final ByteBuffer buffer;
-
-        private WritableComponent(MemorySegment segment, ByteBuffer buffer) {
-            this.segment = segment;
-            this.buffer = buffer;
-        }
-
-        @Override
-        public boolean hasArray() {
-            return false;
-        }
-
-        @Override
-        public byte[] array() {
-            return null;
-        }
-
-        @Override
-        public int arrayOffset() {
-            return 0;
-        }
-
-        @Override
-        public long nativeAddress() {
-            return buffer.isDirect()? segment.address().toRawLongValue() : 0;
-        }
-
-        @Override
-        public ByteBuffer buffer() {
-            return buffer;
-        }
+        return processor.process(initialIndex, this)? 1 : -1;
     }
 
     // <editor-fold defaultstate="collapsed" desc="Primitive accessors implementation.">

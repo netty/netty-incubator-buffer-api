@@ -740,7 +740,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
     }
 
     @Override
-    public int forEachReadable(int initialIndex, ComponentProcessor processor) {
+    public int forEachReadable(int initialIndex, ComponentProcessor.OfReadable processor) {
         checkReadBounds(readerOffset(), Math.max(1, readableBytes()));
         int visited = 0;
         for (Buf buf : bufs) {
@@ -758,7 +758,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
     }
 
     @Override
-    public int forEachWritable(int initialIndex, ComponentProcessor processor) {
+    public int forEachWritable(int initialIndex, ComponentProcessor.OfWritable processor) {
         checkWriteBounds(writerOffset(), Math.max(1, writableBytes()));
         int visited = 0;
         for (Buf buf : bufs) {

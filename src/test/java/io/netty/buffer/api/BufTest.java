@@ -17,7 +17,6 @@ package io.netty.buffer.api;
 
 import io.netty.buffer.api.Fixture.Properties;
 import io.netty.buffer.api.memseg.NativeMemorySegmentManager;
-import org.assertj.core.api.AtomicIntegerArrayAssert;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Disabled;
@@ -2667,20 +2666,20 @@ public class BufTest {
 
     private static void verifyForEachReadableSingleComponent(Fixture fixture, Buf buf) {
         buf.forEachReadable(0, (index, component) -> {
-            var buffer = component.buffer();
+            var buffer = component.readableBuffer();
             assertThat(buffer.position()).isZero();
             assertThat(buffer.limit()).isEqualTo(8);
             assertThat(buffer.capacity()).isEqualTo(8);
             assertEquals(0x0102030405060708L, buffer.getLong());
 
             if (fixture.isDirect()) {
-                assertThat(component.nativeAddress()).isNotZero();
+                assertThat(component.readableNativeAddress()).isNotZero();
             } else {
-                assertThat(component.nativeAddress()).isZero();
+                assertThat(component.readableNativeAddress()).isZero();
             }
 
-            if (component.hasArray()) {
-                byte[] array = component.array();
+            if (component.hasReadableArray()) {
+                byte[] array = component.readableArray();
                 if (buffer.order() == BIG_ENDIAN) {
                     assertThat(array).containsExactly(0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08);
                 } else {
@@ -2707,7 +2706,7 @@ public class BufTest {
             }
             var list = new LinkedList<Integer>(List.of(1, 2, 3));
             int count = composite.forEachReadable(0, (index, component) -> {
-                var buffer = component.buffer();
+                var buffer = component.readableBuffer();
                 int bufferValue = buffer.getInt();
                 assertEquals(list.pollFirst().intValue(), bufferValue);
                 assertEquals(bufferValue, index + 1);
@@ -2746,7 +2745,7 @@ public class BufTest {
             int writePos = composite.writerOffset();
             var list = new LinkedList<Integer>(List.of(1, 2, 3));
             int count = composite.forEachReadable(0, (index, component) -> {
-                var buffer = component.buffer();
+                var buffer = component.readableBuffer();
                 int bufferValue = buffer.getInt();
                 assertEquals(list.pollFirst().intValue(), bufferValue);
                 assertEquals(bufferValue, index + 1);
@@ -2786,7 +2785,7 @@ public class BufTest {
             }
             ByteBuffer[] buffers = new ByteBuffer[buf.countReadableComponents()];
             buf.forEachReadable(0, (index, component) -> {
-                buffers[index] = component.buffer();
+                buffers[index] = component.readableBuffer();
                 return true;
             });
             i = 1;
@@ -2812,7 +2811,7 @@ public class BufTest {
 
     private static void verifyForEachWritableSingleComponent(Fixture fixture, Buf buf) {
         buf.forEachWritable(0, (index, component) -> {
-            var buffer = component.buffer();
+            var buffer = component.writableBuffer();
             assertThat(buffer.position()).isZero();
             assertThat(buffer.limit()).isEqualTo(8);
             assertThat(buffer.capacity()).isEqualTo(8);
@@ -2823,13 +2822,13 @@ public class BufTest {
             assertEquals(0x0102030405060708L, buf.getLong(0));
 
             if (fixture.isDirect()) {
-                assertThat(component.nativeAddress()).isNotZero();
+                assertThat(component.writableNativeAddress()).isNotZero();
             } else {
-                assertThat(component.nativeAddress()).isZero();
+                assertThat(component.writableNativeAddress()).isZero();
             }
 
-            if (component.hasArray()) {
-                byte[] array = component.array();
+            if (component.hasWritableArray()) {
+                byte[] array = component.writableArray();
                 if (buffer.order() == BIG_ENDIAN) {
                     assertThat(array).containsExactly(0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08);
                 } else {
@@ -2855,7 +2854,7 @@ public class BufTest {
             }
             buf.order(BIG_ENDIAN);
             buf.forEachWritable(0, (index, component) -> {
-                component.buffer().putLong(0x0102030405060708L + 0x1010101010101010L * index);
+                component.writableBuffer().putLong(0x0102030405060708L + 0x1010101010101010L * index);
                 return true;
             });
             buf.writerOffset(3 * 8);
@@ -2897,7 +2896,7 @@ public class BufTest {
             buf.writeByte((byte) 0xFF);
             AtomicInteger writtenCounter = new AtomicInteger();
             buf.forEachWritable(0, (index, component) -> {
-                var buffer = component.buffer();
+                var buffer = component.writableBuffer();
                 while (buffer.hasRemaining()) {
                     buffer.put((byte) writtenCounter.incrementAndGet());
                 }
@@ -2916,7 +2915,7 @@ public class BufTest {
              Buf buf = allocator.allocate(8)) {
             AtomicInteger counter = new AtomicInteger();
             buf.forEachWritable(0, (index, component) -> {
-                var buffer = component.buffer();
+                var buffer = component.writableBuffer();
                 while (buffer.hasRemaining()) {
                     buffer.put((byte) counter.incrementAndGet());
                 }
@@ -2955,7 +2954,7 @@ public class BufTest {
              Buf buf = allocator.allocate(8)) {
             ByteBuffer[] buffers = new ByteBuffer[buf.countWritableComponents()];
             buf.forEachWritable(0, (index, component) -> {
-                buffers[index] = component.buffer();
+                buffers[index] = component.writableBuffer();
                 return true;
             });
             assertThat(buffers.length).isGreaterThanOrEqualTo(1);
