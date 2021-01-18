@@ -879,7 +879,7 @@ public class BufTest {
     }
 
     @ParameterizedTest
-    @MethodSource("allocators")
+    @MethodSource("nonCompositeAllocators")
     public void acquireComposingAndSlicingMustIncrementBorrows(Fixture fixture) {
         try (Allocator allocator = fixture.createAllocator();
              Buf buf = allocator.allocate(8)) {
@@ -1628,6 +1628,53 @@ public class BufTest {
         }
     }
 
+    @Test
+    public void compositeBuffersCannotHaveDuplicateComponents() {
+        try (Allocator allocator = Allocator.heap();
+             Buf a = allocator.allocate(4)) {
+            var e = assertThrows(IllegalArgumentException.class, () -> allocator.compose(a, a));
+            assertThat(e).hasMessageContaining("duplicate");
+
+            try (Buf composite = allocator.compose(a)) {
+                a.close();
+                try {
+                    e = assertThrows(IllegalArgumentException.class, () -> Allocator.extend(composite, a));
+                    assertThat(e).hasMessageContaining("duplicate");
+                } finally {
+                    a.acquire();
+                }
+            }
+        }
+    }
+
+    @Test
+    public void compositeBufferMustNotBeAllowedToContainThemselves() {
+        try (Allocator allocator = Allocator.heap()) {
+            Buf a = allocator.allocate(4);
+            Buf buf = allocator.compose(a);
+            try (buf; a) {
+                a.close();
+                try {
+                    assertThrows(IllegalArgumentException.class, () -> Allocator.extend(buf, buf));
+                    assertTrue(buf.isOwned());
+                    try (Buf composite = allocator.compose(buf)) {
+                        // the composing increments the reference count of constituent buffers...
+                        // counter-act this so it can be extended:
+                        a.close(); // buf is now owned so it can be extended.
+                        try {
+                            assertThrows(IllegalArgumentException.class, () -> Allocator.extend(buf, composite));
+                        } finally {
+                            a.acquire(); // restore the reference count to align with our try-with-resources structure.
+                        }
+                    }
+                    assertTrue(buf.isOwned());
+                } finally {
+                    a.acquire();
+                }
+            }
+        }
+    }
+
     @ParameterizedTest
     @MethodSource("allocators")
     public void ensureWritableMustThrowForBorrowedBuffers(Fixture fixture) {
@@ -1852,13 +1899,32 @@ public class BufTest {
             }
             try (composite) {
                 var exc = assertThrows(IllegalArgumentException.class, () -> Allocator.extend(composite, composite));
-                assertThat(exc).hasMessageContaining("itself");
+                assertThat(exc).hasMessageContaining("cannot be extended");
             }
         }
+    }
+
+    @Test
+    public void extendingWithZeroCapacityBufferHasNoEffect() {
         try (Allocator allocator = Allocator.heap();
              Buf composite = allocator.compose()) {
-            var exc = assertThrows(IllegalArgumentException.class, () -> Allocator.extend(composite, composite));
-            assertThat(exc).hasMessageContaining("itself");
+            Allocator.extend(composite, composite);
+            assertThat(composite.capacity()).isZero();
+            assertThat(composite.countComponents()).isZero();
+        }
+        try (Allocator allocator = Allocator.heap()) {
+            Buf a = allocator.allocate(1);
+            Buf composite = allocator.compose(a);
+            a.close();
+            assertTrue(composite.isOwned());
+            assertThat(composite.capacity()).isOne();
+            assertThat(composite.countComponents()).isOne();
+            try (Buf b = allocator.compose()) {
+                Allocator.extend(composite, b);
+            }
+            assertTrue(composite.isOwned());
+            assertThat(composite.capacity()).isOne();
+            assertThat(composite.countComponents()).isOne();
         }
     }
 
