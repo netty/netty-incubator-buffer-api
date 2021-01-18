@@ -56,6 +56,10 @@ public final class Fixture implements Supplier<Allocator> {
         return properties.contains(Properties.DIRECT);
     }
 
+    public boolean isComposite() {
+        return properties.contains(Properties.COMPOSITE);
+    }
+
     public boolean isPooled() {
         return properties.contains(Properties.POOLED);
     }

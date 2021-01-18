@@ -19,6 +19,10 @@ import io.netty.buffer.api.Allocator;
 import io.netty.buffer.api.AllocatorControl;
 import io.netty.buffer.api.Buf;
 import io.netty.buffer.api.ByteCursor;
+import io.netty.buffer.api.ComponentProcessor.ReadableComponent;
+import io.netty.buffer.api.ComponentProcessor.ReadableComponentProcessor;
+import io.netty.buffer.api.ComponentProcessor.WritableComponent;
+import io.netty.buffer.api.ComponentProcessor.WritableComponentProcessor;
 import io.netty.buffer.api.Drop;
 import io.netty.buffer.api.Owned;
 import io.netty.buffer.api.RcSupport;
@@ -42,7 +46,7 @@ import static jdk.incubator.foreign.MemoryAccess.setIntAtOffset;
 import static jdk.incubator.foreign.MemoryAccess.setLongAtOffset;
 import static jdk.incubator.foreign.MemoryAccess.setShortAtOffset;
 
-class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
+class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf, ReadableComponent, WritableComponent {
     private static final MemorySegment CLOSED_SEGMENT;
     static final Drop<MemSegBuf> SEGMENT_CLOSE;
 
@@ -129,8 +133,78 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
         return this;
     }
 
+    // <editor-fold defaultstate="collapsed" desc="Readable/WritableComponent implementation.">
     @Override
-    public long getNativeAddress() {
+    public boolean hasReadableArray() {
+        return false;
+    }
+
+    @Override
+    public byte[] readableArray() {
+        throw new UnsupportedOperationException("This component has no backing array.");
+    }
+
+    @Override
+    public int readableArrayOffset() {
+        throw new UnsupportedOperationException("This component has no backing array.");
+    }
+
+    @Override
+    public long readableNativeAddress() {
+        return nativeAddress();
+    }
+
+    @Override
+    public ByteBuffer readableBuffer() {
+        var buffer = seg.asByteBuffer();
+        if (buffer.isDirect()) {
+            // TODO Remove this when the slicing of shared, native segments JDK bug is fixed.
+            //  See https://mail.openjdk.java.net/pipermail/panama-dev/2021-January/011810.html
+            ByteBuffer tmp = ByteBuffer.allocateDirect(buffer.capacity());
+            tmp.put(buffer);
+            buffer = tmp.position(0);
+        }
+        buffer = buffer.asReadOnlyBuffer();
+        // TODO avoid slicing and just set position+limit when JDK bug is fixed.
+        return buffer.slice(readerOffset(), readableBytes()).order(order);
+    }
+
+    @Override
+    public boolean hasWritableArray() {
+        return false;
+    }
+
+    @Override
+    public byte[] writableArray() {
+        throw new UnsupportedOperationException("This component has no backing array.");
+    }
+
+    @Override
+    public int writableArrayOffset() {
+        throw new UnsupportedOperationException("This component has no backing array.");
+    }
+
+    @Override
+    public long writableNativeAddress() {
+        return nativeAddress();
+    }
+
+    @Override
+    public ByteBuffer writableBuffer() {
+        var buffer = wseg.asByteBuffer();
+
+        if (buffer.isDirect()) {
+            buffer = buffer.position(writerOffset()).limit(writerOffset() + writableBytes());
+        } else {
+            // TODO avoid slicing and just set position when JDK bug is fixed.
+            buffer = buffer.slice(writerOffset(), writableBytes());
+        }
+        return buffer.order(order);
+    }
+    // </editor-fold>
+
+    @Override
+    public long nativeAddress() {
         try {
             return seg.address().toRawLongValue();
         } catch (UnsupportedOperationException e) {
@@ -456,6 +530,33 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
         seg.copyFrom(seg.asSlice(roff, woff - roff));
         roff -= distance;
         woff -= distance;
+    }
+
+    @Override
+    public int countComponents() {
+        return 1;
+    }
+
+    @Override
+    public int countReadableComponents() {
+        return readableBytes() > 0? 1 : 0;
+    }
+
+    @Override
+    public int countWritableComponents() {
+        return writableBytes() > 0? 1 : 0;
+    }
+
+    @Override
+    public int forEachReadable(int initialIndex, ReadableComponentProcessor processor) {
+        checkRead(readerOffset(), Math.max(1, readableBytes()));
+        return processor.process(initialIndex, this)? 1 : -1;
+    }
+
+    @Override
+    public int forEachWritable(int initialIndex, WritableComponentProcessor processor) {
+        checkWrite(writerOffset(), Math.max(1, writableBytes()));
+        return processor.process(initialIndex, this)? 1 : -1;
     }
 
     // <editor-fold defaultstate="collapsed" desc="Primitive accessors implementation.">
@@ -969,13 +1070,13 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
 
     private void checkRead(int index, int size) {
         if (index < 0 || woff < index + size) {
-            throw accessCheckException(index);
+            throw readAccessCheckException(index);
         }
     }
 
     private void checkWrite(int index, int size) {
         if (index < 0 || wseg.byteSize() < index + size) {
-            throw accessCheckException(index);
+            throw writeAccessCheckException(index);
         }
     }
 
@@ -989,16 +1090,21 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
         return ioobe;
     }
 
-    private RuntimeException accessCheckException(int index) {
+    private RuntimeException readAccessCheckException(int index) {
+        if (seg == CLOSED_SEGMENT) {
+            throw bufferIsClosed();
+        }
+        return outOfBounds(index);
+    }
+
+    private RuntimeException writeAccessCheckException(int index) {
         if (seg == CLOSED_SEGMENT) {
             throw bufferIsClosed();
         }
         if (wseg != seg) {
             return bufferIsReadOnly();
         }
-        return new IndexOutOfBoundsException(
-                "Index " + index + " is out of bounds: [read 0 to " + woff + ", write 0 to " +
-                (seg.byteSize() - 1) + "].");
+        return outOfBounds(index);
     }
 
     private static IllegalStateException bufferIsClosed() {
@@ -1007,6 +1113,12 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf {
 
     private static IllegalStateException bufferIsReadOnly() {
         return new IllegalStateException("This buffer is read-only.");
+    }
+
+    private IndexOutOfBoundsException outOfBounds(int index) {
+        return new IndexOutOfBoundsException(
+                "Index " + index + " is out of bounds: [read 0 to " + woff + ", write 0 to " +
+                (seg.byteSize() - 1) + "].");
     }
 
     Object recoverableMemory() {

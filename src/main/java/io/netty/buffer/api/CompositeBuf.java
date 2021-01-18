@@ -15,6 +15,9 @@
  */
 package io.netty.buffer.api;
 
+import io.netty.buffer.api.ComponentProcessor.ReadableComponentProcessor;
+import io.netty.buffer.api.ComponentProcessor.WritableComponentProcessor;
+
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Arrays;
@@ -48,7 +51,19 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
     private boolean readOnly;
 
     CompositeBuf(Allocator allocator, Buf[] bufs) {
-        this(allocator, true, bufs.clone(), COMPOSITE_DROP); // Clone prevents external modification of array.
+        this(allocator, true, filterExternalBufs(bufs), COMPOSITE_DROP);
+    }
+
+    private static Buf[] filterExternalBufs(Buf[] bufs) {
+        // We filter out all zero-capacity buffers because they wouldn't contribute to the composite buffer anyway,
+        // and also, by ensuring that all constituent buffers contribute to the size of the composite buffer,
+        // we make sure that the number of composite buffers will never become greater than the number of bytes in
+        // the composite buffer.
+        // This restriction guarantees that methods like countComponents, forEachReadable and forEachWritable,
+        // will never overflow their component counts.
+        // Allocating a new array unconditionally also prevents external modification of the array.
+        // TODO if any buffer is itself a composite buffer, then we should unwrap its sub-buffers
+        return Arrays.stream(bufs).filter(b -> b.capacity() > 0).toArray(Buf[]::new);
     }
 
     private CompositeBuf(Allocator allocator, boolean isSendable, Buf[] bufs, Drop<CompositeBuf> drop) {
@@ -203,7 +218,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
     }
 
     @Override
-    public long getNativeAddress() {
+    public long nativeAddress() {
         return 0;
     }
 
@@ -616,7 +631,17 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
                     (extension.readOnly()? "read-only." : "writable."));
         }
 
-        long newSize = capacity() + (long) extension.capacity();
+        long extensionCapacity = extension.capacity();
+        if (extensionCapacity == 0) {
+            // Extending by a zero-sized buffer makes no difference. Especially since it's not allowed to change the
+            // capacity of buffers that are constiuents of composite buffers.
+            // This also ensures that methods like countComponents, and forEachReadable, do not have to worry about
+            // overflow in their component counters.
+            return;
+        }
+        // TODO if extension is itself a composite buffer, then we should extend ourselves by all of the sub-buffers
+
+        long newSize = capacity() + extensionCapacity;
         Allocator.checkSize(newSize);
 
         Buf[] restoreTemp = bufs; // We need this to restore our buffer array, in case offset computations fail.
@@ -698,6 +723,69 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
         }
         readerOffset(0);
         writerOffset(woff - distance);
+    }
+
+    @Override
+    public int countComponents() {
+        int sum = 0;
+        for (Buf buf : bufs) {
+            sum += buf.countComponents();
+        }
+        return sum;
+    }
+
+    @Override
+    public int countReadableComponents() {
+        int sum = 0;
+        for (Buf buf : bufs) {
+            sum += buf.countReadableComponents();
+        }
+        return sum;
+    }
+
+    @Override
+    public int countWritableComponents() {
+        int sum = 0;
+        for (Buf buf : bufs) {
+            sum += buf.countWritableComponents();
+        }
+        return sum;
+    }
+
+    @Override
+    public int forEachReadable(int initialIndex, ReadableComponentProcessor processor) {
+        checkReadBounds(readerOffset(), Math.max(1, readableBytes()));
+        int visited = 0;
+        for (Buf buf : bufs) {
+            if (buf.readableBytes() > 0) {
+                int count = buf.forEachReadable(visited + initialIndex, processor);
+                if (count > 0) {
+                    visited += count;
+                } else {
+                    visited = -visited + count;
+                    break;
+                }
+            }
+        }
+        return visited;
+    }
+
+    @Override
+    public int forEachWritable(int initialIndex, WritableComponentProcessor processor) {
+        checkWriteBounds(writerOffset(), Math.max(1, writableBytes()));
+        int visited = 0;
+        for (Buf buf : bufs) {
+            if (buf.writableBytes() > 0) {
+                int count = buf.forEachWritable(visited + initialIndex, processor);
+                if (count > 0) {
+                    visited += count;
+                } else {
+                    visited = -visited + count;
+                    break;
+                }
+            }
+        }
+        return visited;
     }
 
     // <editor-fold defaultstate="collapsed" desc="Primitive accessors.">
