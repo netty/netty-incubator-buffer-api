@@ -62,9 +62,6 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf, ReadableCompon
 
     private final AllocatorControl alloc;
     private final boolean isSendable;
-    // TODO remove baseOffset when JDK bug is fixed (slices of heap buffers)
-    //  See https://mail.openjdk.java.net/pipermail/panama-dev/2021-January/011810.html
-    private final int baseOffset;
     private MemorySegment seg;
     private MemorySegment wseg;
     private ByteOrder order;
@@ -72,17 +69,15 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf, ReadableCompon
     private int woff;
 
     MemSegBuf(MemorySegment segmet, Drop<MemSegBuf> drop, AllocatorControl alloc) {
-        this(segmet, drop, alloc, true, 0);
+        this(segmet, drop, alloc, true);
     }
 
-    private MemSegBuf(MemorySegment segment, Drop<MemSegBuf> drop, AllocatorControl alloc, boolean isSendable,
-                      int baseOffset) {
+    private MemSegBuf(MemorySegment segment, Drop<MemSegBuf> drop, AllocatorControl alloc, boolean isSendable) {
         super(drop);
         this.alloc = alloc;
         seg = segment;
         wseg = segment;
         this.isSendable = isSendable;
-        this.baseOffset = baseOffset;
         order = ByteOrder.nativeOrder();
     }
 
@@ -162,17 +157,16 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf, ReadableCompon
     @Override
     public ByteBuffer readableBuffer() {
         var buffer = seg.asByteBuffer();
-        int base = baseOffset;
         if (buffer.isDirect()) {
             // TODO Remove this when the slicing of shared, native segments JDK bug is fixed.
+            //  See https://mail.openjdk.java.net/pipermail/panama-dev/2021-January/011810.html
             ByteBuffer tmp = ByteBuffer.allocateDirect(buffer.capacity());
             tmp.put(buffer);
             buffer = tmp.position(0);
-            base = 0; // TODO native memory segments do not have the buffer-of-slice bug.
         }
         buffer = buffer.asReadOnlyBuffer();
         // TODO avoid slicing and just set position+limit when JDK bug is fixed.
-        return buffer.slice(base + readerOffset(), readableBytes()).order(order);
+        return buffer.slice(readerOffset(), readableBytes()).order(order);
     }
 
     @Override
@@ -203,7 +197,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf, ReadableCompon
             buffer = buffer.position(writerOffset()).limit(writerOffset() + writableBytes());
         } else {
             // TODO avoid slicing and just set position when JDK bug is fixed.
-            buffer = buffer.slice(baseOffset + writerOffset(), writableBytes());
+            buffer = buffer.slice(writerOffset(), writableBytes());
         }
         return buffer.order(order);
     }
@@ -241,7 +235,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf, ReadableCompon
             b.makeInaccessible();
         };
         var sendable = false; // Sending implies ownership change, which we can't do for slices.
-        return new MemSegBuf(slice, drop, alloc, sendable, baseOffset + offset)
+        return new MemSegBuf(slice, drop, alloc, sendable)
                 .writerOffset(length)
                 .order(order())
                 .readOnly(readOnly());
