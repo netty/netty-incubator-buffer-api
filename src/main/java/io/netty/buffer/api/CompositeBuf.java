@@ -52,7 +52,14 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
     }
 
     private static Buf[] filterExternalBufs(Buf[] bufs) {
+        // We filter out all zero-capacity buffers because they wouldn't contribute to the composite buffer anyway,
+        // and also, by ensuring that all constituent buffers contribute to the size of the composite buffer,
+        // we make sure that the number of composite buffers will never become greater than the number of bytes in
+        // the composite buffer.
+        // This restriction guarantees that methods like countComponents, forEachReadable and forEachWritable,
+        // will never overflow their component counts.
         // Allocating a new array unconditionally also prevents external modification of the array.
+        // TODO if any buffer is itself a composite buffer, then we should unwrap its sub-buffers
         return Arrays.stream(bufs).filter(b -> b.capacity() > 0).toArray(Buf[]::new);
     }
 
@@ -625,8 +632,11 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
         if (extensionCapacity == 0) {
             // Extending by a zero-sized buffer makes no difference. Especially since it's not allowed to change the
             // capacity of buffers that are constiuents of composite buffers.
+            // This also ensures that methods like countComponents, and forEachReadable, do not have to worry about
+            // overflow in their component counters.
             return;
         }
+        // TODO if extension is itself a composite buffer, then we should extend ourselves by all of the sub-buffers
 
         long newSize = capacity() + extensionCapacity;
         Allocator.checkSize(newSize);
