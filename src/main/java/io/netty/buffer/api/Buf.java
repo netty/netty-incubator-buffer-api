@@ -15,8 +15,8 @@
  */
 package io.netty.buffer.api;
 
-import io.netty.buffer.api.ComponentProcessor.OfReadable;
-import io.netty.buffer.api.ComponentProcessor.OfWritable;
+import io.netty.buffer.api.ComponentProcessor.ReadableComponentProcessor;
+import io.netty.buffer.api.ComponentProcessor.WritableComponentProcessor;
 import io.netty.buffer.api.ComponentProcessor.ReadableComponent;
 import io.netty.buffer.api.ComponentProcessor.WritableComponent;
 
@@ -498,9 +498,9 @@ public interface Buf extends Rc<Buf>, BufAccessors {
 
     /**
      * Get the number of "components" in this buffer, that are readable. These are the components that would be
-     * processed by {@link #forEachReadable(int, OfReadable)}. For composite buffers, this is the number of
-     * transitive constituent buffers that are readable, while non-composite buffers only have at most one readable
-     * component.
+     * processed by {@link #forEachReadable(int, ReadableComponentProcessor)}. For composite buffers, this is the
+     * number of transitive constituent buffers that are readable, while non-composite buffers only have at most one
+     * readable component.
      * <p>
      * The number of readable components may be less than the {@link #countComponents() component count}, if not all of
      * them have readable data.
@@ -511,9 +511,9 @@ public interface Buf extends Rc<Buf>, BufAccessors {
 
     /**
      * Get the number of "components" in this buffer, that are writable. These are the components that would be
-     * processed by {@link #forEachWritable(int, OfWritable)}. For composite buffers, this is the number of
-     * transitive constituent buffers that are writable, while non-composite buffers only have at most one writable
-     * component.
+     * processed by {@link #forEachWritable(int, WritableComponentProcessor)}. For composite buffers, this is the
+     * number of transitive constituent buffers that are writable, while non-composite buffers only have at most one
+     * writable component.
      * <p>
      * The number of writable components may be less than the {@link #countComponents() component count}, if not all of
      * them have space for writing.
@@ -525,14 +525,15 @@ public interface Buf extends Rc<Buf>, BufAccessors {
     /**
      * Process all readable components of this buffer, and return the number of components processed.
      * <p>
-     * The given {@linkplain OfReadable processor} is called for each readable component in this buffer,
+     * The given {@linkplain ReadableComponentProcessor processor} is called for each readable component in this buffer,
      * and passed a component index, for the given component in the iteration, and a {@link ReadableComponent} object
      * for accessing the data within the given component.
      * <p>
      * The component index is specific to the particular invokation of this method. The first call to the consumer will
      * be passed the given initial index, and the next call will be passed the initial index plus one, and so on.
      * <p>
-     * The {@linkplain OfReadable component processor} may stop the iteration at any time by returning {@code false}.
+     * The {@linkplain ReadableComponentProcessor component processor} may stop the iteration at any time by returning
+     * {@code false}.
      * This will cause the number of components processed to be returned as a negative number (to signal early return),
      * and the number of components processed may then be less than the
      * {@linkplain #countReadableComponents() readable component count}.
@@ -545,7 +546,7 @@ public interface Buf extends Rc<Buf>, BufAccessors {
      * such changes, are any method that requires the buffer to be {@linkplain #isOwned() owned}.
      * <p>
      * The best way to ensure this doesn't cause any trouble, is to use the buffers directly as part of the iteration,
-     * or immediately after the iteration.
+     * or immediately after the iteration while we are still in the scope of the method that triggered the iteration.
      * <p>
      * <strong>Note</strong> that the arrays, memory addresses, and byte buffers exposed as components by this method,
      * should not be used for changing the buffer contents. Doing so may cause undefined behaviour.
@@ -554,26 +555,27 @@ public interface Buf extends Rc<Buf>, BufAccessors {
      * this buffer instance.
      *
      * @param initialIndex The initial index of the iteration, and the index that will be passed to the first call to
-     *                    the {@linkplain OfReadable#process(int, ReadableComponent) processor}.
+     *                    the {@linkplain ReadableComponentProcessor#process(int, ReadableComponent) processor}.
      * @param processor The processor that will be used to process the buffer components.
      * @return The number of readable components processed, as a positive number of all readable components were
      * processed, or as a negative number if the iteration was stopped because
-     * {@link OfReadable#process(int, ReadableComponent)} returned {@code false}.
+     * {@link ReadableComponentProcessor#process(int, ReadableComponent)} returned {@code false}.
      * In any case, the number of components processed may be less than {@link #countComponents()}.
      */
-    int forEachReadable(int initialIndex, OfReadable processor);
+    int forEachReadable(int initialIndex, ReadableComponentProcessor processor);
 
     /**
      * Process all writable components of this buffer, and return the number of components processed.
      * <p>
-     * The given {@linkplain OfWritable processor} is called for each writable component in this buffer,
+     * The given {@linkplain WritableComponentProcessor processor} is called for each writable component in this buffer,
      * and passed a component index, for the given component in the iteration, and a {@link WritableComponent} object
      * for accessing the data within the given component.
      * <p>
      * The component index is specific to the particular invokation of this method. The first call to the consumer will
      * be passed the given initial index, and the next call will be passed the initial index plus one, and so on.
      * <p>
-     * The {@link OfWritable component processor} may stop the iteration at any time by returning {@code false}.
+     * The {@link WritableComponentProcessor component processor} may stop the iteration at any time by returning
+     * {@code false}.
      * This will cause the number of components processed to be returned as a negative number (to signal early return),
      * and the number of components processed may then be less than the
      * {@linkplain #countReadableComponents() readable component count}.
@@ -586,18 +588,18 @@ public interface Buf extends Rc<Buf>, BufAccessors {
      * such changes, are any method that requires the buffer to be {@linkplain #isOwned() owned}.
      * <p>
      * The best way to ensure this doesn't cause any trouble, is to use the buffers directly as part of the iteration,
-     * or immediately after the iteration.
+     * or immediately after the iteration while we are still in the scope of the method that triggered the iteration.
      * <p>
      * Changes to position and limit of the byte buffers exposed via the processed components, are not reflected back to
      * this buffer instance.
      *
      * @param initialIndex The initial index of the iteration, and the index that will be passed to the first call to
-     *                    the {@linkplain OfWritable#process(int, WritableComponent) processor}.
+     *                    the {@linkplain WritableComponentProcessor#process(int, WritableComponent) processor}.
      * @param processor The processor that will be used to process the buffer components.
      * @return The number of writable components processed, as a positive number of all writable components were
      * processed, or as a negative number if the iteration was stopped because
-     * {@link OfWritable#process(int, WritableComponent)} returned {@code false}.
+     * {@link WritableComponentProcessor#process(int, WritableComponent)} returned {@code false}.
      * In any case, the number of components processed may be less than {@link #countComponents()}.
      */
-    int forEachWritable(int initialIndex, OfWritable processor);
+    int forEachWritable(int initialIndex, WritableComponentProcessor processor);
 }

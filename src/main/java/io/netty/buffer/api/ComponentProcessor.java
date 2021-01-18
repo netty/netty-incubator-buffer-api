@@ -18,24 +18,25 @@ package io.netty.buffer.api;
 import java.nio.ByteBuffer;
 
 /**
- * This interface contain a collection of APIs used in the {@link Buf#forEachReadable(int, OfReadable)} and
- * {@link Buf#forEachWritable(int, OfWritable)} methods.
+ * This interface contain a collection of APIs used in the {@link Buf#forEachReadable(int, ReadableComponentProcessor)}
+ * and {@link Buf#forEachWritable(int, WritableComponentProcessor)} methods.
  */
 public interface ComponentProcessor {
     /**
      * A processor of {@linkplain ReadableComponent readable components}.
      */
     @FunctionalInterface
-    interface OfReadable extends ComponentProcessor {
+    interface ReadableComponentProcessor extends ComponentProcessor {
         /**
-         * Process the given component at the given index in the {@link Buf#forEachReadable(int, OfReadable) iteration}.
+         * Process the given component at the given index in the
+         * {@link Buf#forEachReadable(int, ReadableComponentProcessor) iteration}.
          * <p>
          * The component object itself is only valid during this call, but the {@link ByteBuffer byte buffers}, arrays,
          * and native address pointers obtained from it, will be valid until any
          * {@link Buf#isOwned() ownership} requiring operation is performed on the buffer.
          *
          * @param index The current index of the given buffer component, based on the initial index passed to the
-         *              {@link Buf#forEachReadable(int, OfReadable)} method.
+         *              {@link Buf#forEachReadable(int, ReadableComponentProcessor)} method.
          * @param component The current buffer component being processed.
          * @return {@code true} if the iteration should continue and more components should be processed, otherwise
          * {@code false} to stop the iteration early.
@@ -47,17 +48,17 @@ public interface ComponentProcessor {
      * A processor of {@linkplain WritableComponent writable components}.
      */
     @FunctionalInterface
-    interface OfWritable extends ComponentProcessor {
+    interface WritableComponentProcessor extends ComponentProcessor {
         /**
          * Process the given component at the given index in the
-         * {@link Buf#forEachWritable(int, OfWritable)}  iteration}.
+         * {@link Buf#forEachWritable(int, WritableComponentProcessor)}  iteration}.
          * <p>
          * The component object itself is only valid during this call, but the {@link ByteBuffer byte buffers}, arrays,
          * and native address pointers obtained from it, will be valid until any
          * {@link Buf#isOwned() ownership} requiring operation is performed on the buffer.
          *
          * @param index The current index of the given buffer component, based on the initial index passed to the
-         *              {@link Buf#forEachWritable(int, OfWritable)} method.
+         *              {@link Buf#forEachWritable(int, WritableComponentProcessor)} method.
          * @param component The current buffer component being processed.
          * @return {@code true} if the iteration should continue and more components should be processed, otherwise
          * {@code false} to stop the iteration early.
@@ -67,7 +68,7 @@ public interface ComponentProcessor {
 
     /**
      * A view onto the buffer component being processed in a given iteration of
-     * {@link Buf#forEachReadable(int, OfReadable)}.
+     * {@link Buf#forEachReadable(int, ReadableComponentProcessor)}.
      */
     interface ReadableComponent {
 
@@ -115,16 +116,16 @@ public interface ComponentProcessor {
          * Get a {@link ByteBuffer} instance for this memory component.
          * <p>
          * <strong>Note</strong> that the {@link ByteBuffer} is read-only, to prevent write accesses to the memory,
-         * when the buffer component is obtained through {@link Buf#forEachReadable(int, OfReadable)}.
+         * when the buffer component is obtained through {@link Buf#forEachReadable(int, ReadableComponentProcessor)}.
          *
-         * @return A new {@link ByteBuffer} for this memory component.
+         * @return A new {@link ByteBuffer}, with its own position and limit, for this memory component.
          */
         ByteBuffer readableBuffer();
     }
 
     /**
      * A view onto the buffer component being processed in a given iteration of
-     * {@link Buf#forEachWritable(int, OfWritable)}.
+     * {@link Buf#forEachWritable(int, WritableComponentProcessor)}.
      */
     interface WritableComponent {
 
@@ -162,7 +163,7 @@ public interface ComponentProcessor {
          * Get a {@link ByteBuffer} instance for this memory component, which can be used for modifying the buffer
          * contents.
          *
-         * @return A new {@link ByteBuffer} for this memory component.
+         * @return A new {@link ByteBuffer}, with its own position and limit, for this memory component.
          */
         ByteBuffer writableBuffer();
     }

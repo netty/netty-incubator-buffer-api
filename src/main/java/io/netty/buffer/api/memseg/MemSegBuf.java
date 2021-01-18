@@ -19,9 +19,10 @@ import io.netty.buffer.api.Allocator;
 import io.netty.buffer.api.AllocatorControl;
 import io.netty.buffer.api.Buf;
 import io.netty.buffer.api.ByteCursor;
-import io.netty.buffer.api.ComponentProcessor;
 import io.netty.buffer.api.ComponentProcessor.ReadableComponent;
+import io.netty.buffer.api.ComponentProcessor.ReadableComponentProcessor;
 import io.netty.buffer.api.ComponentProcessor.WritableComponent;
+import io.netty.buffer.api.ComponentProcessor.WritableComponentProcessor;
 import io.netty.buffer.api.Drop;
 import io.netty.buffer.api.Owned;
 import io.netty.buffer.api.RcSupport;
@@ -61,7 +62,9 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf, ReadableCompon
 
     private final AllocatorControl alloc;
     private final boolean isSendable;
-    private final int baseOffset; // TODO remove this when JDK bug is fixed (slices of heap buffers)
+    // TODO remove baseOffset when JDK bug is fixed (slices of heap buffers)
+    //  See https://mail.openjdk.java.net/pipermail/panama-dev/2021-January/011810.html
+    private final int baseOffset;
     private MemorySegment seg;
     private MemorySegment wseg;
     private ByteOrder order;
@@ -551,13 +554,13 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf, ReadableCompon
     }
 
     @Override
-    public int forEachReadable(int initialIndex, ComponentProcessor.OfReadable processor) {
+    public int forEachReadable(int initialIndex, ReadableComponentProcessor processor) {
         checkRead(readerOffset(), Math.max(1, readableBytes()));
         return processor.process(initialIndex, this)? 1 : -1;
     }
 
     @Override
-    public int forEachWritable(int initialIndex, ComponentProcessor.OfWritable processor) {
+    public int forEachWritable(int initialIndex, WritableComponentProcessor processor) {
         checkWrite(writerOffset(), Math.max(1, writableBytes()));
         return processor.process(initialIndex, this)? 1 : -1;
     }

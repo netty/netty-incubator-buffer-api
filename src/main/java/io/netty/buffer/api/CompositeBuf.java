@@ -15,6 +15,9 @@
  */
 package io.netty.buffer.api;
 
+import io.netty.buffer.api.ComponentProcessor.ReadableComponentProcessor;
+import io.netty.buffer.api.ComponentProcessor.WritableComponentProcessor;
+
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Arrays;
@@ -750,7 +753,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
     }
 
     @Override
-    public int forEachReadable(int initialIndex, ComponentProcessor.OfReadable processor) {
+    public int forEachReadable(int initialIndex, ReadableComponentProcessor processor) {
         checkReadBounds(readerOffset(), Math.max(1, readableBytes()));
         int visited = 0;
         for (Buf buf : bufs) {
@@ -768,7 +771,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
     }
 
     @Override
-    public int forEachWritable(int initialIndex, ComponentProcessor.OfWritable processor) {
+    public int forEachWritable(int initialIndex, WritableComponentProcessor processor) {
         checkWriteBounds(writerOffset(), Math.max(1, writableBytes()));
         int visited = 0;
         for (Buf buf : bufs) {
