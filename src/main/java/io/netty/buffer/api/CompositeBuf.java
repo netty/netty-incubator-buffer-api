@@ -21,7 +21,11 @@ import io.netty.buffer.api.ComponentProcessor.WritableComponentProcessor;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Stream;
 
 final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
     /**
@@ -62,8 +66,25 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
         // This restriction guarantees that methods like countComponents, forEachReadable and forEachWritable,
         // will never overflow their component counts.
         // Allocating a new array unconditionally also prevents external modification of the array.
-        // TODO if any buffer is itself a composite buffer, then we should unwrap its sub-buffers
-        return Arrays.stream(bufs).filter(b -> b.capacity() > 0).toArray(Buf[]::new);
+        bufs = Arrays.stream(bufs)
+                     .filter(b -> b.capacity() > 0)
+                     .flatMap(CompositeBuf::flattenBuffer)
+                     .toArray(Buf[]::new);
+        // Make sure there are no duplicates among the buffers.
+        Set<Buf> duplicatesCheck = Collections.newSetFromMap(new IdentityHashMap<>());
+        duplicatesCheck.addAll(Arrays.asList(bufs));
+        if (duplicatesCheck.size() < bufs.length) {
+            throw new IllegalArgumentException(
+                    "Cannot create composite buffer with duplicate constituent buffer components.");
+        }
+        return bufs;
+    }
+
+    private static Stream<Buf> flattenBuffer(Buf buf) {
+        if (buf instanceof CompositeBuf) {
+            return Stream.of(((CompositeBuf) buf).bufs);
+        }
+        return Stream.of(buf);
     }
 
     private CompositeBuf(Allocator allocator, boolean isSendable, Buf[] bufs, Drop<CompositeBuf> drop) {
@@ -616,9 +637,6 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
         if (!isOwned()) {
             throw new IllegalStateException("This buffer cannot be extended because it is not in an owned state.");
         }
-        if (extension == this) {
-            throw new IllegalArgumentException("This buffer cannot be extended with itself.");
-        }
         if (bufs.length > 0 && extension.order() != order()) {
             throw new IllegalArgumentException(
                     "This buffer uses " + order() + " byte order, and cannot be extended with " +
@@ -639,14 +657,38 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
             // overflow in their component counters.
             return;
         }
-        // TODO if extension is itself a composite buffer, then we should extend ourselves by all of the sub-buffers
 
         long newSize = capacity() + extensionCapacity;
         Allocator.checkSize(newSize);
 
         Buf[] restoreTemp = bufs; // We need this to restore our buffer array, in case offset computations fail.
         try {
-            unsafeExtendWith(extension.acquire());
+            if (extension instanceof CompositeBuf) {
+                // If the extension is itself a composite buffer, then extend this one by all of the constituent
+                // component buffers.
+                CompositeBuf compositeExtension = (CompositeBuf) extension;
+                Buf[] addedBuffers = compositeExtension.bufs;
+                Set<Buf> duplicatesCheck = Collections.newSetFromMap(new IdentityHashMap<>());
+                duplicatesCheck.addAll(Arrays.asList(bufs));
+                duplicatesCheck.addAll(Arrays.asList(addedBuffers));
+                if (duplicatesCheck.size() < bufs.length + addedBuffers.length) {
+                    throw extensionDuplicatesException();
+                }
+                for (Buf addedBuffer : addedBuffers) {
+                    addedBuffer.acquire();
+                }
+                int extendAtIndex = bufs.length;
+                bufs = Arrays.copyOf(bufs, extendAtIndex + addedBuffers.length);
+                System.arraycopy(addedBuffers, 0, bufs, extendAtIndex, addedBuffers.length);
+                computeBufferOffsets();
+            } else {
+                for (Buf buf : restoreTemp) {
+                    if (buf == extension) {
+                        throw extensionDuplicatesException();
+                    }
+                }
+                unsafeExtendWith(extension.acquire());
+            }
             if (restoreTemp.length == 0) {
                 order = extension.order();
                 readOnly = extension.readOnly();
@@ -655,6 +697,12 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
             bufs = restoreTemp;
             throw e;
         }
+    }
+
+    private static IllegalArgumentException extensionDuplicatesException() {
+        return new IllegalArgumentException(
+                "The composite buffer cannot be extended with the given extension," +
+                " as it would cause the buffer to have duplicate constituent buffers.");
     }
 
     private void unsafeExtendWith(Buf extension) {
