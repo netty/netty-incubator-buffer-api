@@ -26,7 +26,7 @@ public interface ComponentProcessor {
      * A processor of {@linkplain ReadableComponent readable components}.
      */
     @FunctionalInterface
-    interface ReadableComponentProcessor extends ComponentProcessor {
+    interface ReadableComponentProcessor<E extends Exception> extends ComponentProcessor {
         /**
          * Process the given component at the given index in the
          * {@link Buf#forEachReadable(int, ReadableComponentProcessor) iteration}.
@@ -41,14 +41,14 @@ public interface ComponentProcessor {
          * @return {@code true} if the iteration should continue and more components should be processed, otherwise
          * {@code false} to stop the iteration early.
          */
-        boolean process(int index, ReadableComponent component);
+        boolean process(int index, ReadableComponent component) throws E;
     }
 
     /**
      * A processor of {@linkplain WritableComponent writable components}.
      */
     @FunctionalInterface
-    interface WritableComponentProcessor extends ComponentProcessor {
+    interface WritableComponentProcessor<E extends Exception> extends ComponentProcessor {
         /**
          * Process the given component at the given index in the
          * {@link Buf#forEachWritable(int, WritableComponentProcessor)}  iteration}.
@@ -63,7 +63,7 @@ public interface ComponentProcessor {
          * @return {@code true} if the iteration should continue and more components should be processed, otherwise
          * {@code false} to stop the iteration early.
          */
-        boolean process(int index, WritableComponent component);
+        boolean process(int index, WritableComponent component) throws E;
     }
 
     /**

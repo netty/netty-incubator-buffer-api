@@ -19,7 +19,6 @@ import io.netty.buffer.api.Allocator;
 import io.netty.buffer.api.Buf;
 import io.netty.buffer.api.Send;
 
-import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.file.Path;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -34,27 +33,23 @@ import static java.nio.file.StandardOpenOption.WRITE;
 public final class FileCopyExample {
     public static void main(String[] args) throws Exception {
         ExecutorService executor = Executors.newFixedThreadPool(2);
-        ArrayBlockingQueue<Object> queue = new ArrayBlockingQueue<>(8);
-        Object done = new Object();
+        ArrayBlockingQueue<Send<Buf>> queue = new ArrayBlockingQueue<>(8);
         try (Allocator allocator = Allocator.pooledDirect();
              var input = FileChannel.open(Path.of("/dev/urandom"), READ);
              var output = FileChannel.open(Path.of("random.bin"), CREATE, TRUNCATE_EXISTING, WRITE)) {
+            Send<Buf> done = allocator.compose().send();
 
             var reader = executor.submit(() -> {
-                var buf = ByteBuffer.allocateDirect(1024);
                 for (int i = 0; i < 1024; i++) {
-                    buf.clear();
-                    while (buf.hasRemaining()) {
-                        int r = input.read(buf);
-                        System.out.println("r = " + r);
-                        System.out.println("buf = " + buf);
-                    }
-                    buf.flip();
                     try (Buf in = allocator.allocate(1024)) {
                         System.out.println("in = " + in);
-                        while (buf.hasRemaining()) {
-                            in.writeByte(buf.get());
-                        }
+                        in.forEachWritable(0, (index, component) -> {
+                            var bb = component.writableBuffer();
+                            while (bb.hasRemaining()) {
+                                input.read(bb);
+                            }
+                            return true;
+                        });
                         System.out.println("Sending " + in.readableBytes() + " bytes.");
                         queue.put(in.send());
                     }
@@ -64,19 +59,17 @@ public final class FileCopyExample {
             });
 
             var writer = executor.submit(() -> {
-                var buf = ByteBuffer.allocateDirect(1024);
-                Object msg;
-                while ((msg = queue.take()) != done) {
-                    buf.clear();
-                    @SuppressWarnings("unchecked")
-                    Send<Buf> send = (Send<Buf>) msg;
+                Send<Buf> send;
+                while ((send = queue.take()) != done) {
                     try (Buf out = send.receive()) {
                         System.out.println("Received " + out.readableBytes() + " bytes.");
-                        out.copyInto(0, buf, 0, out.readableBytes());
-                        buf.position(0).limit(out.readableBytes());
-                    }
-                    while (buf.hasRemaining()) {
-                        output.write(buf);
+                        out.forEachReadable(0, (index, component) -> {
+                            var bb = component.readableBuffer();
+                            while (bb.hasRemaining()) {
+                                output.write(bb);
+                            }
+                            return true;
+                        });
                     }
                 }
                 output.force(true);
