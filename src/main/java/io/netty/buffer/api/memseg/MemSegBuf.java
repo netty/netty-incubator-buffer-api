@@ -548,13 +548,15 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf, ReadableCompon
     }
 
     @Override
-    public int forEachReadable(int initialIndex, ReadableComponentProcessor processor) {
+    public <E extends Exception> int forEachReadable(int initialIndex, ReadableComponentProcessor<E> processor)
+            throws E {
         checkRead(readerOffset(), Math.max(1, readableBytes()));
         return processor.process(initialIndex, this)? 1 : -1;
     }
 
     @Override
-    public int forEachWritable(int initialIndex, WritableComponentProcessor processor) {
+    public <E extends Exception> int forEachWritable(int initialIndex, WritableComponentProcessor<E> processor)
+            throws E {
         checkWrite(writerOffset(), Math.max(1, writableBytes()));
         return processor.process(initialIndex, this)? 1 : -1;
     }

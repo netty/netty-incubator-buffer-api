@@ -562,7 +562,7 @@ public interface Buf extends Rc<Buf>, BufAccessors {
      * {@link ReadableComponentProcessor#process(int, ReadableComponent)} returned {@code false}.
      * In any case, the number of components processed may be less than {@link #countComponents()}.
      */
-    int forEachReadable(int initialIndex, ReadableComponentProcessor processor);
+    <E extends Exception> int forEachReadable(int initialIndex, ReadableComponentProcessor<E> processor) throws E;
 
     /**
      * Process all writable components of this buffer, and return the number of components processed.
@@ -601,5 +601,5 @@ public interface Buf extends Rc<Buf>, BufAccessors {
      * {@link WritableComponentProcessor#process(int, WritableComponent)} returned {@code false}.
      * In any case, the number of components processed may be less than {@link #countComponents()}.
      */
-    int forEachWritable(int initialIndex, WritableComponentProcessor processor);
+    <E extends Exception> int forEachWritable(int initialIndex, WritableComponentProcessor<E> processor) throws E;
 }
