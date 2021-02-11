@@ -79,7 +79,7 @@ public abstract class RcSupport<I extends Rc<I>, T extends RcSupport<I, T>> impl
         }
         var owned = prepareSend();
         acquires = -2; // Close without dropping. This also ignore future double-free attempts.
-        return new TransferSend<I, T>(owned, drop);
+        return new TransferSend<I, T>(owned, drop, getClass());
     }
 
     /**

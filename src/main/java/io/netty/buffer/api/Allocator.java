@@ -107,7 +107,7 @@ public interface Allocator extends AutoCloseable {
      * @return A buffer composed of, and backed by, the given buffers.
      * @throws IllegalArgumentException if the given buffers have an inconsistent {@linkplain Buf#order() byte order}.
      */
-    default Buf compose(Buf... bufs) {
+    default Buf compose(Deref<Buf>... bufs) {
         return new CompositeBuf(this, bufs);
     }
 
@@ -117,8 +117,8 @@ public interface Allocator extends AutoCloseable {
      * the composite buffer was created.
      * The composite buffer is modified in-place.
      *
-     * @see #compose(Buf...)
-     * @param composite The composite buffer (from a prior {@link #compose(Buf...)} call) to extend with the given
+     * @see #compose(Deref...)
+     * @param composite The composite buffer (from a prior {@link #compose(Deref...)} call) to extend with the given
      *                 extension buffer.
      * @param extension The buffer to extend the composite buffer with.
      */
@@ -133,9 +133,9 @@ public interface Allocator extends AutoCloseable {
     }
 
     /**
-     * Check if the given buffer is a {@linkplain #compose(Buf...) composite} buffer or not.
+     * Check if the given buffer is a {@linkplain #compose(Deref...) composite} buffer or not.
      * @param composite The buffer to check.
-     * @return {@code true} if the given buffer was created with {@link #compose(Buf...)}, {@code false} otherwise.
+     * @return {@code true} if the given buffer was created with {@link #compose(Deref...)}, {@code false} otherwise.
      */
     static boolean isComposite(Buf composite) {
         return composite.getClass() == CompositeBuf.class;

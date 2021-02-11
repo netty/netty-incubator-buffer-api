@@ -18,6 +18,7 @@ package io.netty.buffer.api.examples;
 import io.netty.buffer.api.Allocator;
 import io.netty.buffer.api.Buf;
 
+import static java.lang.System.out;
 import static java.util.concurrent.CompletableFuture.completedFuture;
 
 public final class AsyncExample {
@@ -33,9 +34,9 @@ public final class AsyncExample {
                 }
             }).thenAcceptAsync(send -> {
                 try (Buf buf = send.receive()) {
-                    System.out.println("First thread id was " + buf.readLong());
-                    System.out.println("Then sent to " + buf.readLong());
-                    System.out.println("And now in thread " + threadId());
+                    out.println("First thread id was " + buf.readLong());
+                    out.println("Then sent to " + buf.readLong());
+                    out.println("And now in thread " + threadId());
                 }
             }).get();
         }

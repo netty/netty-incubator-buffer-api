@@ -121,6 +121,7 @@ public interface ComponentProcessor {
          * @return A new {@link ByteBuffer}, with its own position and limit, for this memory component.
          */
         ByteBuffer readableBuffer();
+        // todo for Unsafe-based impl, DBB.attachment needs to keep underlying memory alive
     }
 
     /**

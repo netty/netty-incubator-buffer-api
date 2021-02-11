@@ -15,6 +15,10 @@
  */
 package io.netty.buffer.api;
 
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Function;
+import java.util.function.Supplier;
+
 /**
  * A Send object is a temporary holder of an {@link Rc}, used for transferring the ownership of the Rc from one thread
  * to another.
@@ -28,8 +32,43 @@ package io.netty.buffer.api;
  *
  * @param <T>
  */
-@FunctionalInterface
-public interface Send<T extends Rc<T>> {
+public interface Send<T extends Rc<T>> extends Deref<T> {
+    /**
+     * Construct a {@link Send} based on the given {@link Supplier}.
+     * The supplier will be called only once, in the receiving thread.
+     *
+     * @param concreteObjectType The concrete type of the object being sent. Specifically, the object returned from the
+     *                           {@link Supplier#get()} method must be an instance of this class.
+     * @param supplier The supplier of the object being sent, which will be called when the object is ready to be
+     *                received.
+     * @param <T> The type of object being sent.
+     * @return A {@link Send} which will deliver an object of the given type, from the supplier.
+     */
+    static <T extends Rc<T>> Send<T> sending(Class<T> concreteObjectType, Supplier<? extends T> supplier) {
+        return new Send<T>() {
+            private final AtomicBoolean gate = new AtomicBoolean();
+            @Override
+            public T receive() {
+                if (gate.getAndSet(true)) {
+                    throw new IllegalStateException("This object has already been received.");
+                }
+                return supplier.get();
+            }
+
+            @Override
+            public boolean isInstanceOf(Class<?> cls) {
+                return cls.isAssignableFrom(concreteObjectType);
+            }
+
+            @Override
+            public void discard() {
+                if (!gate.getAndSet(true)) {
+                    supplier.get().close();
+                }
+            }
+        };
+    }
+
     /**
      * Receive the {@link Rc} instance being sent, and bind its ownership to the calling thread. The invalidation of the
      * sent Rc in the sending thread happens-before the return of this method.
@@ -40,4 +79,33 @@ public interface Send<T extends Rc<T>> {
      * @throws IllegalStateException If this method is called more than once.
      */
     T receive();
+
+    /**
+     * Apply a mapping function to the object being sent. The mapping will occur when the object is received.
+     *
+     * @param type The result type of the mapping function.
+     * @param mapper The mapping function to apply to the object being sent.
+     * @param <R> The result type of the mapping function.
+     * @return A new {@link Send} instance that will deliver an object that is the result of the mapping.
+     */
+    default <R extends Rc<R>> Send<R> map(Class<R> type, Function<T, ? extends R> mapper) {
+        return sending(type, () -> mapper.apply(receive()));
+    }
+
+    /**
+     * Discard this {@link Send} and the object it contains.
+     * This has no effect if the send has already been received.
+     */
+    default void discard() {
+        try {
+            receive().close();
+        } catch (IllegalStateException ignore) {
+            // Don't do anything if the send has already been consumed.
+        }
+    }
+
+    @Override
+    default T get() {
+        return receive();
+    }
 }

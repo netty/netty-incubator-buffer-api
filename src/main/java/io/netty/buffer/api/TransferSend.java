@@ -24,12 +24,14 @@ class TransferSend<I extends Rc<I>, T extends Rc<I>> implements Send<I> {
     private static final VarHandle RECEIVED = findVarHandle(lookup(), TransferSend.class, "received", boolean.class);
     private final Owned<T> outgoing;
     private final Drop<T> drop;
+    private final Class<?> concreteType;
     @SuppressWarnings("unused")
     private volatile boolean received; // Accessed via VarHandle
 
-    TransferSend(Owned<T> outgoing, Drop<T> drop) {
+    TransferSend(Owned<T> outgoing, Drop<T> drop, Class<?> concreteType) {
         this.outgoing = outgoing;
         this.drop = drop;
+        this.concreteType = concreteType;
     }
 
     @SuppressWarnings("unchecked")
@@ -47,8 +49,22 @@ class TransferSend<I extends Rc<I>, T extends Rc<I>> implements Send<I> {
     }
 
     private void gateReception() {
-        if (!RECEIVED.compareAndSet(this, false, true)) {
+        if ((boolean) RECEIVED.getAndSet(this, true)) {
             throw new IllegalStateException("This object has already been received.");
+        }
+    }
+
+    @Override
+    public boolean isInstanceOf(Class<?> cls) {
+        return cls.isAssignableFrom(concreteType);
+    }
+
+    @Override
+    public void discard() {
+        if (!(boolean) RECEIVED.getAndSet(this, true)) {
+            var copy = outgoing.transferOwnership(drop);
+            drop.attach(copy);
+            copy.close();
         }
     }
 }

@@ -70,7 +70,7 @@ import java.nio.ByteOrder;
  * To send a buffer to another thread, the buffer must not have any outstanding borrows.
  * That is to say, all {@linkplain #acquire() acquires} must have been paired with a {@link #close()};
  * all {@linkplain #slice() slices} must have been closed.
- * And if this buffer is a constituent of a {@linkplain Allocator#compose(Buf...) composite buffer},
+ * And if this buffer is a constituent of a {@linkplain Allocator#compose(Deref...) composite buffer},
  * then that composite buffer must be closed.
  * And if this buffer is itself a composite buffer, then it must own all of its constituent buffers.
  * The {@link #isOwned()} method can be used on any buffer to check if it can be sent or not.
@@ -438,6 +438,8 @@ public interface Buf extends Rc<Buf>, BufAccessors {
 
     /**
      * Split the buffer into two, at the {@linkplain #writerOffset() write offset} position.
+     * <p>
+     * The buffer must be in {@linkplain #isOwned() an owned state}, or an exception will be thrown.
      * <p>
      * The region of this buffer that contain the read and readable bytes, will be captured and returned in a new
      * buffer, that will hold its own ownership of that region. This allows the returned buffer to be indepentently
