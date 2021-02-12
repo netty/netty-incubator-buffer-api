@@ -54,11 +54,11 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
     private boolean closed;
     private boolean readOnly;
 
-    CompositeBuf(Allocator allocator, Buf[] bufs) {
-        this(allocator, true, filterExternalBufs(bufs), COMPOSITE_DROP);
+    CompositeBuf(Allocator allocator, Deref<Buf>[] refs) {
+        this(allocator, true, filterExternalBufs(refs), COMPOSITE_DROP, false);
     }
 
-    private static Buf[] filterExternalBufs(Buf[] bufs) {
+    private static Buf[] filterExternalBufs(Deref<Buf>[] refs) {
         // We filter out all zero-capacity buffers because they wouldn't contribute to the composite buffer anyway,
         // and also, by ensuring that all constituent buffers contribute to the size of the composite buffer,
         // we make sure that the number of composite buffers will never become greater than the number of bytes in
@@ -66,56 +66,90 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
         // This restriction guarantees that methods like countComponents, forEachReadable and forEachWritable,
         // will never overflow their component counts.
         // Allocating a new array unconditionally also prevents external modification of the array.
-        bufs = Arrays.stream(bufs)
-                     .filter(b -> b.capacity() > 0)
+        Buf[] bufs = Arrays.stream(refs)
+                     .map(r -> r.get()) // Increments reference counts.
+                     .filter(CompositeBuf::discardEmpty)
                      .flatMap(CompositeBuf::flattenBuffer)
                      .toArray(Buf[]::new);
         // Make sure there are no duplicates among the buffers.
         Set<Buf> duplicatesCheck = Collections.newSetFromMap(new IdentityHashMap<>());
         duplicatesCheck.addAll(Arrays.asList(bufs));
         if (duplicatesCheck.size() < bufs.length) {
+            for (Buf buf : bufs) {
+                buf.close(); // Undo the increment we did with Deref.get().
+            }
             throw new IllegalArgumentException(
                     "Cannot create composite buffer with duplicate constituent buffer components.");
         }
         return bufs;
     }
 
+    private static boolean discardEmpty(Buf buf) {
+        if (buf.capacity() > 0) {
+            return true;
+        } else {
+            // If we filter a buffer out, then we must make sure to close it since we incremented the reference count
+            // with Deref.get() earlier.
+            buf.close();
+            return false;
+        }
+    }
+
     private static Stream<Buf> flattenBuffer(Buf buf) {
         if (buf instanceof CompositeBuf) {
-            return Stream.of(((CompositeBuf) buf).bufs);
+            // Extract components and move our reference count from the composite onto the components.
+            var composite = (CompositeBuf) buf;
+            var bufs = composite.bufs;
+            for (Buf b : bufs) {
+                b.acquire();
+            }
+            buf.close(); // Important: acquire on components *before* closing composite.
+            return Stream.of(bufs);
         }
         return Stream.of(buf);
     }
 
-    private CompositeBuf(Allocator allocator, boolean isSendable, Buf[] bufs, Drop<CompositeBuf> drop) {
+    private CompositeBuf(Allocator allocator, boolean isSendable, Buf[] bufs, Drop<CompositeBuf> drop,
+                         boolean acquireBufs) {
         super(drop);
         this.allocator = allocator;
         this.isSendable = isSendable;
-        for (Buf buf : bufs) {
-            buf.acquire();
-        }
-        if (bufs.length > 0) {
-            ByteOrder targetOrder = bufs[0].order();
+        if (acquireBufs) {
             for (Buf buf : bufs) {
-                if (buf.order() != targetOrder) {
-                    throw new IllegalArgumentException("Constituent buffers have inconsistent byte order.");
-                }
+                buf.acquire();
             }
-            order = bufs[0].order();
+        }
+        try {
+            if (bufs.length > 0) {
+                ByteOrder targetOrder = bufs[0].order();
+                for (Buf buf : bufs) {
+                    if (buf.order() != targetOrder) {
+                        throw new IllegalArgumentException("Constituent buffers have inconsistent byte order.");
+                    }
+                }
+                order = bufs[0].order();
 
-            boolean targetReadOnly = bufs[0].readOnly();
-            for (Buf buf : bufs) {
-                if (buf.readOnly() != targetReadOnly) {
-                    throw new IllegalArgumentException("Constituent buffers have inconsistent read-only state.");
+                boolean targetReadOnly = bufs[0].readOnly();
+                for (Buf buf : bufs) {
+                    if (buf.readOnly() != targetReadOnly) {
+                        throw new IllegalArgumentException("Constituent buffers have inconsistent read-only state.");
+                    }
                 }
+                readOnly = targetReadOnly;
+            } else {
+                order = ByteOrder.nativeOrder();
             }
-            readOnly = targetReadOnly;
-        } else {
-            order = ByteOrder.nativeOrder();
+            this.bufs = bufs;
+            computeBufferOffsets();
+            tornBufAccessors = new TornBufAccessors(this);
+        } catch (Exception e) {
+            // Always close bufs on exception, regardless of acquireBufs value.
+            // If acquireBufs is false, it just means the ref count increments happened prior to this constructor call.
+            for (Buf buf : bufs) {
+                buf.close();
+            }
+            throw e;
         }
-        this.bufs = bufs;
-        computeBufferOffsets();
-        tornBufAccessors = new TornBufAccessors(this);
     }
 
     private void computeBufferOffsets() {
@@ -292,7 +326,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
                 slices = new Buf[] { choice.slice(subOffset, 0) };
             }
 
-            return new CompositeBuf(allocator, false, slices, drop);
+            return new CompositeBuf(allocator, false, slices, drop, true);
         } catch (Throwable throwable) {
             // We called acquire prior to the try-clause. We need to undo that if we're not creating a composite buffer:
             close();
@@ -718,7 +752,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
         }
         if (bufs.length == 0) {
             // Bifurcating a zero-length buffer is trivial.
-            return new CompositeBuf(allocator, true, bufs, unsafeGetDrop()).order(order);
+            return new CompositeBuf(allocator, true, bufs, unsafeGetDrop(), true).order(order);
         }
 
         int i = searchOffsets(woff);
@@ -730,7 +764,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
         }
         computeBufferOffsets();
         try {
-            var compositeBuf = new CompositeBuf(allocator, true, bifs, unsafeGetDrop());
+            var compositeBuf = new CompositeBuf(allocator, true, bifs, unsafeGetDrop(), true);
             compositeBuf.order = order; // Preserve byte order even if bifs array is empty.
             return compositeBuf;
         } finally {
@@ -1133,7 +1167,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
                 for (int i = 0; i < sends.length; i++) {
                     received[i] = sends[i].receive();
                 }
-                var composite = new CompositeBuf(allocator, true, received, drop);
+                var composite = new CompositeBuf(allocator, true, received, drop, true);
                 composite.readOnly = readOnly;
                 drop.attach(composite);
                 return composite;

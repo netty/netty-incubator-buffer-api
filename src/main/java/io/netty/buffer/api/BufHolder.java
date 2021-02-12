@@ -83,10 +83,10 @@ public abstract class BufHolder<T extends BufHolder<T>> implements Rc<T> {
         return buf.countBorrows();
     }
 
+    @SuppressWarnings("unchecked")
     @Override
     public Send<T> send() {
-        var send = buf.send();
-        return () -> receive(send.receive());
+        return buf.send().map((Class<T>) getClass(), this::receive);
     }
 
     /**

@@ -887,10 +887,15 @@ public class BufTest {
             try (Buf ignored = buf.acquire()) {
                 assertEquals(borrows + 1, buf.countBorrows());
                 try (Buf slice = buf.slice()) {
+                    assertEquals(0, slice.capacity()); // We haven't written anything, so the slice is empty.
+                    int sliceBorrows = slice.countBorrows();
                     assertEquals(borrows + 2, buf.countBorrows());
                     try (Buf ignored1 = allocator.compose(buf, slice)) {
                         assertEquals(borrows + 3, buf.countBorrows());
+                        // Note: Slice is empty; not acquired by the composite buffer.
+                        assertEquals(sliceBorrows, slice.countBorrows());
                     }
+                    assertEquals(sliceBorrows, slice.countBorrows());
                     assertEquals(borrows + 2, buf.countBorrows());
                 }
                 assertEquals(borrows + 1, buf.countBorrows());
@@ -1644,6 +1649,18 @@ public class BufTest {
                     a.acquire();
                 }
             }
+        }
+    }
+
+    @Test
+    public void compositeBufferFromSends() {
+        try (Allocator allocator = Allocator.heap();
+             Buf composite = allocator.compose(
+                     allocator.allocate(8).send(),
+                     allocator.allocate(8).send(),
+                     allocator.allocate(8).send())) {
+            assertEquals(24, composite.capacity());
+            assertTrue(composite.isOwned());
         }
     }
 
@@ -2649,6 +2666,7 @@ public class BufTest {
             }
         }
     }
+    // todo read only buffer must have zero writable bytes
 
     @ParameterizedTest
     @MethodSource("nonCompositeAllocators")

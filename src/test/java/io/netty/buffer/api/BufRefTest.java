@@ -100,7 +100,7 @@ class BufRefTest {
         try (Allocator allocator = Allocator.heap();
              BufRef refA = new BufRef(allocator.allocate(8).send())) {
             refA.contents().writeInt(42);
-            var send = refA.send();
+            Send<BufRef> send = refA.send();
             assertThrows(IllegalStateException.class, () -> refA.contents().readInt());
             try (BufRef refB = send.receive()) {
                 assertThat(refB.contents().readInt()).isEqualTo(42);
