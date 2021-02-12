@@ -16,10 +16,10 @@
 package io.netty.buffer.api.memseg;
 
 import io.netty.buffer.api.AllocatorControl;
-import io.netty.buffer.api.Buf;
+import io.netty.buffer.api.Buffer;
 import io.netty.buffer.api.Drop;
 import io.netty.buffer.api.MemoryManager;
-import io.netty.buffer.api.memseg.MemSegBuf.RecoverableMemory;
+import io.netty.buffer.api.memseg.MemSegBuffer.RecoverableMemory;
 import jdk.incubator.foreign.MemorySegment;
 
 import java.lang.ref.Cleaner;
@@ -29,38 +29,38 @@ public abstract class AbstractMemorySegmentManager implements MemoryManager {
     public abstract boolean isNative();
 
     @Override
-    public Buf allocateConfined(AllocatorControl alloc, long size, Drop<Buf> drop, Cleaner cleaner) {
+    public Buffer allocateConfined(AllocatorControl alloc, long size, Drop<Buffer> drop, Cleaner cleaner) {
         var segment = createSegment(size);
         if (cleaner != null) {
             segment = segment.registerCleaner(cleaner);
         }
-        return new MemSegBuf(segment, convert(drop), alloc);
+        return new MemSegBuffer(segment, convert(drop), alloc);
     }
 
     @Override
-    public Buf allocateShared(AllocatorControl alloc, long size, Drop<Buf> drop, Cleaner cleaner) {
+    public Buffer allocateShared(AllocatorControl alloc, long size, Drop<Buffer> drop, Cleaner cleaner) {
         var segment = createSegment(size).share();
         if (cleaner != null) {
             segment = segment.registerCleaner(cleaner);
         }
-        return new MemSegBuf(segment, convert(drop), alloc);
+        return new MemSegBuffer(segment, convert(drop), alloc);
     }
 
     protected abstract MemorySegment createSegment(long size);
 
     @Override
-    public Drop<Buf> drop() {
-        return convert(MemSegBuf.SEGMENT_CLOSE);
+    public Drop<Buffer> drop() {
+        return convert(MemSegBuffer.SEGMENT_CLOSE);
     }
 
     @Override
-    public Object unwrapRecoverableMemory(Buf buf) {
-        var b = (MemSegBuf) buf;
+    public Object unwrapRecoverableMemory(Buffer buf) {
+        var b = (MemSegBuffer) buf;
         return b.recoverableMemory();
     }
 
     @Override
-    public Buf recoverMemory(Object recoverableMemory, Drop<Buf> drop) {
+    public Buffer recoverMemory(Object recoverableMemory, Drop<Buffer> drop) {
         var recovery = (RecoverableMemory) recoverableMemory;
         return recovery.recover(convert(drop));
     }

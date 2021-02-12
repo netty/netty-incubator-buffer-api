@@ -17,7 +17,7 @@ package io.netty.buffer.api;
 
 /**
  * Methods for accessing and controlling the internals of an allocator.
- * This interface is intended to be used by implementors of the {@link Allocator}, {@link Buf} and
+ * This interface is intended to be used by implementors of the {@link BufferAllocator}, {@link Buffer} and
  * {@link MemoryManager} interfaces.
  */
 public interface AllocatorControl {
@@ -25,19 +25,19 @@ public interface AllocatorControl {
      * Allocate a buffer that is not tethered to any particular {@link Drop} implementation,
      * and return the recoverable memory object from it.
      * <p>
-     * This allows a buffer to implement {@link Buf#ensureWritable(int)} by having new memory allocated to it,
+     * This allows a buffer to implement {@link Buffer#ensureWritable(int)} by having new memory allocated to it,
      * without that memory being attached to some other lifetime.
      *
      * @param originator The buffer that originated the request for an untethered memory allocated.
      * @param size The size of the requested memory allocation, in bytes.
      * @return A "recoverable memory" object that is the requested allocation.
      */
-    Object allocateUntethered(Buf originator, int size);
+    Object allocateUntethered(Buffer originator, int size);
 
     /**
      * Return memory to the allocator, after it has been untethered from it's lifetime.
      * This either happens if the memory has leaked and been re-captured, or if it is no longer in use by a buffer
-     * through {@link Buf#ensureWritable(int)}.
+     * through {@link Buffer#ensureWritable(int)}.
      *
      * @param memory The untethered memory to return to the allocator.
      */

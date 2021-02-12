@@ -24,24 +24,24 @@ import static io.netty.buffer.api.Statics.CLEANER;
 import static io.netty.buffer.api.Statics.findVarHandle;
 import static java.lang.invoke.MethodHandles.lookup;
 
-class CleanerPooledDrop implements Drop<Buf> {
+class CleanerPooledDrop implements Drop<Buffer> {
     private static final VarHandle CLEANABLE =
             findVarHandle(lookup(), CleanerPooledDrop.class, "cleanable", GatedCleanable.class);
     private final SizeClassedMemoryPool pool;
     private final MemoryManager manager;
-    private final Drop<Buf> delegate;
+    private final Drop<Buffer> delegate;
     @SuppressWarnings("unused")
     private volatile GatedCleanable cleanable;
 
     CleanerPooledDrop(SizeClassedMemoryPool pool, MemoryManager manager,
-                      Drop<Buf> delegate) {
+                      Drop<Buffer> delegate) {
         this.pool = pool;
         this.manager = manager;
         this.delegate = delegate;
     }
 
     @Override
-    public void drop(Buf buf) {
+    public void drop(Buffer buf) {
         GatedCleanable c = (GatedCleanable) CLEANABLE.getAndSet(this, null);
         if (c != null) {
             c.clean();
@@ -49,7 +49,7 @@ class CleanerPooledDrop implements Drop<Buf> {
     }
 
     @Override
-    public void attach(Buf buf) {
+    public void attach(Buffer buf) {
         // Unregister old cleanable, if any, to avoid uncontrolled build-up.
         GatedCleanable c = (GatedCleanable) CLEANABLE.getAndSet(this, null);
         if (c != null) {
@@ -60,11 +60,11 @@ class CleanerPooledDrop implements Drop<Buf> {
         var pool = this.pool;
         var mem = manager.unwrapRecoverableMemory(buf);
         var delegate = this.delegate;
-        WeakReference<Buf> ref = new WeakReference<>(buf);
+        WeakReference<Buffer> ref = new WeakReference<>(buf);
         AtomicBoolean gate = new AtomicBoolean(true);
         cleanable = new GatedCleanable(gate, CLEANER.register(this, () -> {
             if (gate.getAndSet(false)) {
-                Buf b = ref.get();
+                Buffer b = ref.get();
                 if (b == null) {
                     pool.recoverMemory(mem);
                 } else {

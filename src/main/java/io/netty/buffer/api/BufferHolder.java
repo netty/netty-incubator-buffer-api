@@ -22,42 +22,42 @@ import static io.netty.buffer.api.Statics.findVarHandle;
 import static java.lang.invoke.MethodHandles.lookup;
 
 /**
- * The {@link BufHolder} is an abstract class that simplifies the implementation of objects that themselves contain
- * a {@link Buf} instance.
+ * The {@link BufferHolder} is an abstract class that simplifies the implementation of objects that themselves contain
+ * a {@link Buffer} instance.
  * <p>
- * The {@link BufHolder} can only hold on to a single buffer, so objects and classes that need to hold on to multiple
- * buffers will have to do their implementation from scratch, though they can use the code of the {@link BufHolder} as
- * inspiration.
+ * The {@link BufferHolder} can only hold on to a single buffer, so objects and classes that need to hold on to multiple
+ * buffers will have to do their implementation from scratch, though they can use the code of the {@link BufferHolder}
+ * as inspiration.
  * <p>
- * If you just want an object that is a reference to a buffer, then the {@link BufRef} can be used for that purpose.
+ * If you just want an object that is a reference to a buffer, then the {@link BufferRef} can be used for that purpose.
  * If you have an advanced use case where you wish to implement {@link Rc}, and tightly control lifetimes, then
  * {@link RcSupport} can be of help.
  *
- * @param <T> The concrete {@link BufHolder} type.
+ * @param <T> The concrete {@link BufferHolder} type.
  */
-public abstract class BufHolder<T extends BufHolder<T>> implements Rc<T> {
-    private static final VarHandle BUF = findVarHandle(lookup(), BufHolder.class, "buf", Buf.class);
-    private Buf buf;
+public abstract class BufferHolder<T extends BufferHolder<T>> implements Rc<T> {
+    private static final VarHandle BUF = findVarHandle(lookup(), BufferHolder.class, "buf", Buffer.class);
+    private Buffer buf;
 
     /**
-     * Create a new {@link BufHolder} to hold the given {@linkplain Buf buffer}.
+     * Create a new {@link BufferHolder} to hold the given {@linkplain Buffer buffer}.
      * <p>
      * <strong>Note:</strong> this increases the reference count of the given buffer.
      *
-     * @param buf The {@linkplain Buf buffer} to be held by this holder.
+     * @param buf The {@linkplain Buffer buffer} to be held by this holder.
      */
-    protected BufHolder(Buf buf) {
+    protected BufferHolder(Buffer buf) {
         this.buf = Objects.requireNonNull(buf, "The buffer cannot be null.").acquire();
     }
 
     /**
-     * Create a new {@link BufHolder} to hold the {@linkplain Buf buffer} received from the given {@link Send}.
+     * Create a new {@link BufferHolder} to hold the {@linkplain Buffer buffer} received from the given {@link Send}.
      * <p>
-     * The {@link BufHolder} will then be holding exclusive ownership of the buffer.
+     * The {@link BufferHolder} will then be holding exclusive ownership of the buffer.
      *
-     * @param send The {@linkplain Buf buffer} to be held by this holder.
+     * @param send The {@linkplain Buffer buffer} to be held by this holder.
      */
-    protected BufHolder(Send<Buf> send) {
+    protected BufferHolder(Send<Buffer> send) {
         buf = Objects.requireNonNull(send, "The send cannot be null.").receive();
     }
 
@@ -90,28 +90,28 @@ public abstract class BufHolder<T extends BufHolder<T>> implements Rc<T> {
     }
 
     /**
-     * Called when a {@linkplain #send() sent} {@link BufHolder} is received by the recipient.
-     * The {@link BufHolder} should return a new concrete instance, that wraps the given {@link Buf} object.
+     * Called when a {@linkplain #send() sent} {@link BufferHolder} is received by the recipient.
+     * The {@link BufferHolder} should return a new concrete instance, that wraps the given {@link Buffer} object.
      *
-     * @param buf The {@link Buf} that is {@linkplain Send#receive() received} by the recipient,
-     *           and needs to be wrapped in a new {@link BufHolder} instance.
-     * @return A new {@linkplain T buffer holder} instance, containing the given {@linkplain Buf buffer}.
+     * @param buf The {@link Buffer} that is {@linkplain Send#receive() received} by the recipient,
+     *           and needs to be wrapped in a new {@link BufferHolder} instance.
+     * @return A new {@linkplain T buffer holder} instance, containing the given {@linkplain Buffer buffer}.
      */
-    protected abstract T receive(Buf buf);
+    protected abstract T receive(Buffer buf);
 
     /**
      * Replace the underlying referenced buffer with the given buffer.
      * <p>
-     * This method is protected to permit advanced use cases of {@link BufHolder} sub-class implementations.
+     * This method is protected to permit advanced use cases of {@link BufferHolder} sub-class implementations.
      * <p>
      * <strong>Note:</strong> this method decreases the reference count of the current buffer,
      * and increases the reference count of the new buffer.
      * <p>
      * The buffer assignment is performed using a plain store.
      *
-     * @param newBuf The new {@link Buf} instance that is replacing the currently held buffer.
+     * @param newBuf The new {@link Buffer} instance that is replacing the currently held buffer.
      */
-    protected final void replaceBuf(Buf newBuf) {
+    protected final void replaceBuf(Buffer newBuf) {
         try (var ignore = buf) {
             buf = newBuf.acquire();
         }
@@ -120,16 +120,16 @@ public abstract class BufHolder<T extends BufHolder<T>> implements Rc<T> {
     /**
      * Replace the underlying referenced buffer with the given buffer.
      * <p>
-     * This method is protected to permit advanced use cases of {@link BufHolder} sub-class implementations.
+     * This method is protected to permit advanced use cases of {@link BufferHolder} sub-class implementations.
      * <p>
      * <strong>Note:</strong> this method decreases the reference count of the current buffer,
      * and takes exclusive ownership of the sent buffer.
      * <p>
      * The buffer assignment is performed using a plain store.
      *
-     * @param send The new {@link Buf} instance that is replacing the currently held buffer.
+     * @param send The new {@link Buffer} instance that is replacing the currently held buffer.
      */
-    protected final void replaceBuf(Send<Buf> send) {
+    protected final void replaceBuf(Send<Buffer> send) {
         try (var ignore = buf) {
             buf = send.receive();
         }
@@ -138,56 +138,56 @@ public abstract class BufHolder<T extends BufHolder<T>> implements Rc<T> {
     /**
      * Replace the underlying referenced buffer with the given buffer.
      * <p>
-     * This method is protected to permit advanced use cases of {@link BufHolder} sub-class implementations.
+     * This method is protected to permit advanced use cases of {@link BufferHolder} sub-class implementations.
      * <p>
      * <strong>Note:</strong> this method decreases the reference count of the current buffer,
      * and increases the reference count of the new buffer.
      * <p>
      * The buffer assignment is performed using a volatile store.
      *
-     * @param newBuf The new {@link Buf} instance that is replacing the currently held buffer.
+     * @param newBuf The new {@link Buffer} instance that is replacing the currently held buffer.
      */
-    protected final void replaceBufVolatile(Buf newBuf) {
-        var prev = (Buf) BUF.getAndSet(this, newBuf.acquire());
+    protected final void replaceBufVolatile(Buffer newBuf) {
+        var prev = (Buffer) BUF.getAndSet(this, newBuf.acquire());
         prev.close();
     }
 
     /**
      * Replace the underlying referenced buffer with the given buffer.
      * <p>
-     * This method is protected to permit advanced use cases of {@link BufHolder} sub-class implementations.
+     * This method is protected to permit advanced use cases of {@link BufferHolder} sub-class implementations.
      * <p>
      * <strong>Note:</strong> this method decreases the reference count of the current buffer,
      * and takes exclusive ownership of the sent buffer.
      * <p>
      * The buffer assignment is performed using a volatile store.
      *
-     * @param send The {@link Send} with the new {@link Buf} instance that is replacing the currently held buffer.
+     * @param send The {@link Send} with the new {@link Buffer} instance that is replacing the currently held buffer.
      */
-    protected final void replaceBufVolatile(Send<Buf> send) {
-        var prev = (Buf) BUF.getAndSet(this, send.receive());
+    protected final void replaceBufVolatile(Send<Buffer> send) {
+        var prev = (Buffer) BUF.getAndSet(this, send.receive());
         prev.close();
     }
 
     /**
-     * Access the held {@link Buf} instance.
+     * Access the held {@link Buffer} instance.
      * <p>
      * The access is performed using a plain load.
      *
-     * @return The {@link Buf} instance being held by this {@linkplain T buffer holder}.
+     * @return The {@link Buffer} instance being held by this {@linkplain T buffer holder}.
      */
-    protected final Buf getBuf() {
+    protected final Buffer getBuf() {
         return buf;
     }
 
     /**
-     * Access the held {@link Buf} instance.
+     * Access the held {@link Buffer} instance.
      * <p>
      * The access is performed using a volatile load.
      *
-     * @return The {@link Buf} instance being held by this {@linkplain T buffer holder}.
+     * @return The {@link Buffer} instance being held by this {@linkplain T buffer holder}.
      */
-    protected final Buf getBufVolatile() {
-        return (Buf) BUF.getVolatile(this);
+    protected final Buffer getBufVolatile() {
+        return (Buffer) BUF.getVolatile(this);
     }
 }

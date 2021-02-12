@@ -30,9 +30,9 @@ public interface MemoryManager {
     }
 
     boolean isNative();
-    Buf allocateConfined(AllocatorControl alloc, long size, Drop<Buf> drop, Cleaner cleaner);
-    Buf allocateShared(AllocatorControl allo, long size, Drop<Buf> drop, Cleaner cleaner);
-    Drop<Buf> drop();
-    Object unwrapRecoverableMemory(Buf buf);
-    Buf recoverMemory(Object recoverableMemory, Drop<Buf> drop);
+    Buffer allocateConfined(AllocatorControl alloc, long size, Drop<Buffer> drop, Cleaner cleaner);
+    Buffer allocateShared(AllocatorControl allo, long size, Drop<Buffer> drop, Cleaner cleaner);
+    Drop<Buffer> drop();
+    Object unwrapRecoverableMemory(Buffer buf);
+    Buffer recoverMemory(Object recoverableMemory, Drop<Buffer> drop);
 }

@@ -18,9 +18,9 @@ package io.netty.buffer.api;
 import java.nio.ByteOrder;
 
 /**
- * Interface for {@link Buf} allocators.
+ * Interface for {@link Buffer} allocators.
  */
-public interface Allocator extends AutoCloseable {
+public interface BufferAllocator extends AutoCloseable {
     static void checkSize(long size) {
         if (size < 1) {
             throw new IllegalArgumentException("Buffer size must be positive, but was " + size + '.');
@@ -34,28 +34,28 @@ public interface Allocator extends AutoCloseable {
     }
 
     /**
-     * Allocate a {@link Buf} of the given size in bytes. This method may throw an {@link OutOfMemoryError} if there is
-     * not enough free memory available to allocate a {@link Buf} of the requested size.
+     * Allocate a {@link Buffer} of the given size in bytes. This method may throw an {@link OutOfMemoryError} if there
+     * is not enough free memory available to allocate a {@link Buffer} of the requested size.
      * <p>
      * The buffer will use the current platform native byte order by default, for accessor methods that don't have an
      * explicit byte order.
      *
-     * @param size The size of {@link Buf} to allocate.
-     * @return The newly allocated {@link Buf}.
+     * @param size The size of {@link Buffer} to allocate.
+     * @return The newly allocated {@link Buffer}.
      */
-    Buf allocate(int size);
+    Buffer allocate(int size);
 
     /**
-     * Allocate a {@link Buf} of the given size in bytes. This method may throw an {@link OutOfMemoryError} if there is
-     * not enough free memory available to allocate a {@link Buf} of the requested size.
+     * Allocate a {@link Buffer} of the given size in bytes. This method may throw an {@link OutOfMemoryError} if there
+     * is not enough free memory available to allocate a {@link Buffer} of the requested size.
      * <p>
      * The buffer will use the given byte order by default.
      *
-     * @param size The size of {@link Buf} to allocate.
+     * @param size The size of {@link Buffer} to allocate.
      * @param order The default byte order used by the accessor methods that don't have an explicit byte order.
-     * @return The newly allocated {@link Buf}.
+     * @return The newly allocated {@link Buffer}.
      */
-    default Buf allocate(int size, ByteOrder order) {
+    default Buffer allocate(int size, ByteOrder order) {
         return allocate(size).order(order);
     }
 
@@ -68,18 +68,18 @@ public interface Allocator extends AutoCloseable {
      * If the buffers are allocated for the purpose of participating in the composite buffer,
      * then they should be closed as soon as the composite buffer has been created, like in this example:
      * <pre>{@code
-     *     try (Buf a = allocator.allocate(size);
-     *          Buf b = allocator.allocate(size)) {
+     *     try (Buffer a = allocator.allocate(size);
+     *          Buffer b = allocator.allocate(size)) {
      *         return allocator.compose(a, b); // Reference counts for 'a' and 'b' incremented here.
      *     } // Reference count for 'a' and 'b' decremented here; composite buffer now holds the last references.
      * }</pre>
      * <p>
-     * {@linkplain Buf#send() Sending} a composite buffer implies sending all of its constituent buffers.
+     * {@linkplain Buffer#send() Sending} a composite buffer implies sending all of its constituent buffers.
      * For sending to be possible, both the composite buffer itself, and all of its constituent buffers, must be in an
      * {@linkplain Rc#isOwned() owned state}.
      * This means that the composite buffer must be the only reference to the constituent buffers.
      * <p>
-     * All of the constituent buffers must have the same {@linkplain Buf#order() byte order}.
+     * All of the constituent buffers must have the same {@linkplain Buffer#order() byte order}.
      * An exception will be thrown if you attempt to compose buffers that have different byte orders,
      * and changing the byte order of the constituent buffers so they become inconsistent after construction,
      * will result in unspecified behaviour.
@@ -99,16 +99,17 @@ public interface Allocator extends AutoCloseable {
      * <p>
      * It is not a requirement that the buffers have the same size.
      * <p>
-     * It is not a requirement that the buffers are allocated by this allocator, but if {@link Buf#ensureWritable(int)}
-     * is called on the composed buffer, and the composed buffer needs to be expanded, then this allocator instance
-     * will be used for allocation the extra memory.
+     * It is not a requirement that the buffers are allocated by this allocator, but if
+     * {@link Buffer#ensureWritable(int)} is called on the composed buffer, and the composed buffer needs to be
+     * expanded, then this allocator instance will be used for allocation the extra memory.
      *
      * @param bufs The buffers to compose into a single buffer view.
      * @return A buffer composed of, and backed by, the given buffers.
-     * @throws IllegalArgumentException if the given buffers have an inconsistent {@linkplain Buf#order() byte order}.
+     * @throws IllegalArgumentException if the given buffers have an inconsistent
+     * {@linkplain Buffer#order() byte order}.
      */
-    default Buf compose(Deref<Buf>... bufs) {
-        return new CompositeBuf(this, bufs);
+    default Buffer compose(Deref<Buffer>... bufs) {
+        return new CompositeBuffer(this, bufs);
     }
 
     /**
@@ -122,13 +123,13 @@ public interface Allocator extends AutoCloseable {
      *                 extension buffer.
      * @param extension The buffer to extend the composite buffer with.
      */
-    static void extend(Buf composite, Buf extension) {
+    static void extend(Buffer composite, Buffer extension) {
         if (!isComposite(composite)) {
             throw new IllegalArgumentException(
                     "Expected the first buffer to be a composite buffer, " +
                     "but it is a " + composite.getClass() + " buffer: " + composite + '.');
         }
-        CompositeBuf buf = (CompositeBuf) composite;
+        CompositeBuffer buf = (CompositeBuffer) composite;
         buf.extendWith(extension);
     }
 
@@ -137,8 +138,8 @@ public interface Allocator extends AutoCloseable {
      * @param composite The buffer to check.
      * @return {@code true} if the given buffer was created with {@link #compose(Deref...)}, {@code false} otherwise.
      */
-    static boolean isComposite(Buf composite) {
-        return composite.getClass() == CompositeBuf.class;
+    static boolean isComposite(Buffer composite) {
+        return composite.getClass() == CompositeBuffer.class;
     }
 
     /**
@@ -149,19 +150,19 @@ public interface Allocator extends AutoCloseable {
     default void close() {
     }
 
-    static Allocator heap() {
-        return new ManagedAllocator(MemoryManager.getHeapMemoryManager(), Statics.CLEANER);
+    static BufferAllocator heap() {
+        return new ManagedBufferAllocator(MemoryManager.getHeapMemoryManager(), Statics.CLEANER);
     }
 
-    static Allocator direct() {
-        return new ManagedAllocator(MemoryManager.getNativeMemoryManager(), Statics.CLEANER);
+    static BufferAllocator direct() {
+        return new ManagedBufferAllocator(MemoryManager.getNativeMemoryManager(), Statics.CLEANER);
     }
 
-    static Allocator pooledHeap() {
+    static BufferAllocator pooledHeap() {
         return new SizeClassedMemoryPool(MemoryManager.getHeapMemoryManager());
     }
 
-    static Allocator pooledDirect() {
+    static BufferAllocator pooledDirect() {
         return new SizeClassedMemoryPool(MemoryManager.getNativeMemoryManager());
     }
 }

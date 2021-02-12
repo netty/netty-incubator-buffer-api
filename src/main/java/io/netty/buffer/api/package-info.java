@@ -15,6 +15,6 @@
  */
 
 /**
- * Incubating {@code Buf} API, as a proposed alternative to {@code ByteBuf}.
+ * Incubating {@code Buffer} API, as a proposed alternative to {@code ByteBuf}.
  */
 package io.netty.buffer.api;

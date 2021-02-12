@@ -15,8 +15,8 @@
  */
 package io.netty.buffer.api.examples;
 
-import io.netty.buffer.api.Allocator;
-import io.netty.buffer.api.Buf;
+import io.netty.buffer.api.BufferAllocator;
+import io.netty.buffer.api.Buffer;
 import io.netty.buffer.api.Send;
 
 import java.nio.channels.FileChannel;
@@ -33,15 +33,15 @@ import static java.nio.file.StandardOpenOption.WRITE;
 public final class FileCopyExample {
     public static void main(String[] args) throws Exception {
         ExecutorService executor = Executors.newFixedThreadPool(2);
-        ArrayBlockingQueue<Send<Buf>> queue = new ArrayBlockingQueue<>(8);
-        try (Allocator allocator = Allocator.pooledDirect();
+        ArrayBlockingQueue<Send<Buffer>> queue = new ArrayBlockingQueue<>(8);
+        try (BufferAllocator allocator = BufferAllocator.pooledDirect();
              var input = FileChannel.open(Path.of("/dev/urandom"), READ);
              var output = FileChannel.open(Path.of("random.bin"), CREATE, TRUNCATE_EXISTING, WRITE)) {
-            Send<Buf> done = allocator.compose().send();
+            Send<Buffer> done = allocator.compose().send();
 
             var reader = executor.submit(() -> {
                 for (int i = 0; i < 1024; i++) {
-                    try (Buf in = allocator.allocate(1024)) {
+                    try (Buffer in = allocator.allocate(1024)) {
                         System.out.println("in = " + in);
                         in.forEachWritable(0, (index, component) -> {
                             var bb = component.writableBuffer();
@@ -59,9 +59,9 @@ public final class FileCopyExample {
             });
 
             var writer = executor.submit(() -> {
-                Send<Buf> send;
+                Send<Buffer> send;
                 while ((send = queue.take()) != done) {
-                    try (Buf out = send.receive()) {
+                    try (Buffer out = send.receive()) {
                         System.out.println("Received " + out.readableBytes() + " bytes.");
                         out.forEachReadable(0, (index, component) -> {
                             var bb = component.readableBuffer();

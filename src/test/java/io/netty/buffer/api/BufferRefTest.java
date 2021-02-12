@@ -20,13 +20,13 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
 
-class BufRefTest {
+class BufferRefTest {
     @Test
     public void closingBufRefMustCloseOwnedBuf() {
-        try (Allocator allocator = Allocator.heap()) {
-            BufRef ref;
-            try (Buf b = allocator.allocate(8)) {
-                ref = new BufRef(b);
+        try (BufferAllocator allocator = BufferAllocator.heap()) {
+            BufferRef ref;
+            try (Buffer b = allocator.allocate(8)) {
+                ref = new BufferRef(b);
             }
             ref.contents().writeInt(42);
             assertThat(ref.contents().readInt()).isEqualTo(42);
@@ -37,9 +37,9 @@ class BufRefTest {
 
     @Test
     public void closingBufRefMustCloseOwnedBufFromSend() {
-        try (Allocator allocator = Allocator.heap();
-             Buf buf = allocator.allocate(8)) {
-            BufRef ref = new BufRef(buf.send());
+        try (BufferAllocator allocator = BufferAllocator.heap();
+             Buffer buf = allocator.allocate(8)) {
+            BufferRef ref = new BufferRef(buf.send());
             ref.contents().writeInt(42);
             assertThat(ref.contents().readInt()).isEqualTo(42);
             ref.close();
@@ -49,17 +49,17 @@ class BufRefTest {
 
     @Test
     public void mustCloseOwnedBufferWhenReplaced() {
-        try (Allocator allocator = Allocator.heap()) {
-            Buf orig;
-            BufRef ref;
-            try (Buf buf = allocator.allocate(8)) {
-                ref = new BufRef(orig = buf);
+        try (BufferAllocator allocator = BufferAllocator.heap()) {
+            Buffer orig;
+            BufferRef ref;
+            try (Buffer buf = allocator.allocate(8)) {
+                ref = new BufferRef(orig = buf);
             }
 
             orig.writeInt(42);
             assertThat(ref.contents().readInt()).isEqualTo(42);
 
-            try (Buf buf = allocator.allocate(8)) {
+            try (Buffer buf = allocator.allocate(8)) {
                 ref.replace(buf); // Pass replacement directly.
             }
 
@@ -73,17 +73,17 @@ class BufRefTest {
 
     @Test
     public void mustCloseOwnedBufferWhenReplacedFromSend() {
-        try (Allocator allocator = Allocator.heap()) {
-            Buf orig;
-            BufRef ref;
-            try (Buf buf = allocator.allocate(8)) {
-                ref = new BufRef(orig = buf);
+        try (BufferAllocator allocator = BufferAllocator.heap()) {
+            Buffer orig;
+            BufferRef ref;
+            try (Buffer buf = allocator.allocate(8)) {
+                ref = new BufferRef(orig = buf);
             }
 
             orig.writeInt(42);
             assertThat(ref.contents().readInt()).isEqualTo(42);
 
-            try (Buf buf = allocator.allocate(8)) {
+            try (Buffer buf = allocator.allocate(8)) {
                 ref.replace(buf.send()); // Pass replacement via send().
             }
 
@@ -97,12 +97,12 @@ class BufRefTest {
 
     @Test
     public void sendingRefMustSendBuffer() {
-        try (Allocator allocator = Allocator.heap();
-             BufRef refA = new BufRef(allocator.allocate(8).send())) {
+        try (BufferAllocator allocator = BufferAllocator.heap();
+             BufferRef refA = new BufferRef(allocator.allocate(8).send())) {
             refA.contents().writeInt(42);
-            Send<BufRef> send = refA.send();
+            Send<BufferRef> send = refA.send();
             assertThrows(IllegalStateException.class, () -> refA.contents().readInt());
-            try (BufRef refB = send.receive()) {
+            try (BufferRef refB = send.receive()) {
                 assertThat(refB.contents().readInt()).isEqualTo(42);
             }
         }

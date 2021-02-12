@@ -27,24 +27,24 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Stream;
 
-final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
+final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> implements Buffer {
     /**
      * The max array size is JVM implementation dependant, but most seem to settle on {@code Integer.MAX_VALUE - 8}.
      * We set the max composite buffer capacity to the same, since it would otherwise be impossible to create a
      * non-composite copy of the buffer.
      */
     private static final int MAX_CAPACITY = Integer.MAX_VALUE - 8;
-    private static final Drop<CompositeBuf> COMPOSITE_DROP = buf -> {
-        for (Buf b : buf.bufs) {
+    private static final Drop<CompositeBuffer> COMPOSITE_DROP = buf -> {
+        for (Buffer b : buf.bufs) {
             b.close();
         }
         buf.makeInaccessible();
     };
 
-    private final Allocator allocator;
-    private final TornBufAccessors tornBufAccessors;
+    private final BufferAllocator allocator;
+    private final TornBufferAccessors tornBufAccessors;
     private final boolean isSendable;
-    private Buf[] bufs;
+    private Buffer[] bufs;
     private int[] offsets; // The offset, for the composite buffer, where each constituent buffer starts.
     private int capacity;
     private int roff;
@@ -54,11 +54,11 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
     private boolean closed;
     private boolean readOnly;
 
-    CompositeBuf(Allocator allocator, Deref<Buf>[] refs) {
+    CompositeBuffer(BufferAllocator allocator, Deref<Buffer>[] refs) {
         this(allocator, true, filterExternalBufs(refs), COMPOSITE_DROP, false);
     }
 
-    private static Buf[] filterExternalBufs(Deref<Buf>[] refs) {
+    private static Buffer[] filterExternalBufs(Deref<Buffer>[] refs) {
         // We filter out all zero-capacity buffers because they wouldn't contribute to the composite buffer anyway,
         // and also, by ensuring that all constituent buffers contribute to the size of the composite buffer,
         // we make sure that the number of composite buffers will never become greater than the number of bytes in
@@ -66,16 +66,16 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
         // This restriction guarantees that methods like countComponents, forEachReadable and forEachWritable,
         // will never overflow their component counts.
         // Allocating a new array unconditionally also prevents external modification of the array.
-        Buf[] bufs = Arrays.stream(refs)
-                     .map(r -> r.get()) // Increments reference counts.
-                     .filter(CompositeBuf::discardEmpty)
-                     .flatMap(CompositeBuf::flattenBuffer)
-                     .toArray(Buf[]::new);
+        Buffer[] bufs = Arrays.stream(refs)
+                              .map(r -> r.get()) // Increments reference counts.
+                              .filter(CompositeBuffer::discardEmpty)
+                              .flatMap(CompositeBuffer::flattenBuffer)
+                              .toArray(Buffer[]::new);
         // Make sure there are no duplicates among the buffers.
-        Set<Buf> duplicatesCheck = Collections.newSetFromMap(new IdentityHashMap<>());
+        Set<Buffer> duplicatesCheck = Collections.newSetFromMap(new IdentityHashMap<>());
         duplicatesCheck.addAll(Arrays.asList(bufs));
         if (duplicatesCheck.size() < bufs.length) {
-            for (Buf buf : bufs) {
+            for (Buffer buf : bufs) {
                 buf.close(); // Undo the increment we did with Deref.get().
             }
             throw new IllegalArgumentException(
@@ -84,7 +84,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
         return bufs;
     }
 
-    private static boolean discardEmpty(Buf buf) {
+    private static boolean discardEmpty(Buffer buf) {
         if (buf.capacity() > 0) {
             return true;
         } else {
@@ -95,12 +95,12 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
         }
     }
 
-    private static Stream<Buf> flattenBuffer(Buf buf) {
-        if (buf instanceof CompositeBuf) {
+    private static Stream<Buffer> flattenBuffer(Buffer buf) {
+        if (buf instanceof CompositeBuffer) {
             // Extract components and move our reference count from the composite onto the components.
-            var composite = (CompositeBuf) buf;
+            var composite = (CompositeBuffer) buf;
             var bufs = composite.bufs;
-            for (Buf b : bufs) {
+            for (Buffer b : bufs) {
                 b.acquire();
             }
             buf.close(); // Important: acquire on components *before* closing composite.
@@ -109,20 +109,20 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
         return Stream.of(buf);
     }
 
-    private CompositeBuf(Allocator allocator, boolean isSendable, Buf[] bufs, Drop<CompositeBuf> drop,
-                         boolean acquireBufs) {
+    private CompositeBuffer(BufferAllocator allocator, boolean isSendable, Buffer[] bufs, Drop<CompositeBuffer> drop,
+                            boolean acquireBufs) {
         super(drop);
         this.allocator = allocator;
         this.isSendable = isSendable;
         if (acquireBufs) {
-            for (Buf buf : bufs) {
+            for (Buffer buf : bufs) {
                 buf.acquire();
             }
         }
         try {
             if (bufs.length > 0) {
                 ByteOrder targetOrder = bufs[0].order();
-                for (Buf buf : bufs) {
+                for (Buffer buf : bufs) {
                     if (buf.order() != targetOrder) {
                         throw new IllegalArgumentException("Constituent buffers have inconsistent byte order.");
                     }
@@ -130,7 +130,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
                 order = bufs[0].order();
 
                 boolean targetReadOnly = bufs[0].readOnly();
-                for (Buf buf : bufs) {
+                for (Buffer buf : bufs) {
                     if (buf.readOnly() != targetReadOnly) {
                         throw new IllegalArgumentException("Constituent buffers have inconsistent read-only state.");
                     }
@@ -141,11 +141,11 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
             }
             this.bufs = bufs;
             computeBufferOffsets();
-            tornBufAccessors = new TornBufAccessors(this);
+            tornBufAccessors = new TornBufferAccessors(this);
         } catch (Exception e) {
             // Always close bufs on exception, regardless of acquireBufs value.
             // If acquireBufs is false, it just means the ref count increments happened prior to this constructor call.
-            for (Buf buf : bufs) {
+            for (Buffer buf : bufs) {
                 buf.close();
             }
             throw e;
@@ -157,7 +157,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
             int woff = 0;
             int roff = 0;
             boolean woffMidpoint = false;
-            for (Buf buf : bufs) {
+            for (Buffer buf : bufs) {
                 if (buf.writableBytes() == 0) {
                     woff += buf.capacity();
                 } else if (!woffMidpoint) {
@@ -170,7 +170,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
                 }
             }
             boolean roffMidpoint = false;
-            for (Buf buf : bufs) {
+            for (Buffer buf : bufs) {
                 if (buf.readableBytes() == 0 && buf.writableBytes() == 0) {
                     roff += buf.capacity();
                 } else if (!roffMidpoint) {
@@ -206,14 +206,14 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
 
     @Override
     public String toString() {
-        return "Buf[roff:" + roff + ", woff:" + woff + ", cap:" + capacity + ']';
+        return "Buffer[roff:" + roff + ", woff:" + woff + ", cap:" + capacity + ']';
     }
 
     @Override
-    public Buf order(ByteOrder order) {
+    public Buffer order(ByteOrder order) {
         if (this.order != order) {
             this.order = order;
-            for (Buf buf : bufs) {
+            for (Buffer buf : bufs) {
                 buf.order(order);
             }
         }
@@ -236,10 +236,10 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
     }
 
     @Override
-    public Buf readerOffset(int index) {
+    public Buffer readerOffset(int index) {
         prepRead(index, 0);
         int indexLeft = index;
-        for (Buf buf : bufs) {
+        for (Buffer buf : bufs) {
             buf.readerOffset(Math.min(indexLeft, buf.capacity()));
             indexLeft = Math.max(0, indexLeft - buf.capacity());
         }
@@ -253,10 +253,10 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
     }
 
     @Override
-    public Buf writerOffset(int index) {
+    public Buffer writerOffset(int index) {
         checkWriteBounds(index, 0);
         int indexLeft = index;
-        for (Buf buf : bufs) {
+        for (Buffer buf : bufs) {
             buf.writerOffset(Math.min(indexLeft, buf.capacity()));
             indexLeft = Math.max(0, indexLeft - buf.capacity());
         }
@@ -265,8 +265,8 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
     }
 
     @Override
-    public Buf fill(byte value) {
-        for (Buf buf : bufs) {
+    public Buffer fill(byte value) {
+        for (Buffer buf : bufs) {
             buf.fill(value);
         }
         return this;
@@ -278,8 +278,8 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
     }
 
     @Override
-    public Buf readOnly(boolean readOnly) {
-        for (Buf buf : bufs) {
+    public Buffer readOnly(boolean readOnly) {
+        for (Buffer buf : bufs) {
             buf.readOnly(readOnly);
         }
         this.readOnly = readOnly;
@@ -292,24 +292,24 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
     }
 
     @Override
-    public Buf slice(int offset, int length) {
+    public Buffer slice(int offset, int length) {
         checkWriteBounds(offset, length);
         if (offset < 0 || length < 0) {
             throw new IllegalArgumentException(
                     "Offset and length cannot be negative, but offset was " +
                     offset + ", and length was " + length + '.');
         }
-        Buf choice = (Buf) chooseBuffer(offset, 0);
-        Buf[] slices = null;
+        Buffer choice = (Buffer) chooseBuffer(offset, 0);
+        Buffer[] slices = null;
         acquire(); // Increase reference count of the original composite buffer.
-        Drop<CompositeBuf> drop = obj -> {
+        Drop<CompositeBuffer> drop = obj -> {
             close(); // Decrement the reference count of the original composite buffer.
             COMPOSITE_DROP.drop(obj);
         };
 
         try {
             if (length > 0) {
-                slices = new Buf[bufs.length];
+                slices = new Buffer[bufs.length];
                 int off = subOffset;
                 int cap = length;
                 int i;
@@ -323,17 +323,17 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
                 slices = Arrays.copyOf(slices, i);
             } else {
                 // Specialize for length == 0, since we must slice from at least one constituent buffer.
-                slices = new Buf[] { choice.slice(subOffset, 0) };
+                slices = new Buffer[] { choice.slice(subOffset, 0) };
             }
 
-            return new CompositeBuf(allocator, false, slices, drop, true);
+            return new CompositeBuffer(allocator, false, slices, drop, true);
         } catch (Throwable throwable) {
             // We called acquire prior to the try-clause. We need to undo that if we're not creating a composite buffer:
             close();
             throw throwable;
         } finally {
             if (slices != null) {
-                for (Buf slice : slices) {
+                for (Buffer slice : slices) {
                     if (slice != null) {
                         slice.close(); // Ownership now transfers to the composite buffer.
                     }
@@ -363,7 +363,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
             throw indexOutOfBounds(srcPos + length, false);
         }
         while (length > 0) {
-            var buf = (Buf) chooseBuffer(srcPos, 0);
+            var buf = (Buffer) chooseBuffer(srcPos, 0);
             int toCopy = Math.min(buf.capacity() - subOffset, length);
             dest.copyInto(buf, subOffset, destPos, toCopy);
             srcPos += toCopy;
@@ -374,11 +374,11 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
 
     @FunctionalInterface
     private interface CopyInto {
-        void copyInto(Buf src, int srcPos, int destPos, int length);
+        void copyInto(Buffer src, int srcPos, int destPos, int length);
     }
 
     @Override
-    public void copyInto(int srcPos, Buf dest, int destPos, int length) {
+    public void copyInto(int srcPos, Buffer dest, int destPos, int length) {
         if (length < 0) {
             throw new IndexOutOfBoundsException("Length cannot be negative: " + length + '.');
         }
@@ -422,7 +422,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
         }
         int startBufferIndex = searchOffsets(fromOffset);
         int off = fromOffset - offsets[startBufferIndex];
-        Buf startBuf = bufs[startBufferIndex];
+        Buffer startBuf = bufs[startBufferIndex];
         ByteCursor startCursor = startBuf.openCursor(off, Math.min(startBuf.capacity() - off, length));
         return new ByteCursor() {
             int index = fromOffset;
@@ -484,7 +484,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
 
             private void nextCursor() {
                 bufferIndex++;
-                Buf nextBuf = bufs[bufferIndex];
+                Buffer nextBuf = bufs[bufferIndex];
                 cursor = nextBuf.openCursor(0, Math.min(nextBuf.capacity(), bytesLeft()));
                 initOffset = 0;
             }
@@ -523,7 +523,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
         }
         int startBufferIndex = searchOffsets(fromOffset);
         int off = fromOffset - offsets[startBufferIndex];
-        Buf startBuf = bufs[startBufferIndex];
+        Buffer startBuf = bufs[startBufferIndex];
         ByteCursor startCursor = startBuf.openReverseCursor(off, Math.min(off + 1, length));
         return new ByteCursor() {
             int index = fromOffset;
@@ -585,7 +585,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
 
             private void nextCursor() {
                 bufferIndex--;
-                Buf nextBuf = bufs[bufferIndex];
+                Buffer nextBuf = bufs[bufferIndex];
                 int length = Math.min(nextBuf.capacity(), bytesLeft());
                 int offset = nextBuf.capacity() - 1;
                 cursor = nextBuf.openReverseCursor(offset, length);
@@ -632,23 +632,23 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
             // Let's see if we can solve some or all of the requested size with compaction.
             // We always compact as much as is possible, regardless of size. This amortizes our work.
             int compactableBuffers = 0;
-            for (Buf buf : bufs) {
+            for (Buffer buf : bufs) {
                 if (buf.capacity() != buf.readerOffset()) {
                     break;
                 }
                 compactableBuffers++;
             }
             if (compactableBuffers > 0) {
-                Buf[] compactable;
+                Buffer[] compactable;
                 if (compactableBuffers < bufs.length) {
-                    compactable = new Buf[compactableBuffers];
+                    compactable = new Buffer[compactableBuffers];
                     System.arraycopy(bufs, 0, compactable, 0, compactable.length);
                     System.arraycopy(bufs, compactable.length, bufs, 0, bufs.length - compactable.length);
                     System.arraycopy(compactable, 0, bufs, bufs.length - compactable.length, compactable.length);
                 } else {
                     compactable = bufs;
                 }
-                for (Buf buf : compactable) {
+                for (Buffer buf : compactable) {
                     buf.reset();
                 }
                 computeBufferOffsets();
@@ -660,13 +660,13 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
         }
 
         long newSize = capacity() + (long) size;
-        Allocator.checkSize(newSize);
+        BufferAllocator.checkSize(newSize);
         int growth = size - writableBytes();
-        Buf extension = bufs.length == 0? allocator.allocate(growth) : allocator.allocate(growth, order());
+        Buffer extension = bufs.length == 0? allocator.allocate(growth) : allocator.allocate(growth, order());
         unsafeExtendWith(extension);
     }
 
-    void extendWith(Buf extension) {
+    void extendWith(Buffer extension) {
         Objects.requireNonNull(extension, "Extension buffer cannot be null.");
         if (!isOwned()) {
             throw new IllegalStateException("This buffer cannot be extended because it is not in an owned state.");
@@ -693,22 +693,22 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
         }
 
         long newSize = capacity() + extensionCapacity;
-        Allocator.checkSize(newSize);
+        BufferAllocator.checkSize(newSize);
 
-        Buf[] restoreTemp = bufs; // We need this to restore our buffer array, in case offset computations fail.
+        Buffer[] restoreTemp = bufs; // We need this to restore our buffer array, in case offset computations fail.
         try {
-            if (extension instanceof CompositeBuf) {
+            if (extension instanceof CompositeBuffer) {
                 // If the extension is itself a composite buffer, then extend this one by all of the constituent
                 // component buffers.
-                CompositeBuf compositeExtension = (CompositeBuf) extension;
-                Buf[] addedBuffers = compositeExtension.bufs;
-                Set<Buf> duplicatesCheck = Collections.newSetFromMap(new IdentityHashMap<>());
+                CompositeBuffer compositeExtension = (CompositeBuffer) extension;
+                Buffer[] addedBuffers = compositeExtension.bufs;
+                Set<Buffer> duplicatesCheck = Collections.newSetFromMap(new IdentityHashMap<>());
                 duplicatesCheck.addAll(Arrays.asList(bufs));
                 duplicatesCheck.addAll(Arrays.asList(addedBuffers));
                 if (duplicatesCheck.size() < bufs.length + addedBuffers.length) {
                     throw extensionDuplicatesException();
                 }
-                for (Buf addedBuffer : addedBuffers) {
+                for (Buffer addedBuffer : addedBuffers) {
                     addedBuffer.acquire();
                 }
                 int extendAtIndex = bufs.length;
@@ -716,7 +716,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
                 System.arraycopy(addedBuffers, 0, bufs, extendAtIndex, addedBuffers.length);
                 computeBufferOffsets();
             } else {
-                for (Buf buf : restoreTemp) {
+                for (Buffer buf : restoreTemp) {
                     if (buf == extension) {
                         throw extensionDuplicatesException();
                     }
@@ -739,37 +739,37 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
                 " as it would cause the buffer to have duplicate constituent buffers.");
     }
 
-    private void unsafeExtendWith(Buf extension) {
+    private void unsafeExtendWith(Buffer extension) {
         bufs = Arrays.copyOf(bufs, bufs.length + 1);
         bufs[bufs.length - 1] = extension;
         computeBufferOffsets();
     }
 
     @Override
-    public Buf bifurcate() {
+    public Buffer bifurcate() {
         if (!isOwned()) {
             throw new IllegalStateException("Cannot bifurcate a buffer that is not owned.");
         }
         if (bufs.length == 0) {
             // Bifurcating a zero-length buffer is trivial.
-            return new CompositeBuf(allocator, true, bufs, unsafeGetDrop(), true).order(order);
+            return new CompositeBuffer(allocator, true, bufs, unsafeGetDrop(), true).order(order);
         }
 
         int i = searchOffsets(woff);
         int off = woff - offsets[i];
-        Buf[] bifs = Arrays.copyOf(bufs, off == 0? i : 1 + i);
+        Buffer[] bifs = Arrays.copyOf(bufs, off == 0? i : 1 + i);
         bufs = Arrays.copyOfRange(bufs, off == bufs[i].capacity()? 1 + i : i, bufs.length);
         if (off > 0 && bifs.length > 0 && off < bifs[bifs.length - 1].capacity()) {
             bifs[bifs.length - 1] = bufs[0].bifurcate();
         }
         computeBufferOffsets();
         try {
-            var compositeBuf = new CompositeBuf(allocator, true, bifs, unsafeGetDrop(), true);
+            var compositeBuf = new CompositeBuffer(allocator, true, bifs, unsafeGetDrop(), true);
             compositeBuf.order = order; // Preserve byte order even if bifs array is empty.
             return compositeBuf;
         } finally {
             // Drop our references to the buffers in the bifs array. They belong to the new composite buffer now.
-            for (Buf bif : bifs) {
+            for (Buffer bif : bifs) {
                 bif.close();
             }
         }
@@ -810,7 +810,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
     @Override
     public int countComponents() {
         int sum = 0;
-        for (Buf buf : bufs) {
+        for (Buffer buf : bufs) {
             sum += buf.countComponents();
         }
         return sum;
@@ -819,7 +819,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
     @Override
     public int countReadableComponents() {
         int sum = 0;
-        for (Buf buf : bufs) {
+        for (Buffer buf : bufs) {
             sum += buf.countReadableComponents();
         }
         return sum;
@@ -828,7 +828,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
     @Override
     public int countWritableComponents() {
         int sum = 0;
-        for (Buf buf : bufs) {
+        for (Buffer buf : bufs) {
             sum += buf.countWritableComponents();
         }
         return sum;
@@ -839,7 +839,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
             throws E {
         checkReadBounds(readerOffset(), Math.max(1, readableBytes()));
         int visited = 0;
-        for (Buf buf : bufs) {
+        for (Buffer buf : bufs) {
             if (buf.readableBytes() > 0) {
                 int count = buf.forEachReadable(visited + initialIndex, processor);
                 if (count > 0) {
@@ -858,7 +858,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
             throws E {
         checkWriteBounds(writerOffset(), Math.max(1, writableBytes()));
         int visited = 0;
-        for (Buf buf : bufs) {
+        for (Buffer buf : bufs) {
             if (buf.writableBytes() > 0) {
                 int count = buf.forEachWritable(visited + initialIndex, processor);
                 if (count > 0) {
@@ -894,25 +894,25 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
     }
 
     @Override
-    public Buf writeByte(byte value) {
+    public Buffer writeByte(byte value) {
         prepWrite(Byte.BYTES).writeByte(value);
         return this;
     }
 
     @Override
-    public Buf setByte(int woff, byte value) {
+    public Buffer setByte(int woff, byte value) {
         prepWrite(woff, Byte.BYTES).setByte(subOffset, value);
         return this;
     }
 
     @Override
-    public Buf writeUnsignedByte(int value) {
+    public Buffer writeUnsignedByte(int value) {
         prepWrite(Byte.BYTES).writeUnsignedByte(value);
         return this;
     }
 
     @Override
-    public Buf setUnsignedByte(int woff, int value) {
+    public Buffer setUnsignedByte(int woff, int value) {
         prepWrite(woff, Byte.BYTES).setUnsignedByte(subOffset, value);
         return this;
     }
@@ -928,13 +928,13 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
     }
 
     @Override
-    public Buf writeChar(char value) {
+    public Buffer writeChar(char value) {
         prepWrite(2).writeChar(value);
         return this;
     }
 
     @Override
-    public Buf setChar(int woff, char value) {
+    public Buffer setChar(int woff, char value) {
         prepWrite(woff, 2).setChar(subOffset, value);
         return this;
     }
@@ -960,25 +960,25 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
     }
 
     @Override
-    public Buf writeShort(short value) {
+    public Buffer writeShort(short value) {
         prepWrite(Short.BYTES).writeShort(value);
         return this;
     }
 
     @Override
-    public Buf setShort(int woff, short value) {
+    public Buffer setShort(int woff, short value) {
         prepWrite(woff, Short.BYTES).setShort(subOffset, value);
         return this;
     }
 
     @Override
-    public Buf writeUnsignedShort(int value) {
+    public Buffer writeUnsignedShort(int value) {
         prepWrite(Short.BYTES).writeUnsignedShort(value);
         return this;
     }
 
     @Override
-    public Buf setUnsignedShort(int woff, int value) {
+    public Buffer setUnsignedShort(int woff, int value) {
         prepWrite(woff, Short.BYTES).setUnsignedShort(subOffset, value);
         return this;
     }
@@ -1004,25 +1004,25 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
     }
 
     @Override
-    public Buf writeMedium(int value) {
+    public Buffer writeMedium(int value) {
         prepWrite(3).writeMedium(value);
         return this;
     }
 
     @Override
-    public Buf setMedium(int woff, int value) {
+    public Buffer setMedium(int woff, int value) {
         prepWrite(woff, 3).setMedium(subOffset, value);
         return this;
     }
 
     @Override
-    public Buf writeUnsignedMedium(int value) {
+    public Buffer writeUnsignedMedium(int value) {
         prepWrite(3).writeUnsignedMedium(value);
         return this;
     }
 
     @Override
-    public Buf setUnsignedMedium(int woff, int value) {
+    public Buffer setUnsignedMedium(int woff, int value) {
         prepWrite(woff, 3).setUnsignedMedium(subOffset, value);
         return this;
     }
@@ -1048,25 +1048,25 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
     }
 
     @Override
-    public Buf writeInt(int value) {
+    public Buffer writeInt(int value) {
         prepWrite(Integer.BYTES).writeInt(value);
         return this;
     }
 
     @Override
-    public Buf setInt(int woff, int value) {
+    public Buffer setInt(int woff, int value) {
         prepWrite(woff, Integer.BYTES).setInt(subOffset, value);
         return this;
     }
 
     @Override
-    public Buf writeUnsignedInt(long value) {
+    public Buffer writeUnsignedInt(long value) {
         prepWrite(Integer.BYTES).writeUnsignedInt(value);
         return this;
     }
 
     @Override
-    public Buf setUnsignedInt(int woff, long value) {
+    public Buffer setUnsignedInt(int woff, long value) {
         prepWrite(woff, Integer.BYTES).setUnsignedInt(subOffset, value);
         return this;
     }
@@ -1082,13 +1082,13 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
     }
 
     @Override
-    public Buf writeFloat(float value) {
+    public Buffer writeFloat(float value) {
         prepWrite(Float.BYTES).writeFloat(value);
         return this;
     }
 
     @Override
-    public Buf setFloat(int woff, float value) {
+    public Buffer setFloat(int woff, float value) {
         prepWrite(woff, Float.BYTES).setFloat(subOffset, value);
         return this;
     }
@@ -1104,13 +1104,13 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
     }
 
     @Override
-    public Buf writeLong(long value) {
+    public Buffer writeLong(long value) {
         prepWrite(Long.BYTES).writeLong(value);
         return this;
     }
 
     @Override
-    public Buf setLong(int woff, long value) {
+    public Buffer setLong(int woff, long value) {
         prepWrite(woff, Long.BYTES).setLong(subOffset, value);
         return this;
     }
@@ -1126,22 +1126,22 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
     }
 
     @Override
-    public Buf writeDouble(double value) {
+    public Buffer writeDouble(double value) {
         prepWrite(Double.BYTES).writeDouble(value);
         return this;
     }
 
     @Override
-    public Buf setDouble(int woff, double value) {
+    public Buffer setDouble(int woff, double value) {
         prepWrite(woff, Double.BYTES).setDouble(subOffset, value);
         return this;
     }
     // </editor-fold>
 
     @Override
-    protected Owned<CompositeBuf> prepareSend() {
+    protected Owned<CompositeBuffer> prepareSend() {
         @SuppressWarnings("unchecked")
-        Send<Buf>[] sends = new Send[bufs.length];
+        Send<Buffer>[] sends = new Send[bufs.length];
         try {
             for (int i = 0; i < bufs.length; i++) {
                 sends[i] = bufs[i].send();
@@ -1160,14 +1160,14 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
             throw throwable;
         }
         makeInaccessible();
-        return new Owned<CompositeBuf>() {
+        return new Owned<CompositeBuffer>() {
             @Override
-            public CompositeBuf transferOwnership(Drop<CompositeBuf> drop) {
-                Buf[] received = new Buf[sends.length];
+            public CompositeBuffer transferOwnership(Drop<CompositeBuffer> drop) {
+                Buffer[] received = new Buffer[sends.length];
                 for (int i = 0; i < sends.length; i++) {
                     received[i] = sends[i].receive();
                 }
-                var composite = new CompositeBuf(allocator, true, received, drop, true);
+                var composite = new CompositeBuffer(allocator, true, received, drop, true);
                 composite.readOnly = readOnly;
                 drop.attach(composite);
                 return composite;
@@ -1198,7 +1198,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
 
     private boolean allConstituentsAreOwned() {
         boolean result = true;
-        for (Buf buf : bufs) {
+        for (Buffer buf : bufs) {
             result &= buf.isOwned();
         }
         return result;
@@ -1228,13 +1228,13 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
         buf.setUnsignedByte(subOffset, value);
     }
 
-    private BufAccessors prepRead(int size) {
+    private BufferAccessors prepRead(int size) {
         var buf = prepRead(roff, size);
         roff += size;
         return buf;
     }
 
-    private BufAccessors prepRead(int index, int size) {
+    private BufferAccessors prepRead(int index, int size) {
         checkReadBounds(index, size);
         return chooseBuffer(index, size);
     }
@@ -1245,13 +1245,13 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
         }
     }
 
-    private BufAccessors prepWrite(int size) {
+    private BufferAccessors prepWrite(int size) {
         var buf = prepWrite(woff, size);
         woff += size;
         return buf;
     }
 
-    private BufAccessors prepWrite(int index, int size) {
+    private BufferAccessors prepWrite(int index, int size) {
         checkWriteBounds(index, size);
         return chooseBuffer(index, size);
     }
@@ -1282,7 +1282,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
         return new IllegalStateException("This buffer is read-only.");
     }
 
-    private BufAccessors chooseBuffer(int index, int size) {
+    private BufferAccessors chooseBuffer(int index, int size) {
         int i = searchOffsets(index);
         if (i == bufs.length) {
             // This happens when the read/write offsets are parked 1 byte beyond the end of the buffer.
@@ -1290,7 +1290,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
             return null;
         }
         int off = index - offsets[i];
-        Buf candidate = bufs[i];
+        Buffer candidate = bufs[i];
         if (off + size <= candidate.capacity()) {
             subOffset = off;
             return candidate;
@@ -1299,7 +1299,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
         return tornBufAccessors;
     }
 
-    private BufAccessors choosePassThroughBuffer(int index) {
+    private BufferAccessors choosePassThroughBuffer(int index) {
         int i = searchOffsets(index);
         return bufs[i];
     }
@@ -1310,10 +1310,10 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
     }
 
     // <editor-fold defaultstate="collapsed" desc="Torn buffer access.">
-    private static final class TornBufAccessors implements BufAccessors {
-        private final CompositeBuf buf;
+    private static final class TornBufferAccessors implements BufferAccessors {
+        private final CompositeBuffer buf;
 
-        private TornBufAccessors(CompositeBuf buf) {
+        private TornBufferAccessors(CompositeBuffer buf) {
             this.buf = buf;
         }
 
@@ -1338,22 +1338,22 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
         }
 
         @Override
-        public Buf writeByte(byte value) {
+        public Buffer writeByte(byte value) {
             throw new AssertionError("Method should not be used.");
         }
 
         @Override
-        public Buf setByte(int woff, byte value) {
+        public Buffer setByte(int woff, byte value) {
             throw new AssertionError("Method should not be used.");
         }
 
         @Override
-        public Buf writeUnsignedByte(int value) {
+        public Buffer writeUnsignedByte(int value) {
             throw new AssertionError("Method should not be used.");
         }
 
         @Override
-        public Buf setUnsignedByte(int woff, int value) {
+        public Buffer setUnsignedByte(int woff, int value) {
             throw new AssertionError("Method should not be used.");
         }
 
@@ -1376,7 +1376,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
         }
 
         @Override
-        public Buf writeChar(char value) {
+        public Buffer writeChar(char value) {
             if (bigEndian()) {
                 write(value >>> 8);
                 write(value & 0xFF);
@@ -1388,7 +1388,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
         }
 
         @Override
-        public Buf setChar(int woff, char value) {
+        public Buffer setChar(int woff, char value) {
             if (bigEndian()) {
                 write(woff, value >>> 8);
                 write(woff + 1, value & 0xFF);
@@ -1436,7 +1436,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
         }
 
         @Override
-        public Buf writeShort(short value) {
+        public Buffer writeShort(short value) {
             if (bigEndian()) {
                 write(value >>> 8);
                 write(value & 0xFF);
@@ -1448,7 +1448,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
         }
 
         @Override
-        public Buf setShort(int woff, short value) {
+        public Buffer setShort(int woff, short value) {
             if (bigEndian()) {
                 write(woff, value >>> 8);
                 write(woff + 1, value & 0xFF);
@@ -1460,7 +1460,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
         }
 
         @Override
-        public Buf writeUnsignedShort(int value) {
+        public Buffer writeUnsignedShort(int value) {
             if (bigEndian()) {
                 write(value >>> 8);
                 write(value & 0xFF);
@@ -1472,7 +1472,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
         }
 
         @Override
-        public Buf setUnsignedShort(int woff, int value) {
+        public Buffer setUnsignedShort(int woff, int value) {
             if (bigEndian()) {
                 write(woff, value >>> 8);
                 write(woff + 1, value & 0xFF);
@@ -1520,7 +1520,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
         }
 
         @Override
-        public Buf writeMedium(int value) {
+        public Buffer writeMedium(int value) {
             if (bigEndian()) {
                 write(value >>> 16);
                 write(value >>> 8 & 0xFF);
@@ -1534,7 +1534,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
         }
 
         @Override
-        public Buf setMedium(int woff, int value) {
+        public Buffer setMedium(int woff, int value) {
             if (bigEndian()) {
                 write(woff, value >>> 16);
                 write(woff + 1, value >>> 8 & 0xFF);
@@ -1548,7 +1548,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
         }
 
         @Override
-        public Buf writeUnsignedMedium(int value) {
+        public Buffer writeUnsignedMedium(int value) {
             if (bigEndian()) {
                 write(value >>> 16);
                 write(value >>> 8 & 0xFF);
@@ -1562,7 +1562,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
         }
 
         @Override
-        public Buf setUnsignedMedium(int woff, int value) {
+        public Buffer setUnsignedMedium(int woff, int value) {
             if (bigEndian()) {
                 write(woff, value >>> 16);
                 write(woff + 1, value >>> 8 & 0xFF);
@@ -1612,7 +1612,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
         }
 
         @Override
-        public Buf writeInt(int value) {
+        public Buffer writeInt(int value) {
             if (bigEndian()) {
                 write(value >>> 24);
                 write(value >>> 16 & 0xFF);
@@ -1628,7 +1628,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
         }
 
         @Override
-        public Buf setInt(int woff, int value) {
+        public Buffer setInt(int woff, int value) {
             if (bigEndian()) {
                 write(woff, value >>> 24);
                 write(woff + 1, value >>> 16 & 0xFF);
@@ -1644,7 +1644,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
         }
 
         @Override
-        public Buf writeUnsignedInt(long value) {
+        public Buffer writeUnsignedInt(long value) {
             if (bigEndian()) {
                 write((int) (value >>> 24));
                 write((int) (value >>> 16 & 0xFF));
@@ -1660,7 +1660,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
         }
 
         @Override
-        public Buf setUnsignedInt(int woff, long value) {
+        public Buffer setUnsignedInt(int woff, long value) {
             if (bigEndian()) {
                 write(woff, (int) (value >>> 24));
                 write(woff + 1, (int) (value >>> 16 & 0xFF));
@@ -1686,12 +1686,12 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
         }
 
         @Override
-        public Buf writeFloat(float value) {
+        public Buffer writeFloat(float value) {
             return writeUnsignedInt(Float.floatToRawIntBits(value));
         }
 
         @Override
-        public Buf setFloat(int woff, float value) {
+        public Buffer setFloat(int woff, float value) {
             return setUnsignedInt(woff, Float.floatToRawIntBits(value));
         }
 
@@ -1718,7 +1718,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
         }
 
         @Override
-        public Buf writeLong(long value) {
+        public Buffer writeLong(long value) {
             if (bigEndian()) {
                 write((int) (value >>> 56));
                 write((int) (value >>> 48 & 0xFF));
@@ -1742,7 +1742,7 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
         }
 
         @Override
-        public Buf setLong(int woff, long value) {
+        public Buffer setLong(int woff, long value) {
             if (bigEndian()) {
                 write(woff, (int) (value >>> 56));
                 write(woff + 1, (int) (value >>> 48 & 0xFF));
@@ -1776,12 +1776,12 @@ final class CompositeBuf extends RcSupport<Buf, CompositeBuf> implements Buf {
         }
 
         @Override
-        public Buf writeDouble(double value) {
+        public Buffer writeDouble(double value) {
             return writeLong(Double.doubleToRawLongBits(value));
         }
 
         @Override
-        public Buf setDouble(int woff, double value) {
+        public Buffer setDouble(int woff, double value) {
             return setLong(woff, Double.doubleToRawLongBits(value));
         }
 

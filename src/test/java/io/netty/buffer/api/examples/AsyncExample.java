@@ -15,25 +15,25 @@
  */
 package io.netty.buffer.api.examples;
 
-import io.netty.buffer.api.Allocator;
-import io.netty.buffer.api.Buf;
+import io.netty.buffer.api.BufferAllocator;
+import io.netty.buffer.api.Buffer;
 
 import static java.lang.System.out;
 import static java.util.concurrent.CompletableFuture.completedFuture;
 
 public final class AsyncExample {
     public static void main(String[] args) throws Exception {
-        try (Allocator allocator = Allocator.pooledDirect();
-             Buf startBuf = allocator.allocate(16)) {
+        try (BufferAllocator allocator = BufferAllocator.pooledDirect();
+             Buffer startBuf = allocator.allocate(16)) {
             startBuf.writeLong(threadId());
 
             completedFuture(startBuf.send()).thenApplyAsync(send -> {
-                try (Buf buf = send.receive()) {
+                try (Buffer buf = send.receive()) {
                     buf.writeLong(threadId());
                     return buf.send();
                 }
             }).thenAcceptAsync(send -> {
-                try (Buf buf = send.receive()) {
+                try (Buffer buf = send.receive()) {
                     out.println("First thread id was " + buf.readLong());
                     out.println("Then sent to " + buf.readLong());
                     out.println("And now in thread " + threadId());

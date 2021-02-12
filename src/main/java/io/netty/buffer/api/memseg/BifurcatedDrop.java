@@ -20,7 +20,7 @@ import io.netty.buffer.api.Drop;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 
-class BifurcatedDrop implements Drop<MemSegBuf> {
+class BifurcatedDrop implements Drop<MemSegBuffer> {
     private static final VarHandle COUNT;
     static {
         try {
@@ -30,12 +30,12 @@ class BifurcatedDrop implements Drop<MemSegBuf> {
         }
     }
 
-    private final MemSegBuf originalBuf;
-    private final Drop<MemSegBuf> delegate;
+    private final MemSegBuffer originalBuf;
+    private final Drop<MemSegBuffer> delegate;
     @SuppressWarnings("FieldMayBeFinal")
     private volatile int count;
 
-    BifurcatedDrop(MemSegBuf originalBuf, Drop<MemSegBuf> delegate) {
+    BifurcatedDrop(MemSegBuffer originalBuf, Drop<MemSegBuffer> delegate) {
         this.originalBuf = originalBuf;
         this.delegate = delegate;
         count = 2; // These are created by buffer bifurcation, so we initially have 2 references to this drop.
@@ -50,7 +50,7 @@ class BifurcatedDrop implements Drop<MemSegBuf> {
     }
 
     @Override
-    public void drop(MemSegBuf buf) {
+    public void drop(MemSegBuffer buf) {
         int c;
         int n;
         do {
@@ -66,11 +66,11 @@ class BifurcatedDrop implements Drop<MemSegBuf> {
     }
 
     @Override
-    public void attach(MemSegBuf obj) {
+    public void attach(MemSegBuffer obj) {
         delegate.attach(obj);
     }
 
-    Drop<MemSegBuf> unwrap() {
+    Drop<MemSegBuffer> unwrap() {
         return delegate;
     }
 
