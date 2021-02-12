@@ -19,23 +19,23 @@ import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.function.Supplier;
 
-public final class Fixture implements Supplier<Allocator> {
+public final class Fixture implements Supplier<BufferAllocator> {
     private final String name;
-    private final Supplier<Allocator> factory;
+    private final Supplier<BufferAllocator> factory;
     private final EnumSet<Properties> properties;
 
-    public Fixture(String name, Supplier<Allocator> factory, Properties... props) {
+    public Fixture(String name, Supplier<BufferAllocator> factory, Properties... props) {
         this.name = name;
         this.factory = factory;
         properties = EnumSet.copyOf(Arrays.asList(props));
     }
 
-    public Allocator createAllocator() {
+    public BufferAllocator createAllocator() {
         return factory.get();
     }
 
     @Override
-    public Allocator get() {
+    public BufferAllocator get() {
         return factory.get();
     }
 

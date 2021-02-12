@@ -15,8 +15,8 @@
  */
 package io.netty.buffer.api.benchmarks;
 
-import io.netty.buffer.api.Allocator;
-import io.netty.buffer.api.Buf;
+import io.netty.buffer.api.BufferAllocator;
+import io.netty.buffer.api.Buffer;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
@@ -41,10 +41,10 @@ import static java.util.concurrent.CompletableFuture.completedFuture;
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
 @State(Scope.Benchmark)
 public class MemorySegmentClosedByCleanerBenchmark {
-    private static final Allocator heap = Allocator.heap();
-    private static final Allocator heapPooled = Allocator.pooledHeap();
-    private static final Allocator direct = Allocator.direct();
-    private static final Allocator directPooled = Allocator.pooledDirect();
+    private static final BufferAllocator heap = BufferAllocator.heap();
+    private static final BufferAllocator heapPooled = BufferAllocator.pooledHeap();
+    private static final BufferAllocator direct = BufferAllocator.direct();
+    private static final BufferAllocator directPooled = BufferAllocator.pooledDirect();
 
     @Param({"heavy", "light"})
     public String workload;
@@ -62,56 +62,56 @@ public class MemorySegmentClosedByCleanerBenchmark {
     }
 
     @Benchmark
-    public Buf explicitCloseHeap() throws Exception {
-        try (Buf buf = process(heap.allocate(256))) {
+    public Buffer explicitCloseHeap() throws Exception {
+        try (Buffer buf = process(heap.allocate(256))) {
             return buf;
         }
     }
 
     @Benchmark
-    public Buf explicitPooledCloseHeap() throws Exception {
-        try (Buf buf = process(heapPooled.allocate(256))) {
+    public Buffer explicitPooledCloseHeap() throws Exception {
+        try (Buffer buf = process(heapPooled.allocate(256))) {
             return buf;
         }
     }
 
     @Benchmark
-    public Buf explicitCloseDirect() throws Exception {
-        try (Buf buf = process(direct.allocate(256))) {
+    public Buffer explicitCloseDirect() throws Exception {
+        try (Buffer buf = process(direct.allocate(256))) {
             return buf;
         }
     }
 
     @Benchmark
-    public Buf explicitPooledCloseDirect() throws Exception {
-        try (Buf buf = process(directPooled.allocate(256))) {
+    public Buffer explicitPooledCloseDirect() throws Exception {
+        try (Buffer buf = process(directPooled.allocate(256))) {
             return buf;
         }
     }
 
     @Benchmark
-    public Buf cleanerClose() throws Exception {
+    public Buffer cleanerClose() throws Exception {
         return process(direct.allocate(256));
     }
 
     @Benchmark
-    public Buf cleanerClosePooled() throws Exception {
+    public Buffer cleanerClosePooled() throws Exception {
         return process(directPooled.allocate(256));
     }
 
-    private Buf process(Buf buffer) throws Exception {
+    private Buffer process(Buffer buffer) throws Exception {
         // Simulate some async network server thingy, processing the buffer.
         var tlr = ThreadLocalRandom.current();
         if (isHeavy) {
             return completedFuture(buffer.send()).thenApplyAsync(send -> {
-                try (Buf buf = send.receive()) {
+                try (Buffer buf = send.receive()) {
                     while (buf.writableBytes() > 0) {
                         buf.writeByte((byte) tlr.nextInt());
                     }
                     return buf.send();
                 }
             }).thenApplyAsync(send -> {
-                try (Buf buf = send.receive()) {
+                try (Buffer buf = send.receive()) {
                     byte b = 0;
                     while (buf.readableBytes() > 0) {
                         b += buf.readByte();

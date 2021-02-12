@@ -24,11 +24,11 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import static io.netty.buffer.api.Statics.NO_OP_DROP;
 import static java.lang.invoke.MethodHandles.lookup;
 
-class SizeClassedMemoryPool implements Allocator, AllocatorControl, Drop<Buf> {
+class SizeClassedMemoryPool implements BufferAllocator, AllocatorControl, Drop<Buffer> {
     private static final VarHandle CLOSE = Statics.findVarHandle(
             lookup(), SizeClassedMemoryPool.class, "closed", boolean.class);
     private final MemoryManager manager;
-    private final ConcurrentHashMap<Integer, ConcurrentLinkedQueue<Send<Buf>>> pool;
+    private final ConcurrentHashMap<Integer, ConcurrentLinkedQueue<Send<Buffer>>> pool;
     @SuppressWarnings("unused")
     private volatile boolean closed;
 
@@ -38,10 +38,10 @@ class SizeClassedMemoryPool implements Allocator, AllocatorControl, Drop<Buf> {
     }
 
     @Override
-    public Buf allocate(int size) {
-        Allocator.checkSize(size);
+    public Buffer allocate(int size) {
+        BufferAllocator.checkSize(size);
         var sizeClassPool = getSizeClassPool(size);
-        Send<Buf> send = sizeClassPool.poll();
+        Send<Buffer> send = sizeClassPool.poll();
         if (send != null) {
             return send.receive()
                        .reset()
@@ -56,13 +56,13 @@ class SizeClassedMemoryPool implements Allocator, AllocatorControl, Drop<Buf> {
         return manager;
     }
 
-    protected Buf createBuf(int size, Drop<Buf> drop) {
+    protected Buffer createBuf(int size, Drop<Buffer> drop) {
         var buf = manager.allocateShared(this, size, drop, null);
         drop.attach(buf);
         return buf;
     }
 
-    protected Drop<Buf> getDrop() {
+    protected Drop<Buffer> getDrop() {
         return new CleanerPooledDrop(this, getMemoryManager(), this);
     }
 
@@ -71,7 +71,7 @@ class SizeClassedMemoryPool implements Allocator, AllocatorControl, Drop<Buf> {
         if (CLOSE.compareAndSet(this, false, true)) {
             var capturedExceptions = new ArrayList<Exception>(4);
             pool.forEach((k, v) -> {
-                Send<Buf> send;
+                Send<Buffer> send;
                 while ((send = v.poll()) != null) {
                     try {
                         send.receive().close();
@@ -89,7 +89,7 @@ class SizeClassedMemoryPool implements Allocator, AllocatorControl, Drop<Buf> {
     }
 
     @Override
-    public void drop(Buf buf) {
+    public void drop(Buffer buf) {
         if (closed) {
             dispose(buf);
             return;
@@ -97,7 +97,7 @@ class SizeClassedMemoryPool implements Allocator, AllocatorControl, Drop<Buf> {
         var sizeClassPool = getSizeClassPool(buf.capacity());
         sizeClassPool.offer(buf.send());
         if (closed) {
-            Send<Buf> send;
+            Send<Buffer> send;
             while ((send = sizeClassPool.poll()) != null) {
                 send.receive().close();
             }
@@ -105,12 +105,12 @@ class SizeClassedMemoryPool implements Allocator, AllocatorControl, Drop<Buf> {
     }
 
     @Override
-    public Object allocateUntethered(Buf originator, int size) {
+    public Object allocateUntethered(Buffer originator, int size) {
         var sizeClassPool = getSizeClassPool(size);
-        Send<Buf> send = sizeClassPool.poll();
-        Buf untetheredBuf;
+        Send<Buffer> send = sizeClassPool.poll();
+        Buffer untetheredBuf;
         if (send != null) {
-            var transfer = (TransferSend<Buf, Buf>) send;
+            var transfer = (TransferSend<Buffer, Buffer>) send;
             var owned = transfer.unsafeUnwrapOwned();
             untetheredBuf = owned.transferOwnership(NO_OP_DROP);
         } else {
@@ -127,11 +127,11 @@ class SizeClassedMemoryPool implements Allocator, AllocatorControl, Drop<Buf> {
         buf.close();
     }
 
-    private ConcurrentLinkedQueue<Send<Buf>> getSizeClassPool(int size) {
+    private ConcurrentLinkedQueue<Send<Buffer>> getSizeClassPool(int size) {
         return pool.computeIfAbsent(size, k -> new ConcurrentLinkedQueue<>());
     }
 
-    private void dispose(Buf buf) {
+    private void dispose(Buffer buf) {
         manager.drop().drop(buf);
     }
 }

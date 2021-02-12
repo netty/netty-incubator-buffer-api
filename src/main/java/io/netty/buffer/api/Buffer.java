@@ -15,11 +15,6 @@
  */
 package io.netty.buffer.api;
 
-import io.netty.buffer.api.ComponentProcessor.ReadableComponentProcessor;
-import io.netty.buffer.api.ComponentProcessor.WritableComponentProcessor;
-import io.netty.buffer.api.ComponentProcessor.ReadableComponent;
-import io.netty.buffer.api.ComponentProcessor.WritableComponent;
-
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
@@ -30,8 +25,9 @@ import java.nio.ByteOrder;
  *
  * <h3>Creating a buffer</h3>
  *
- * Buffers are created by {@linkplain Allocator allocators}, and their {@code allocate} family of methods.
- * A number of standard allocators exist, and ara available through static methods on the {@code Allocator} interface.
+ * Buffers are created by {@linkplain BufferAllocator allocators}, and their {@code allocate} family of methods.
+ * A number of standard allocators exist, and ara available through static methods on the {@code BufferAllocator}
+ * interface.
  *
  * <h3>Life cycle and reference counting</h3>
  *
@@ -70,7 +66,7 @@ import java.nio.ByteOrder;
  * To send a buffer to another thread, the buffer must not have any outstanding borrows.
  * That is to say, all {@linkplain #acquire() acquires} must have been paired with a {@link #close()};
  * all {@linkplain #slice() slices} must have been closed.
- * And if this buffer is a constituent of a {@linkplain Allocator#compose(Deref...) composite buffer},
+ * And if this buffer is a constituent of a {@linkplain BufferAllocator#compose(Deref...) composite buffer},
  * then that composite buffer must be closed.
  * And if this buffer is itself a composite buffer, then it must own all of its constituent buffers.
  * The {@link #isOwned()} method can be used on any buffer to check if it can be sent or not.
@@ -106,14 +102,14 @@ import java.nio.ByteOrder;
  * </pre>
  *
  */
-public interface Buf extends Rc<Buf>, BufAccessors {
+public interface Buffer extends Rc<Buffer>, BufferAccessors {
     /**
      * Change the default byte order of this buffer, and return this buffer.
      *
      * @param order The new default byte order, used by accessor methods that don't use an explicit byte order.
      * @return This buffer instance.
      */
-    Buf order(ByteOrder order);
+    Buffer order(ByteOrder order);
 
     /**
      * The default byte order of this buffer.
@@ -139,11 +135,11 @@ public interface Buf extends Rc<Buf>, BufAccessors {
      * Set the reader offset. Make the next read happen from the given offset into the buffer.
      *
      * @param offset The reader offset to set.
-     * @return This Buf.
+     * @return This Buffer.
      * @throws IndexOutOfBoundsException if the specified {@code offset} is less than zero or greater than the current
      *                                   {@link #writerOffset()}.
      */
-    Buf readerOffset(int offset);
+    Buffer readerOffset(int offset);
 
     /**
      * Get the current writer offset. The next write will happen at this byte offset into the byffer.
@@ -156,12 +152,12 @@ public interface Buf extends Rc<Buf>, BufAccessors {
      * Set the writer offset. Make the next write happen at the given offset.
      *
      * @param offset The writer offset to set.
-     * @return This Buf.
+     * @return This Buffer.
      * @throws IndexOutOfBoundsException if the specified {@code offset} is less than the current
      * {@link #readerOffset()} or greater than {@link #capacity()}.
      * @throws IllegalStateException if this buffer is {@linkplain #readOnly() read-only}.
      */
-    Buf writerOffset(int offset);
+    Buffer writerOffset(int offset);
 
     /**
      * Returns the number of readable bytes which is equal to {@code (writerOffset() - readerOffset())}.
@@ -183,10 +179,10 @@ public interface Buf extends Rc<Buf>, BufAccessors {
      * #writerOffset()} are not modified.
      *
      * @param value The byte value to write at every position in the buffer.
-     * @return This Buf.
+     * @return This Buffer.
      * @throws IllegalStateException if this buffer is {@linkplain #readOnly() read-only}.
      */
-    Buf fill(byte value);
+    Buffer fill(byte value);
 
     /**
      * Give the native memory address backing this buffer, or return 0 if this buffer has no native memory address.
@@ -199,7 +195,7 @@ public interface Buf extends Rc<Buf>, BufAccessors {
      *
      * @return this buffer.
      */
-    Buf readOnly(boolean readOnly);
+    Buffer readOnly(boolean readOnly);
 
     /**
      * Query if this buffer is read-only or not.
@@ -224,7 +220,7 @@ public interface Buf extends Rc<Buf>, BufAccessors {
      * @return A new buffer instance, with independent {@link #readerOffset()} and {@link #writerOffset()},
      * that is a view of the readable region of this buffer.
      */
-    default Buf slice() {
+    default Buffer slice() {
         return slice(readerOffset(), readableBytes());
     }
 
@@ -243,7 +239,7 @@ public interface Buf extends Rc<Buf>, BufAccessors {
      * @return A new buffer instance, with independent {@link #readerOffset()} and {@link #writerOffset()},
      * that is a view of the given region of this buffer.
      */
-    Buf slice(int offset, int length);
+    Buffer slice(int offset, int length);
 
     /**
      * Copies the given length of data from this buffer into the given destination array, beginning at the given source
@@ -303,13 +299,13 @@ public interface Buf extends Rc<Buf>, BufAccessors {
      * @throws IndexOutOfBoundsException if the source or destination positions, or the length, are negative,
      * or if the resulting end positions reaches beyond the end of either this buffer or the destination array.
      */
-    void copyInto(int srcPos, Buf dest, int destPos, int length);
+    void copyInto(int srcPos, Buffer dest, int destPos, int length);
 
     /**
      * Resets the {@linkplain #readerOffset() read offset} and the {@linkplain #writerOffset() write offset} on this
      * buffer to their initial values.
      */
-    default Buf reset() {
+    default Buffer reset() {
         readerOffset(0);
         writerOffset(0);
         return this;
@@ -386,8 +382,8 @@ public interface Buf extends Rc<Buf>, BufAccessors {
      * bytes.
      * The buffer must be in {@linkplain #isOwned() an owned state}, or an exception will be thrown.
      * If this buffer already has the necessary space, then this method returns immediately.
-     * If this buffer does not already have the necessary space, then it will be expanded using the {@link Allocator}
-     * the buffer was created with.
+     * If this buffer does not already have the necessary space, then it will be expanded using the
+     * {@link BufferAllocator} the buffer was created with.
      * This method is the same as calling {@link #ensureWritable(int, boolean)} where {@code allowCompaction} is
      * {@code false}.
      *
@@ -418,8 +414,8 @@ public interface Buf extends Rc<Buf>, BufAccessors {
      *     </li>
      *     <li>
      *         Regardless of the value of the {@code allowCompaction}, the implementation may make more space available
-     *         by just allocating more or larger buffers. This allocation would use the same {@link Allocator} that this
-     *         buffer was created with.
+     *         by just allocating more or larger buffers. This allocation would use the same {@link BufferAllocator}
+     *         that this buffer was created with.
      *     </li>
      *     <li>
      *         If {@code allowCompaction} is {@code true}, then the implementation may choose to do a combination of
@@ -480,7 +476,7 @@ public interface Buf extends Rc<Buf>, BufAccessors {
      *
      * @return A new buffer with independent and exclusive ownership over the read and readable bytes from this buffer.
      */
-    Buf bifurcate();
+    Buffer bifurcate();
 
     /**
      * Discards the read bytes, and moves the buffer contents to the beginning of the buffer.

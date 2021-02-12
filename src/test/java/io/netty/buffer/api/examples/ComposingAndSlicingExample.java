@@ -15,23 +15,23 @@
  */
 package io.netty.buffer.api.examples;
 
-import io.netty.buffer.api.Allocator;
-import io.netty.buffer.api.Buf;
+import io.netty.buffer.api.BufferAllocator;
+import io.netty.buffer.api.Buffer;
 import io.netty.buffer.api.Scope;
 
 import java.util.concurrent.ThreadLocalRandom;
 
 public final class ComposingAndSlicingExample {
     public static void main(String[] args) {
-        try (Allocator allocator = Allocator.pooledDirect();
-             Buf buf = createBigBuffer(allocator)) {
+        try (BufferAllocator allocator = BufferAllocator.pooledDirect();
+             Buffer buf = createBigBuffer(allocator)) {
 
             ThreadLocalRandom tlr = ThreadLocalRandom.current();
             for (int i = 0; i < tlr.nextInt(4, 200); i++) {
                 buf.writeByte((byte) tlr.nextInt());
             }
 
-            try (Buf slice = buf.slice()) {
+            try (Buffer slice = buf.slice()) {
                 slice.send();
                 System.out.println("buf.capacity() = " + buf.capacity());
                 System.out.println("buf.readableBytes() = " + buf.readableBytes());
@@ -42,7 +42,7 @@ public final class ComposingAndSlicingExample {
         }
     }
 
-    private static Buf createBigBuffer(Allocator allocator) {
+    private static Buffer createBigBuffer(BufferAllocator allocator) {
         try (Scope scope = new Scope()) {
             return allocator.compose(
                     scope.add(allocator.allocate(64)),

@@ -15,14 +15,14 @@
  */
 package io.netty.buffer.api.memseg;
 
-import io.netty.buffer.api.Allocator;
+import io.netty.buffer.api.BufferAllocator;
 import io.netty.buffer.api.AllocatorControl;
-import io.netty.buffer.api.Buf;
+import io.netty.buffer.api.Buffer;
 import io.netty.buffer.api.ByteCursor;
-import io.netty.buffer.api.ComponentProcessor.ReadableComponent;
-import io.netty.buffer.api.ComponentProcessor.ReadableComponentProcessor;
-import io.netty.buffer.api.ComponentProcessor.WritableComponent;
-import io.netty.buffer.api.ComponentProcessor.WritableComponentProcessor;
+import io.netty.buffer.api.ReadableComponent;
+import io.netty.buffer.api.ReadableComponentProcessor;
+import io.netty.buffer.api.WritableComponent;
+import io.netty.buffer.api.WritableComponentProcessor;
 import io.netty.buffer.api.Drop;
 import io.netty.buffer.api.Owned;
 import io.netty.buffer.api.RcSupport;
@@ -46,9 +46,9 @@ import static jdk.incubator.foreign.MemoryAccess.setIntAtOffset;
 import static jdk.incubator.foreign.MemoryAccess.setLongAtOffset;
 import static jdk.incubator.foreign.MemoryAccess.setShortAtOffset;
 
-class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf, ReadableComponent, WritableComponent {
+class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, ReadableComponent, WritableComponent {
     private static final MemorySegment CLOSED_SEGMENT;
-    static final Drop<MemSegBuf> SEGMENT_CLOSE;
+    static final Drop<MemSegBuffer> SEGMENT_CLOSE;
 
     static {
         CLOSED_SEGMENT = MemorySegment.ofArray(new byte[0]);
@@ -68,11 +68,11 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf, ReadableCompon
     private int roff;
     private int woff;
 
-    MemSegBuf(MemorySegment segmet, Drop<MemSegBuf> drop, AllocatorControl alloc) {
+    MemSegBuffer(MemorySegment segmet, Drop<MemSegBuffer> drop, AllocatorControl alloc) {
         this(segmet, drop, alloc, true);
     }
 
-    private MemSegBuf(MemorySegment segment, Drop<MemSegBuf> drop, AllocatorControl alloc, boolean isSendable) {
+    private MemSegBuffer(MemorySegment segment, Drop<MemSegBuffer> drop, AllocatorControl alloc, boolean isSendable) {
         super(drop);
         this.alloc = alloc;
         seg = segment;
@@ -83,11 +83,11 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf, ReadableCompon
 
     @Override
     public String toString() {
-        return "Buf[roff:" + roff + ", woff:" + woff + ", cap:" + seg.byteSize() + ']';
+        return "Buffer[roff:" + roff + ", woff:" + woff + ", cap:" + seg.byteSize() + ']';
     }
 
     @Override
-    public Buf order(ByteOrder order) {
+    public Buffer order(ByteOrder order) {
         this.order = order;
         return this;
     }
@@ -108,7 +108,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf, ReadableCompon
     }
 
     @Override
-    public MemSegBuf readerOffset(int index) {
+    public MemSegBuffer readerOffset(int index) {
         checkRead(index, 0);
         roff = index;
         return this;
@@ -120,14 +120,14 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf, ReadableCompon
     }
 
     @Override
-    public MemSegBuf writerOffset(int index) {
+    public MemSegBuffer writerOffset(int index) {
         checkWrite(index, 0);
         woff = index;
         return this;
     }
 
     @Override
-    public Buf fill(byte value) {
+    public Buffer fill(byte value) {
         checkWrite(0, capacity());
         seg.fill(value);
         return this;
@@ -213,7 +213,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf, ReadableCompon
     }
 
     @Override
-    public Buf readOnly(boolean readOnly) {
+    public Buffer readOnly(boolean readOnly) {
         wseg = readOnly? CLOSED_SEGMENT : seg;
         return this;
     }
@@ -224,18 +224,18 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf, ReadableCompon
     }
 
     @Override
-    public Buf slice(int offset, int length) {
+    public Buffer slice(int offset, int length) {
         if (length < 0) {
             throw new IllegalArgumentException("Length cannot be negative: " + length + '.');
         }
         var slice = seg.asSlice(offset, length);
         acquire();
-        Drop<MemSegBuf> drop = b -> {
+        Drop<MemSegBuffer> drop = b -> {
             close();
             b.makeInaccessible();
         };
         var sendable = false; // Sending implies ownership change, which we can't do for slices.
-        return new MemSegBuf(slice, drop, alloc, sendable)
+        return new MemSegBuffer(slice, drop, alloc, sendable)
                 .writerOffset(length)
                 .order(order())
                 .readOnly(readOnly());
@@ -273,9 +273,9 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf, ReadableCompon
     }
 
     @Override
-    public void copyInto(int srcPos, Buf dest, int destPos, int length) {
-        if (dest instanceof MemSegBuf) {
-            var memSegBuf = (MemSegBuf) dest;
+    public void copyInto(int srcPos, Buffer dest, int destPos, int length) {
+        if (dest instanceof MemSegBuffer) {
+            var memSegBuf = (MemSegBuffer) dest;
             memSegBuf.checkWrite(destPos, length);
             copyInto(srcPos, memSegBuf.seg, destPos, length);
             return;
@@ -456,7 +456,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf, ReadableCompon
 
         // Allocate a bigger buffer.
         long newSize = capacity() + size - (long) writableBytes();
-        Allocator.checkSize(newSize);
+        BufferAllocator.checkSize(newSize);
         RecoverableMemory recoverableMemory = (RecoverableMemory) alloc.allocateUntethered(this, (int) newSize);
         var newSegment = recoverableMemory.segment;
 
@@ -484,7 +484,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf, ReadableCompon
     }
 
     @Override
-    public Buf bifurcate() {
+    public Buffer bifurcate() {
         if (!isOwned()) {
             throw new IllegalStateException("Cannot bifurcate a buffer that is not owned.");
         }
@@ -496,11 +496,11 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf, ReadableCompon
         if (drop instanceof BifurcatedDrop) {
             ((BifurcatedDrop) drop).increment();
         } else {
-            drop = new BifurcatedDrop(new MemSegBuf(seg, drop, alloc), drop);
+            drop = new BifurcatedDrop(new MemSegBuffer(seg, drop, alloc), drop);
             unsafeSetDrop(drop);
         }
         var bifurcatedSeg = seg.asSlice(0, woff);
-        var bifurcatedBuf = new MemSegBuf(bifurcatedSeg, drop, alloc);
+        var bifurcatedBuf = new MemSegBuffer(bifurcatedSeg, drop, alloc);
         bifurcatedBuf.woff = woff;
         bifurcatedBuf.roff = roff;
         bifurcatedBuf.order(order);
@@ -591,7 +591,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf, ReadableCompon
     }
 
     @Override
-    public Buf writeByte(byte value) {
+    public Buffer writeByte(byte value) {
         try {
             setByteAtOffset(wseg, woff, value);
             woff += Byte.BYTES;
@@ -602,7 +602,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf, ReadableCompon
     }
 
     @Override
-    public Buf setByte(int woff, byte value) {
+    public Buffer setByte(int woff, byte value) {
         try {
             setByteAtOffset(wseg, woff, value);
             return this;
@@ -612,7 +612,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf, ReadableCompon
     }
 
     @Override
-    public Buf writeUnsignedByte(int value) {
+    public Buffer writeUnsignedByte(int value) {
         try {
             setByteAtOffset(wseg, woff, (byte) (value & 0xFF));
             woff += Byte.BYTES;
@@ -623,7 +623,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf, ReadableCompon
     }
 
     @Override
-    public Buf setUnsignedByte(int woff, int value) {
+    public Buffer setUnsignedByte(int woff, int value) {
         try {
             setByteAtOffset(wseg, woff, (byte) (value & 0xFF));
             return this;
@@ -647,7 +647,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf, ReadableCompon
     }
 
     @Override
-    public Buf writeChar(char value) {
+    public Buffer writeChar(char value) {
         try {
             setCharAtOffset(wseg, woff, order, value);
             woff += 2;
@@ -658,7 +658,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf, ReadableCompon
     }
 
     @Override
-    public Buf setChar(int woff, char value) {
+    public Buffer setChar(int woff, char value) {
         try {
             setCharAtOffset(wseg, woff, order, value);
             return this;
@@ -696,7 +696,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf, ReadableCompon
     }
 
     @Override
-    public Buf writeShort(short value) {
+    public Buffer writeShort(short value) {
         try {
             setShortAtOffset(wseg, woff, order, value);
             woff += Short.BYTES;
@@ -707,7 +707,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf, ReadableCompon
     }
 
     @Override
-    public Buf setShort(int woff, short value) {
+    public Buffer setShort(int woff, short value) {
         try {
             setShortAtOffset(wseg, woff, order, value);
             return this;
@@ -717,7 +717,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf, ReadableCompon
     }
 
     @Override
-    public Buf writeUnsignedShort(int value) {
+    public Buffer writeUnsignedShort(int value) {
         try {
             setShortAtOffset(wseg, woff, order, (short) (value & 0xFFFF));
             woff += Short.BYTES;
@@ -728,7 +728,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf, ReadableCompon
     }
 
     @Override
-    public Buf setUnsignedShort(int woff, int value) {
+    public Buffer setUnsignedShort(int woff, int value) {
         try {
             setShortAtOffset(wseg, woff, order, (short) (value & 0xFFFF));
             return this;
@@ -790,7 +790,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf, ReadableCompon
     }
 
     @Override
-    public Buf writeMedium(int value) {
+    public Buffer writeMedium(int value) {
         checkWrite(woff, 3);
         if (order == ByteOrder.BIG_ENDIAN) {
             setByteAtOffset(wseg, woff, (byte) (value >> 16));
@@ -806,7 +806,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf, ReadableCompon
     }
 
     @Override
-    public Buf setMedium(int woff, int value) {
+    public Buffer setMedium(int woff, int value) {
         checkWrite(woff, 3);
         if (order == ByteOrder.BIG_ENDIAN) {
             setByteAtOffset(wseg, woff, (byte) (value >> 16));
@@ -821,7 +821,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf, ReadableCompon
     }
 
     @Override
-    public Buf writeUnsignedMedium(int value) {
+    public Buffer writeUnsignedMedium(int value) {
         checkWrite(woff, 3);
         if (order == ByteOrder.BIG_ENDIAN) {
             setByteAtOffset(wseg, woff, (byte) (value >> 16));
@@ -837,7 +837,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf, ReadableCompon
     }
 
     @Override
-    public Buf setUnsignedMedium(int woff, int value) {
+    public Buffer setUnsignedMedium(int woff, int value) {
         checkWrite(woff, 3);
         if (order == ByteOrder.BIG_ENDIAN) {
             setByteAtOffset(wseg, woff, (byte) (value >> 16));
@@ -880,7 +880,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf, ReadableCompon
     }
 
     @Override
-    public Buf writeInt(int value) {
+    public Buffer writeInt(int value) {
         try {
             setIntAtOffset(wseg, woff, order, value);
             woff += Integer.BYTES;
@@ -891,7 +891,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf, ReadableCompon
     }
 
     @Override
-    public Buf setInt(int woff, int value) {
+    public Buffer setInt(int woff, int value) {
         try {
             setIntAtOffset(wseg, woff, order, value);
             return this;
@@ -901,7 +901,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf, ReadableCompon
     }
 
     @Override
-    public Buf writeUnsignedInt(long value) {
+    public Buffer writeUnsignedInt(long value) {
         try {
             setIntAtOffset(wseg, woff, order, (int) (value & 0xFFFFFFFFL));
             woff += Integer.BYTES;
@@ -912,7 +912,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf, ReadableCompon
     }
 
     @Override
-    public Buf setUnsignedInt(int woff, long value) {
+    public Buffer setUnsignedInt(int woff, long value) {
         try {
             setIntAtOffset(wseg, woff, order, (int) (value & 0xFFFFFFFFL));
             return this;
@@ -936,7 +936,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf, ReadableCompon
     }
 
     @Override
-    public Buf writeFloat(float value) {
+    public Buffer writeFloat(float value) {
         try {
             setFloatAtOffset(wseg, woff, order, value);
             woff += Float.BYTES;
@@ -947,7 +947,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf, ReadableCompon
     }
 
     @Override
-    public Buf setFloat(int woff, float value) {
+    public Buffer setFloat(int woff, float value) {
         try {
             setFloatAtOffset(wseg, woff, order, value);
             return this;
@@ -971,7 +971,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf, ReadableCompon
     }
 
     @Override
-    public Buf writeLong(long value) {
+    public Buffer writeLong(long value) {
         try {
             setLongAtOffset(wseg, woff, order, value);
             woff += Long.BYTES;
@@ -982,7 +982,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf, ReadableCompon
     }
 
     @Override
-    public Buf setLong(int woff, long value) {
+    public Buffer setLong(int woff, long value) {
         try {
             setLongAtOffset(wseg, woff, order, value);
             return this;
@@ -1006,7 +1006,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf, ReadableCompon
     }
 
     @Override
-    public Buf writeDouble(double value) {
+    public Buffer writeDouble(double value) {
         try {
             setDoubleAtOffset(wseg, woff, order, value);
             woff += Double.BYTES;
@@ -1017,7 +1017,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf, ReadableCompon
     }
 
     @Override
-    public Buf setDouble(int woff, double value) {
+    public Buffer setDouble(int woff, double value) {
         try {
             setDoubleAtOffset(wseg, woff, order, value);
             return this;
@@ -1028,7 +1028,7 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf, ReadableCompon
     // </editor-fold>
 
     @Override
-    protected Owned<MemSegBuf> prepareSend() {
+    protected Owned<MemSegBuffer> prepareSend() {
         var order = this.order;
         var roff = this.roff;
         var woff = this.woff;
@@ -1036,10 +1036,10 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf, ReadableCompon
         boolean isConfined = seg.ownerThread() == null;
         MemorySegment transferSegment = isConfined? seg : seg.share();
         makeInaccessible();
-        return new Owned<MemSegBuf>() {
+        return new Owned<MemSegBuffer>() {
             @Override
-            public MemSegBuf transferOwnership(Drop<MemSegBuf> drop) {
-                MemSegBuf copy = new MemSegBuf(transferSegment, drop, alloc);
+            public MemSegBuffer transferOwnership(Drop<MemSegBuffer> drop) {
+                MemSegBuffer copy = new MemSegBuffer(transferSegment, drop, alloc);
                 copy.order = order;
                 copy.roff = roff;
                 copy.woff = woff;
@@ -1136,8 +1136,8 @@ class MemSegBuf extends RcSupport<Buf, MemSegBuf> implements Buf, ReadableCompon
             this.alloc = alloc;
         }
 
-        Buf recover(Drop<MemSegBuf> drop) {
-            return new MemSegBuf(segment, drop, alloc);
+        Buffer recover(Drop<MemSegBuffer> drop) {
+            return new MemSegBuffer(segment, drop, alloc);
         }
     }
 }

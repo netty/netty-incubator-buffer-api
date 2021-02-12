@@ -15,8 +15,8 @@
  */
 package io.netty.buffer.api.benchmarks;
 
-import io.netty.buffer.api.Allocator;
-import io.netty.buffer.api.Buf;
+import io.netty.buffer.api.BufferAllocator;
+import io.netty.buffer.api.Buffer;
 import io.netty.buffer.api.Send;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
@@ -40,27 +40,27 @@ import static java.util.concurrent.CompletableFuture.completedFuture;
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
 @State(Scope.Benchmark)
 public class SendBenchmark {
-    private static final Allocator NON_POOLED = Allocator.heap();
-    private static final Allocator POOLED = Allocator.pooledHeap();
-    private static final Function<Send<Buf>, Send<Buf>> BUFFER_BOUNCE = send -> {
-        try (Buf buf = send.receive()) {
+    private static final BufferAllocator NON_POOLED = BufferAllocator.heap();
+    private static final BufferAllocator POOLED = BufferAllocator.pooledHeap();
+    private static final Function<Send<Buffer>, Send<Buffer>> BUFFER_BOUNCE = send -> {
+        try (Buffer buf = send.receive()) {
             return buf.send();
         }
     };
 
     @Benchmark
-    public Buf sendNonPooled() throws Exception {
-        try (Buf buf = NON_POOLED.allocate(8)) {
-            try (Buf receive = completedFuture(buf.send()).thenApplyAsync(BUFFER_BOUNCE).get().receive()) {
+    public Buffer sendNonPooled() throws Exception {
+        try (Buffer buf = NON_POOLED.allocate(8)) {
+            try (Buffer receive = completedFuture(buf.send()).thenApplyAsync(BUFFER_BOUNCE).get().receive()) {
                 return receive;
             }
         }
     }
 
     @Benchmark
-    public Buf sendPooled() throws Exception {
-        try (Buf buf = POOLED.allocate(8)) {
-            try (Buf receive = completedFuture(buf.send()).thenApplyAsync(BUFFER_BOUNCE).get().receive()) {
+    public Buffer sendPooled() throws Exception {
+        try (Buffer buf = POOLED.allocate(8)) {
+            try (Buffer receive = completedFuture(buf.send()).thenApplyAsync(BUFFER_BOUNCE).get().receive()) {
                 return receive;
             }
         }

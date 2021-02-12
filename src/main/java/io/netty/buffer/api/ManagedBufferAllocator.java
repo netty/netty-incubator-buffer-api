@@ -19,24 +19,24 @@ import java.lang.ref.Cleaner;
 
 import static io.netty.buffer.api.Statics.NO_OP_DROP;
 
-class ManagedAllocator implements Allocator, AllocatorControl {
+class ManagedBufferAllocator implements BufferAllocator, AllocatorControl {
     private final MemoryManager manager;
     private final Cleaner cleaner;
 
-    ManagedAllocator(MemoryManager manager, Cleaner cleaner) {
+    ManagedBufferAllocator(MemoryManager manager, Cleaner cleaner) {
         this.manager = manager;
         this.cleaner = cleaner;
     }
 
     @Override
-    public Buf allocate(int size) {
-        Allocator.checkSize(size);
+    public Buffer allocate(int size) {
+        BufferAllocator.checkSize(size);
         return manager.allocateShared(this, size, manager.drop(), cleaner);
     }
 
     @Override
-    public Object allocateUntethered(Buf originator, int size) {
-        Allocator.checkSize(size);
+    public Object allocateUntethered(Buffer originator, int size) {
+        BufferAllocator.checkSize(size);
         var buf = manager.allocateShared(this, size, NO_OP_DROP, null);
         return manager.unwrapRecoverableMemory(buf);
     }

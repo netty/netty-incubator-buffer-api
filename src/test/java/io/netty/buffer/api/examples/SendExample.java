@@ -15,8 +15,8 @@
  */
 package io.netty.buffer.api.examples;
 
-import io.netty.buffer.api.Allocator;
-import io.netty.buffer.api.Buf;
+import io.netty.buffer.api.BufferAllocator;
+import io.netty.buffer.api.Buffer;
 import io.netty.buffer.api.Send;
 
 import java.util.concurrent.ExecutorService;
@@ -31,7 +31,7 @@ public class SendExample {
         public static void main(String[] args) throws Exception {
             ExecutorService executor =
                     newSingleThreadExecutor();
-            Allocator allocator = Allocator.heap();
+            BufferAllocator allocator = BufferAllocator.heap();
 
             var future = beginTask(executor, allocator);
             future.get();
@@ -41,17 +41,17 @@ public class SendExample {
         }
 
         private static Future<?> beginTask(
-                ExecutorService executor, Allocator allocator) {
-            try (Buf buf = allocator.allocate(32)) {
+                ExecutorService executor, BufferAllocator allocator) {
+            try (Buffer buf = allocator.allocate(32)) {
                 // !!! pit-fall: buffer life-time ends before task completes
                 return executor.submit(new Task(buf));
             }
         }
 
         private static class Task implements Runnable {
-            private final Buf buf;
+            private final Buffer buf;
 
-            Task(Buf buf) {
+            Task(Buffer buf) {
                 this.buf = buf;
             }
 
@@ -68,7 +68,7 @@ public class SendExample {
     static final class Ex2 {
         public static void main(String[] args) throws Exception {
             ExecutorService executor = newSingleThreadExecutor();
-            Allocator allocator = Allocator.heap();
+            BufferAllocator allocator = BufferAllocator.heap();
 
             var future = beginTask(executor, allocator);
             future.get();
@@ -78,17 +78,17 @@ public class SendExample {
         }
 
         private static Future<?> beginTask(
-                ExecutorService executor, Allocator allocator) {
-            try (Buf buf = allocator.allocate(32)) {
+                ExecutorService executor, BufferAllocator allocator) {
+            try (Buffer buf = allocator.allocate(32)) {
                 // !!! pit-fall: Rc decrement in other thread.
                 return executor.submit(new Task(buf.acquire()));
             }
         }
 
         private static class Task implements Runnable {
-            private final Buf buf;
+            private final Buffer buf;
 
-            Task(Buf buf) {
+            Task(Buffer buf) {
                 this.buf = buf;
             }
 
@@ -107,7 +107,7 @@ public class SendExample {
     static final class Ex3 {
         public static void main(String[] args) throws Exception {
             ExecutorService executor = newSingleThreadExecutor();
-            Allocator allocator = Allocator.heap();
+            BufferAllocator allocator = BufferAllocator.heap();
 
             var future = beginTask(executor, allocator);
             future.get();
@@ -117,22 +117,22 @@ public class SendExample {
         }
 
         private static Future<?> beginTask(
-                ExecutorService executor, Allocator allocator) {
-            try (Buf buf = allocator.allocate(32)) {
+                ExecutorService executor, BufferAllocator allocator) {
+            try (Buffer buf = allocator.allocate(32)) {
                 return executor.submit(new Task(buf.send()));
             }
         }
 
         private static class Task implements Runnable {
-            private final Send<Buf> send;
+            private final Send<Buffer> send;
 
-            Task(Send<Buf> send) {
+            Task(Send<Buffer> send) {
                 this.send = send;
             }
 
             @Override
             public void run() {
-                try (Buf buf = send.receive()) {
+                try (Buffer buf = send.receive()) {
                     while (buf.writableBytes() > 0) {
                         buf.writeByte((byte) 42);
                     }
@@ -144,9 +144,9 @@ public class SendExample {
     static final class Ex4 {
         public static void main(String[] args) throws Exception {
             ExecutorService executor = newFixedThreadPool(4);
-            Allocator allocator = Allocator.heap();
+            BufferAllocator allocator = BufferAllocator.heap();
 
-            try (Buf buf = allocator.allocate(4096)) {
+            try (Buffer buf = allocator.allocate(4096)) {
                 // !!! pit-fall: Rc decrement in other thread.
                 var futA = executor.submit(new Task(buf.slice(0, 1024)));
                 var futB = executor.submit(new Task(buf.slice(1024, 1024)));
@@ -163,9 +163,9 @@ public class SendExample {
         }
 
         private static class Task implements Runnable {
-            private final Buf slice;
+            private final Buffer slice;
 
-            Task(Buf slice) {
+            Task(Buffer slice) {
                 this.slice = slice;
             }
 
@@ -183,13 +183,13 @@ public class SendExample {
     static final class Ex5 {
         public static void main(String[] args) throws Exception {
             ExecutorService executor = newFixedThreadPool(4);
-            Allocator allocator = Allocator.heap();
+            BufferAllocator allocator = BufferAllocator.heap();
 
-            try (Buf buf = allocator.allocate(4096);
-                 Buf sliceA = buf.slice(0, 1024);
-                 Buf sliceB = buf.slice(1024, 1024);
-                 Buf sliceC = buf.slice(2048, 1024);
-                 Buf sliceD = buf.slice(3072, 1024)) {
+            try (Buffer buf = allocator.allocate(4096);
+                 Buffer sliceA = buf.slice(0, 1024);
+                 Buffer sliceB = buf.slice(1024, 1024);
+                 Buffer sliceC = buf.slice(2048, 1024);
+                 Buffer sliceD = buf.slice(3072, 1024)) {
                 var futA = executor.submit(new Task(sliceA));
                 var futB = executor.submit(new Task(sliceB));
                 var futC = executor.submit(new Task(sliceC));
@@ -205,9 +205,9 @@ public class SendExample {
         }
 
         private static class Task implements Runnable {
-            private final Buf slice;
+            private final Buffer slice;
 
-            Task(Buf slice) {
+            Task(Buffer slice) {
                 this.slice = slice;
             }
 
@@ -223,9 +223,9 @@ public class SendExample {
     static final class Ex6 {
         public static void main(String[] args) throws Exception {
             ExecutorService executor = newFixedThreadPool(4);
-            Allocator allocator = Allocator.heap();
+            BufferAllocator allocator = BufferAllocator.heap();
 
-            try (Buf buf = allocator.allocate(4096)) {
+            try (Buffer buf = allocator.allocate(4096)) {
                 var futA = executor.submit(new Task(buf.writerOffset(1024).bifurcate().send()));
                 var futB = executor.submit(new Task(buf.writerOffset(1024).bifurcate().send()));
                 var futC = executor.submit(new Task(buf.writerOffset(1024).bifurcate().send()));
@@ -241,15 +241,15 @@ public class SendExample {
         }
 
         private static class Task implements Runnable {
-            private final Send<Buf> send;
+            private final Send<Buffer> send;
 
-            Task(Send<Buf> send) {
+            Task(Send<Buffer> send) {
                 this.send = send;
             }
 
             @Override
             public void run() {
-                try (Buf buf = send.receive().writerOffset(0)) {
+                try (Buffer buf = send.receive().writerOffset(0)) {
                     while (buf.writableBytes() > 0) {
                         buf.writeByte((byte) 42);
                     }

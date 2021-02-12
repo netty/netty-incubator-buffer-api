@@ -15,6 +15,6 @@
  */
 
 /**
- * Experimental {@code Buf} implementation, based on the MemorySegment API from OpenJDK Panama Foreign.
+ * Experimental {@code Buffer} implementation, based on the MemorySegment API from OpenJDK Panama Foreign.
  */
 package io.netty.buffer.api.memseg;

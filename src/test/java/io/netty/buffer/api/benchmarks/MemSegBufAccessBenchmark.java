@@ -15,8 +15,8 @@
 */
 package io.netty.buffer.api.benchmarks;
 
-import io.netty.buffer.api.Allocator;
-import io.netty.buffer.api.Buf;
+import io.netty.buffer.api.BufferAllocator;
+import io.netty.buffer.api.Buffer;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
@@ -42,30 +42,30 @@ public class MemSegBufAccessBenchmark {
     public enum BBufType {
         DIRECT {
             @Override
-            Buf newBuffer() {
-                return Allocator.direct().allocate(64);
+            Buffer newBuffer() {
+                return BufferAllocator.direct().allocate(64);
             }
         },
         HEAP {
             @Override
-            Buf newBuffer() {
-                return Allocator.heap().allocate(64);
+            Buffer newBuffer() {
+                return BufferAllocator.heap().allocate(64);
             }
         },
 //        COMPOSITE {
 //            @Override
-//            Buf newBuffer() {
+//            Buffer newBuffer() {
 //                return Unpooled.wrappedBuffer(UNSAFE.newBuffer(), HEAP.newBuffer());
 //            }
 //        },
 //        NIO {
 //            @Override
-//            Buf newBuffer() {
+//            Buffer newBuffer() {
 //                return new NioFacade(BBuffer.allocateDirect(64));
 //            }
 //        }
         ;
-        abstract Buf newBuffer();
+        abstract Buffer newBuffer();
     }
 
     @Param
@@ -80,7 +80,7 @@ public class MemSegBufAccessBenchmark {
         buffer.writerOffset(batchSize);
     }
 
-    private Buf buffer;
+    private Buffer buffer;
 
     @TearDown
     public void tearDown() {
@@ -93,7 +93,7 @@ public class MemSegBufAccessBenchmark {
     }
 
     @Benchmark
-    public Buf setLong() {
+    public Buffer setLong() {
         return buffer.setLong(0, 1);
     }
 
