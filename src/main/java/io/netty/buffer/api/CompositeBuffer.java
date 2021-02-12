@@ -15,9 +15,6 @@
  */
 package io.netty.buffer.api;
 
-import io.netty.buffer.api.ComponentProcessor.ReadableComponentProcessor;
-import io.netty.buffer.api.ComponentProcessor.WritableComponentProcessor;
-
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Arrays;
