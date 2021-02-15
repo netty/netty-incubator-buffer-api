@@ -62,14 +62,14 @@ public class ByteIterationBenchmark {
             allocator = BufferAllocator.heap();
             try (var a = allocator.allocate(SIZE / 2);
                  var b = allocator.allocate(SIZE / 2)) {
-                buf = allocator.compose(a, b);
+                buf = Buffer.compose(allocator, a, b);
             }
             break;
         case "composite-direct":
             allocator = BufferAllocator.direct();
             try (var a = allocator.allocate(SIZE / 2);
                  var b = allocator.allocate(SIZE / 2)) {
-                buf = allocator.compose(a, b);
+                buf = Buffer.compose(allocator, a, b);
             }
             break;
         default:

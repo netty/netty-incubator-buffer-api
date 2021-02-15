@@ -66,7 +66,7 @@ import java.nio.ByteOrder;
  * To send a buffer to another thread, the buffer must not have any outstanding borrows.
  * That is to say, all {@linkplain #acquire() acquires} must have been paired with a {@link #close()};
  * all {@linkplain #slice() slices} must have been closed.
- * And if this buffer is a constituent of a {@linkplain BufferAllocator#compose(Deref...) composite buffer},
+ * And if this buffer is a constituent of a {@linkplain Buffer#compose(BufferAllocator, Deref...) composite buffer},
  * then that composite buffer must be closed.
  * And if this buffer is itself a composite buffer, then it must own all of its constituent buffers.
  * The {@link #isOwned()} method can be used on any buffer to check if it can be sent or not.
@@ -103,6 +103,93 @@ import java.nio.ByteOrder;
  *
  */
 public interface Buffer extends Rc<Buffer>, BufferAccessors {
+    /**
+     * Compose the given sequence of buffers and present them as a single buffer.
+     * <p>
+     * <strong>Note:</strong> The composite buffer increments the reference count on all the constituent buffers,
+     * and holds a reference to them until the composite buffer is deallocated.
+     * This means the constituent buffers must still have their outside-reference count decremented as normal.
+     * If the buffers are allocated for the purpose of participating in the composite buffer,
+     * then they should be closed as soon as the composite buffer has been created, like in this example:
+     * <pre>{@code
+     *     try (Buffer a = allocator.allocate(size);
+     *          Buffer b = allocator.allocate(size)) {
+     *         return allocator.compose(a, b); // Reference counts for 'a' and 'b' incremented here.
+     *     } // Reference count for 'a' and 'b' decremented here; composite buffer now holds the last references.
+     * }</pre>
+     * <p>
+     * {@linkplain Buffer#send() Sending} a composite buffer implies sending all of its constituent buffers.
+     * For sending to be possible, both the composite buffer itself, and all of its constituent buffers, must be in an
+     * {@linkplain Rc#isOwned() owned state}.
+     * This means that the composite buffer must be the only reference to the constituent buffers.
+     * <p>
+     * All of the constituent buffers must have the same {@linkplain Buffer#order() byte order}.
+     * An exception will be thrown if you attempt to compose buffers that have different byte orders,
+     * and changing the byte order of the constituent buffers so they become inconsistent after construction,
+     * will result in unspecified behaviour.
+     * <p>
+     * The read and write offsets of the constituent buffers must be arranged such that there are no "gaps" when viewed
+     * as a single connected chunk of memory.
+     * Specifically, there can be at most one buffer whose write offset is neither zero nor at capacity,
+     * and all buffers prior to it must have their write offsets at capacity, and all buffers after it must have a write
+     * offset of zero.
+     * Likewise, there can be at most one buffer whose read offset is neither zero nor at capacity,
+     * and all buffers prior to it must have their read offsets at capacity, and all buffers after it must have a read
+     * offset of zero.
+     * Furthermore, the sum of the read offsets must be less than or equal to the sum of the write offsets.
+     * <p>
+     * Reads and writes to the composite buffer that modifies the read or write offsets, will also modify the relevant
+     * offsets in the constituent buffers.
+     * <p>
+     * It is not a requirement that the buffers have the same size.
+     * <p>
+     * It is not a requirement that the buffers are allocated by this allocator, but if
+     * {@link Buffer#ensureWritable(int)} is called on the composed buffer, and the composed buffer needs to be
+     * expanded, then this allocator instance will be used for allocation the extra memory.
+     *
+     * @param allocator The allocator for the composite buffer. This allocator will be used e.g. to service
+     * {@link #ensureWritable(int)} calls.
+     * @param bufs The buffers to compose into a single buffer view.
+     * @return A buffer composed of, and backed by, the given buffers.
+     * @throws IllegalArgumentException if the given buffers have an inconsistent
+     * {@linkplain Buffer#order() byte order}.
+     */
+    @SafeVarargs
+    static Buffer compose(BufferAllocator allocator, Deref<Buffer>... bufs) {
+        return new CompositeBuffer(allocator, bufs);
+    }
+
+    /**
+     * Extend the given composite buffer with the given extension buffer.
+     * This works as if the extension had originally been included at the end of the list of constituent buffers when
+     * the composite buffer was created.
+     * The composite buffer is modified in-place.
+     *
+     * @see #compose(BufferAllocator, Deref...)
+     * @param composite The composite buffer (from a prior {@link #compose(BufferAllocator, Deref...)} call) to extend
+     *                 with the given extension buffer.
+     * @param extension The buffer to extend the composite buffer with.
+     */
+    static void extendComposite(Buffer composite, Buffer extension) {
+        if (!isComposite(composite)) {
+            throw new IllegalArgumentException(
+                    "Expected the first buffer to be a composite buffer, " +
+                    "but it is a " + composite.getClass() + " buffer: " + composite + '.');
+        }
+        CompositeBuffer compositeBuffer = (CompositeBuffer) composite;
+        compositeBuffer.extendWith(extension);
+    }
+
+    /**
+     * Check if the given buffer is a {@linkplain #compose(BufferAllocator, Deref...) composite} buffer or not.
+     * @param composite The buffer to check.
+     * @return {@code true} if the given buffer was created with {@link #compose(BufferAllocator, Deref...)},
+     * {@code false} otherwise.
+     */
+    static boolean isComposite(Buffer composite) {
+        return composite.getClass() == CompositeBuffer.class;
+    }
+
     /**
      * Change the default byte order of this buffer, and return this buffer.
      *
