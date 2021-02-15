@@ -44,7 +44,7 @@ public final class ComposingAndSlicingExample {
 
     private static Buffer createBigBuffer(BufferAllocator allocator) {
         try (Scope scope = new Scope()) {
-            return allocator.compose(
+            return Buffer.compose(allocator,
                     scope.add(allocator.allocate(64)),
                     scope.add(allocator.allocate(64)),
                     scope.add(allocator.allocate(64)),

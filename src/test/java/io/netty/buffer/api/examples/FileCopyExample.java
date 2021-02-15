@@ -37,7 +37,7 @@ public final class FileCopyExample {
         try (BufferAllocator allocator = BufferAllocator.pooledDirect();
              var input = FileChannel.open(Path.of("/dev/urandom"), READ);
              var output = FileChannel.open(Path.of("random.bin"), CREATE, TRUNCATE_EXISTING, WRITE)) {
-            Send<Buffer> done = allocator.compose().send();
+            Send<Buffer> done = Buffer.compose(allocator).send();
 
             var reader = executor.submit(() -> {
                 for (int i = 0; i < 1024; i++) {
