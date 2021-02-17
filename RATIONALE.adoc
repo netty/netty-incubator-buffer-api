@@ -219,17 +219,17 @@ This is to avoid the pains currently observed where we code that branches on whe
 Being able to unify these code paths will help with maintainability.
 
 Buffers need to know their allocators, in order to implement `ensureWritable()`, and the same is true for composite buffers.
-That’s why the method to compose buffers is placed on the `BufferAllocator` interface:
+That’s why the method to compose buffers takes a `BufferAllocator` as a first argument:
 
 [source,java]
 ----
 try (Buffer x = allocator.allocate(128);
      Buffer y = allocator.allocate(128)) {
-    return allocator.compose(x, y);
+    return Buffer.compose(allocator, x, y);
 }
 ----
 
-The `compose()` method will create a composite buffer, even when only given a single buffer.
+The static `compose()` method will create a composite buffer, even when only given a single buffer.
 
 The composite buffer acquires a reference on each of its constituent component buffers.
 This means that, for instance, newly allocated buffers will not be owned by the composite buffer unless the reference outside of the composite buffer is closed.
@@ -247,17 +247,12 @@ This ensures the composite buffer gets an exclusive reference to the sent compon
 Although there is in principle is no need for integrating code to know whether a buffer is composite, it is still possible to query, in case it is helpful for some optimisations.
 This is done with the `countComponents()`, `countReadableComponents()`, and `countWritableComponents()` family of methods.
 These methods exist on the `Buffer` interface, so non-composite buffers have them too, and will pretend to have a single component, namely themselves.
-If it is important to know with certainly, if a buffer is composite or not, then the `BufferAllocator.isComposite()` method can be used.
+If it is important to know with certainly, if a buffer is composite or not, then the static `Buffer.isComposite()` method can be used.
 
-If you know that a buffer is composite, and the composite buffer is owned, then it’s possible to extend the composite buffer with more components, using the `BufferAllocator.extend()` method.
-
-[NOTE]
---
-We plan to change where these composite buffer methods are located.
---
+If you know that a buffer is composite, and the composite buffer is owned, then it’s possible to extend the composite buffer with more components, using the static `Buffer.extendComposite()` method.
 
 Composite buffers can be nested, but they will flatten themselves internally.
-That is, you can pass composite buffers to the `BufferAllocator.compose()` method, and the resulting composite buffer will appear to contain all their data just as if the components had been non-composite.
+That is, you can pass composite buffers to the `Buffer.compose()` method, and the resulting composite buffer will appear to contain all their data just as if the components had been non-composite.
 However, the new composite buffer will end up with the flattened concatenation of all constituent components.
 This means the number of indirections will not increase in the new buffer.
 
