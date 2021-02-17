@@ -15,6 +15,7 @@
  */
 package io.netty.buffer.api.memseg;
 
+import io.netty.buffer.ByteBuf;
 import io.netty.buffer.api.BufferAllocator;
 import io.netty.buffer.api.AllocatorControl;
 import io.netty.buffer.api.Buffer;
@@ -26,6 +27,9 @@ import io.netty.buffer.api.WritableComponentProcessor;
 import io.netty.buffer.api.Drop;
 import io.netty.buffer.api.Owned;
 import io.netty.buffer.api.RcSupport;
+import io.netty.buffer.api.adaptor.BufferIntegratable;
+import io.netty.buffer.api.adaptor.ByteBufAdaptor;
+import io.netty.buffer.api.adaptor.ByteBufAllocatorAdaptor;
 import jdk.incubator.foreign.MemorySegment;
 
 import java.nio.ByteBuffer;
@@ -46,7 +50,8 @@ import static jdk.incubator.foreign.MemoryAccess.setIntAtOffset;
 import static jdk.incubator.foreign.MemoryAccess.setLongAtOffset;
 import static jdk.incubator.foreign.MemoryAccess.setShortAtOffset;
 
-class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, ReadableComponent, WritableComponent {
+class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, ReadableComponent, WritableComponent,
+                                                                      BufferIntegratable {
     private static final MemorySegment CLOSED_SEGMENT;
     static final Drop<MemSegBuffer> SEGMENT_CLOSE;
 
@@ -1137,6 +1142,66 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
     Object recoverableMemory() {
         return new RecoverableMemory(seg, alloc);
     }
+
+    // <editor-fold name="BufferIntegratable methods">
+    private ByteBufAdaptor adaptor;
+    @Override
+    public ByteBuf asByteBuf() {
+        ByteBufAdaptor bba = adaptor;
+        if (bba == null) {
+            ByteBufAllocatorAdaptor alloc = new ByteBufAllocatorAdaptor(
+                    BufferAllocator.heap(), BufferAllocator.direct());
+            return adaptor = new ByteBufAdaptor(alloc, this);
+        }
+        return bba;
+    }
+
+    @Override
+    public int readableBytes() {
+        return writerOffset() - readerOffset();
+    }
+
+    @Override
+    public MemSegBuffer retain(int increment) {
+        for (int i = 0; i < increment; i++) {
+            acquire();
+        }
+        return this;
+    }
+
+    @Override
+    public int refCnt() {
+        return isAccessible()? 1 + countBorrows() : 0;
+    }
+
+    @Override
+    public MemSegBuffer retain() {
+        return retain(1);
+    }
+
+    @Override
+    public MemSegBuffer touch() {
+        return this;
+    }
+
+    @Override
+    public MemSegBuffer touch(Object hint) {
+        return this;
+    }
+
+    @Override
+    public boolean release() {
+        return release(1);
+    }
+
+    @Override
+    public boolean release(int decrement) {
+        for (int i = 0; i < decrement; i++) {
+            close();
+        }
+        return !isAccessible();
+    }
+    // </editor-fold>
 
     static final class RecoverableMemory {
         private final MemorySegment segment;

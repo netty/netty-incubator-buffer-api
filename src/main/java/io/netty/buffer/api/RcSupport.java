@@ -102,6 +102,11 @@ public abstract class RcSupport<I extends Rc<I>, T extends RcSupport<I, T>> impl
         return Math.max(acquires, 0);
     }
 
+    @Override
+    public boolean isAccessible() {
+        return acquires >= 0;
+    }
+
     /**
      * Prepare this instance for ownsership transfer. This method is called from {@link #send()} in the sending thread.
      * This method should put this Rc in a deactivated state where it is no longer accessible from the currently owning

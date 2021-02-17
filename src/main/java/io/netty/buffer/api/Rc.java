@@ -87,4 +87,13 @@ public interface Rc<I extends Rc<I>> extends AutoCloseable, Deref<I> {
      * @return The number of borrows, if any, of this object.
      */
     int countBorrows();
+
+    /**
+     * Check if this object is accessible.
+     *
+     * @return {@code true} if this object is still valid and can be accessed,
+     * otherwise {@code false} if, for instance, this object has been dropped/deallocated,
+     * or been {@linkplain #send() sent} elsewhere.
+     */
+    boolean isAccessible();
 }
