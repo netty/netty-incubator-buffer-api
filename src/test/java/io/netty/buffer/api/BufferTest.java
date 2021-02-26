@@ -2891,6 +2891,39 @@ public class BufferTest {
     }
 
     @ParameterizedTest
+    @MethodSource("allocators")
+    public void forEachReadableMustExposeByteCursors(Fixture fixture) {
+        try (BufferAllocator allocator = fixture.createAllocator();
+             Buffer buf = allocator.allocate(32).order(BIG_ENDIAN)) {
+            buf.writeLong(0x0102030405060708L);
+            buf.writeLong(0x1112131415161718L);
+            assertEquals(0x01020304, buf.readInt());
+            try (Buffer actualData = allocator.allocate(buf.readableBytes()).order(BIG_ENDIAN);
+                 Buffer expectedData = allocator.allocate(12).order(BIG_ENDIAN)) {
+                expectedData.writeInt(0x05060708);
+                expectedData.writeInt(0x11121314);
+                expectedData.writeInt(0x15161718);
+
+                buf.forEachReadable(0, (i, component) -> {
+                    ByteCursor forward = component.openCursor();
+                    while (forward.readLong()) {
+                        actualData.writeLong(forward.getLong());
+                    }
+                    while (forward.readByte()) {
+                        actualData.writeByte(forward.getByte());
+                    }
+                    return true;
+                });
+
+                assertEquals(expectedData.readableBytes(), actualData.readableBytes());
+                while (expectedData.readableBytes() > 0) {
+                    assertEquals(expectedData.readByte(), actualData.readByte());
+                }
+            }
+        }
+    }
+
+    @ParameterizedTest
     @MethodSource("nonCompositeAllocators")
     public void forEachWritableMustVisitBuffer(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();

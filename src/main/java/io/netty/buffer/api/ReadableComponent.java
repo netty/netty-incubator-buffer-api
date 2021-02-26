@@ -72,5 +72,18 @@ public interface ReadableComponent {
      * @return A new {@link ByteBuffer}, with its own position and limit, for this memory component.
      */
     ByteBuffer readableBuffer();
+
+    /**
+     * Open a cursor to iterate the readable bytes of this component.
+     * Any offsets internal to the component are not modified by the cursor.
+     * <p>
+     * Care should be taken to ensure that the buffers lifetime extends beyond the cursor and the iteration, and that
+     * the internal offsets of the component (such as {@link Buffer#readerOffset()} and {@link Buffer#writerOffset()})
+     * are not modified while the iteration takes place. Otherwise unpredictable behaviour might result.
+     *
+     * @return A {@link ByteCursor} for iterating the readable bytes of this buffer.
+     * @see Buffer#openCursor()
+     */
+    ByteCursor openCursor();
     // todo for Unsafe-based impl, DBB.attachment needs to keep underlying memory alive
 }
