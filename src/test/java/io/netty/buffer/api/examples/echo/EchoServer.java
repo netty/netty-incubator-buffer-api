@@ -59,7 +59,7 @@ public final class EchoServer {
             ServerBootstrap b = new ServerBootstrap();
             b.group(bossGroup, workerGroup)
              .channel(NioServerSocketChannel.class)
-             .option(ChannelOption.ALLOCATOR, allocator)
+             .childOption(ChannelOption.ALLOCATOR, allocator)
              .option(ChannelOption.SO_BACKLOG, 100)
              .handler(new LoggingHandler(LogLevel.INFO))
              .childHandler(new ChannelInitializer<SocketChannel>() {

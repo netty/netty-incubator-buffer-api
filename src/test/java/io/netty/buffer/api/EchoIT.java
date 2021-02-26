@@ -53,18 +53,18 @@ public class EchoIT {
         try {
             ServerBootstrap server = new ServerBootstrap();
             server.group(bossGroup, workerGroup)
-             .channel(NioServerSocketChannel.class)
-             .option(ChannelOption.ALLOCATOR, allocator)
-             .option(ChannelOption.SO_BACKLOG, 100)
-             .handler(new LoggingHandler(LogLevel.INFO))
-             .childHandler(new ChannelInitializer<SocketChannel>() {
-                 @Override
-                 public void initChannel(SocketChannel ch) throws Exception {
-                     ChannelPipeline p = ch.pipeline();
-                     p.addLast(new LoggingHandler(LogLevel.INFO));
-                     p.addLast(serverHandler);
-                 }
-             });
+                  .channel(NioServerSocketChannel.class)
+                  .childOption(ChannelOption.ALLOCATOR, allocator)
+                  .option(ChannelOption.SO_BACKLOG, 100)
+                  .handler(new LoggingHandler(LogLevel.INFO))
+                  .childHandler(new ChannelInitializer<SocketChannel>() {
+                      @Override
+                      public void initChannel(SocketChannel ch) throws Exception {
+                          ChannelPipeline p = ch.pipeline();
+                          p.addLast(new LoggingHandler(LogLevel.INFO));
+                          p.addLast(serverHandler);
+                      }
+                  });
 
             // Start the server.
             ChannelFuture bind = server.bind("localhost", 0).sync();
@@ -115,7 +115,7 @@ public class EchoIT {
          */
         EchoClientHandler() {
             firstMessage = BufferAllocator.heap().allocate(SIZE);
-            for (int i = 0; i < SIZE; i ++) {
+            for (int i = 0; i < SIZE; i++) {
                 firstMessage.writeByte((byte) i);
             }
         }

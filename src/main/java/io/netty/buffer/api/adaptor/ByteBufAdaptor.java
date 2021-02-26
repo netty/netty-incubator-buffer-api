@@ -33,13 +33,30 @@ import java.nio.channels.GatheringByteChannel;
 import java.nio.channels.ScatteringByteChannel;
 import java.nio.charset.Charset;
 
-public class ByteBufAdaptor extends ByteBuf {
+public final class ByteBufAdaptor extends ByteBuf {
     private final ByteBufAllocatorAdaptor alloc;
     private final Buffer buffer;
 
     public ByteBufAdaptor(ByteBufAllocatorAdaptor alloc, Buffer buffer) {
         this.alloc = alloc;
         this.buffer = buffer;
+    }
+
+    /**
+     * Extracts the underlying {@link Buffer} instance that is backing this {@link ByteBuf}, if any.
+     * This is similar to {@link #unwrap()} except the return type is a {@link Buffer}.
+     * If this {@link ByteBuf} does not wrap a {@link Buffer}, then {@code null} is returned.
+     *
+     * @param byteBuf The {@link ByteBuf} to extract the {@link Buffer} from.
+     * @return The {@link Buffer} instance that is backing the given {@link ByteBuf}, or {@code null} if the given
+     * {@link ByteBuf} is not backed by a {@link Buffer}.
+     */
+    public static Buffer extract(ByteBuf byteBuf) {
+        if (byteBuf instanceof ByteBufAdaptor) {
+            ByteBufAdaptor bba = (ByteBufAdaptor) byteBuf;
+            return bba.buffer;
+        }
+        return null;
     }
 
     @Override
@@ -1005,7 +1022,9 @@ public class ByteBufAdaptor extends ByteBuf {
             return true;
         });
         int read = (int) in.read(components);
-        writerIndex(read + writerIndex());
+        if (read > 0) {
+            writerIndex(read + writerIndex());
+        }
         return read;
     }
 
@@ -1019,7 +1038,10 @@ public class ByteBufAdaptor extends ByteBuf {
         });
         int read = 0;
         for (ByteBuffer component : components) {
-            read += in.read(component, position + read);
+            int r = in.read(component, position + read);
+            if (r > 0) {
+                read += r;
+            }
             if (component.hasRemaining()) {
                 break;
             }

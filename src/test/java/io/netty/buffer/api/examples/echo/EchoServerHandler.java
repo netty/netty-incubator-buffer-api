@@ -15,6 +15,9 @@
  */
 package io.netty.buffer.api.examples.echo;
 
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.api.Buffer;
+import io.netty.buffer.api.adaptor.ByteBufAdaptor;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandler.Sharable;
 import io.netty.channel.ChannelHandlerContext;
@@ -24,10 +27,13 @@ import io.netty.channel.ChannelHandlerContext;
  */
 @Sharable
 public class EchoServerHandler implements ChannelHandler {
-
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) {
-        ctx.write(msg);
+        if (msg instanceof ByteBuf) {
+            // For this example, we only echo back buffers that are using the new buffer API.
+            Buffer buf = ByteBufAdaptor.extract((ByteBuf) msg);
+            ctx.write(buf);
+        }
     }
 
     @Override
