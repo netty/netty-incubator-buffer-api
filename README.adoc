@@ -2,6 +2,8 @@
 
 This repository is incubating a new buffer API proposed for Netty 5.
 
+See the xref:RATIONALE.adoc[RATIONALE] document for more background.
+
 == Building and Testing
 
 Short version: just run `make`.
