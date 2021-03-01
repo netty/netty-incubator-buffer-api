@@ -190,4 +190,9 @@ public abstract class BufferHolder<T extends BufferHolder<T>> implements Rc<T> {
     protected final Buffer getBufVolatile() {
         return (Buffer) BUF.getVolatile(this);
     }
+
+    @Override
+    public boolean isAccessible() {
+        return buf.isAccessible();
+    }
 }
