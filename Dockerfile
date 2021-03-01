@@ -24,7 +24,7 @@ ENV PATH=/home/build/apache-maven-3.6.3/bin:$PATH
 # Prepare a snapshot of Netty 5
 RUN git clone -b master https://github.com/netty/netty.git netty
 WORKDIR /home/build/netty
-RUN mvn install -DskipTests -T1C -B -am -pl buffer
+RUN mvn install -DskipTests -T1C -B -am -pl buffer,handler
 WORKDIR /home/build
 
 # Prepare our own build
