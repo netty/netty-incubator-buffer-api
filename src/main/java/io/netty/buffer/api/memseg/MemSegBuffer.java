@@ -301,6 +301,11 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
     }
 
     @Override
+    public ByteCursor openCursor() {
+        return openCursor(readerOffset(), readableBytes());
+    }
+
+    @Override
     public ByteCursor openCursor(int fromOffset, int length) {
         if (seg == CLOSED_SEGMENT) {
             throw bufferIsClosed();
@@ -362,6 +367,12 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
                 return end - index;
             }
         };
+    }
+
+    @Override
+    public ByteCursor openReverseCursor() {
+        int woff = writerOffset();
+        return openReverseCursor(woff == 0? 0 : woff - 1, readableBytes());
     }
 
     @Override
