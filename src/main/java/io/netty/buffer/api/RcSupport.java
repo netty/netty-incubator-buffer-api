@@ -20,9 +20,11 @@ import java.util.Objects;
 public abstract class RcSupport<I extends Rc<I>, T extends RcSupport<I, T>> implements Rc<I> {
     private int acquires; // Closed if negative.
     private Drop<T> drop;
+    private final LifecycleTracer tracer;
 
     protected RcSupport(Drop<T> drop) {
         this.drop = drop;
+        tracer = LifecycleTracer.get();
     }
 
     /**
@@ -35,12 +37,13 @@ public abstract class RcSupport<I extends Rc<I>, T extends RcSupport<I, T>> impl
     @Override
     public final I acquire() {
         if (acquires < 0) {
-            throw new IllegalStateException("Resource is closed.");
+            throw attachTrace(new IllegalStateException("Resource is closed."));
         }
         if (acquires == Integer.MAX_VALUE) {
             throw new IllegalStateException("Cannot acquire more references; counter would overflow.");
         }
         acquires++;
+        tracer.acquire(acquires);
         return self();
     }
 
@@ -54,12 +57,14 @@ public abstract class RcSupport<I extends Rc<I>, T extends RcSupport<I, T>> impl
     @Override
     public final void close() {
         if (acquires == -1) {
-            throw new IllegalStateException("Double-free: Resource already closed and dropped.");
+            throw attachTrace(new IllegalStateException("Double-free: Resource already closed and dropped."));
         }
         if (acquires == 0) {
+            tracer.drop(acquires);
             drop.drop(impl());
         }
         acquires--;
+        tracer.close(acquires);
     }
 
     /**
@@ -77,9 +82,13 @@ public abstract class RcSupport<I extends Rc<I>, T extends RcSupport<I, T>> impl
         if (!isOwned()) {
             throw notSendableException();
         }
-        var owned = prepareSend();
+        var owned = tracer.send(prepareSend(), acquires);
         acquires = -2; // Close without dropping. This also ignore future double-free attempts.
         return new TransferSend<I, T>(owned, drop, getClass());
+    }
+
+    protected <E extends Throwable> E attachTrace(E throwable) {
+        return tracer.attachTrace(throwable);
     }
 
     /**

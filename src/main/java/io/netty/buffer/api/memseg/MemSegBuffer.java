@@ -451,7 +451,8 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
     @Override
     public void ensureWritable(int size, boolean allowCompaction) {
         if (!isOwned()) {
-            throw new IllegalStateException("Buffer is not owned. Only owned buffers can call ensureWritable.");
+            throw attachTrace(new IllegalStateException(
+                    "Buffer is not owned. Only owned buffers can call ensureWritable."));
         }
         if (size < 0) {
             throw new IllegalArgumentException("Cannot ensure writable for a negative size: " + size + '.');
