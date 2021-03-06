@@ -503,7 +503,7 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
     @Override
     public Buffer bifurcate() {
         if (!isOwned()) {
-            throw new IllegalStateException("Cannot bifurcate a buffer that is not owned.");
+            throw attachTrace(new IllegalStateException("Cannot bifurcate a buffer that is not owned."));
         }
         var drop = unsafeGetDrop();
         if (seg.ownerThread() != null) {
@@ -535,7 +535,7 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
     @Override
     public void compact() {
         if (!isOwned()) {
-            throw new IllegalStateException("Buffer must be owned in order to compact.");
+            throw attachTrace(new IllegalStateException("Buffer must be owned in order to compact."));
         }
         if (readOnly()) {
             throw new IllegalStateException("Buffer must be writable in order to compact, but was read-only.");
