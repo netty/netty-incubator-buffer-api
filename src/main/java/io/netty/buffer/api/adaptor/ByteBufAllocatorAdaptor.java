@@ -98,9 +98,7 @@ public class ByteBufAllocatorAdaptor implements ByteBufAllocator, AutoCloseable 
 
     @Override
     public ByteBuf directBuffer(int initialCapacity) {
-        // TODO we cannot use off-heap buffers here, until the JDK allows direct byte buffers based on native
-        //  memory segments to be used in IO operations.
-        return new ByteBufAdaptor(this, onheap.allocate(initialCapacity));
+        return new ByteBufAdaptor(this, offheap.allocate(initialCapacity));
     }
 
     @Override
