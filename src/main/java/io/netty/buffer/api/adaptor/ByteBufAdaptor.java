@@ -18,6 +18,7 @@ package io.netty.buffer.api.adaptor;
 import io.netty.buffer.ByteBufConvertible;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
+import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.Unpooled;
 import io.netty.buffer.api.Buffer;
 import io.netty.buffer.api.BufferAllocator;
@@ -464,7 +465,8 @@ public final class ByteBufAdaptor extends ByteBuf {
 
     @Override
     public ByteBuf getBytes(int index, byte[] dst, int dstIndex, int length) {
-        if (index < 0 || capacity() < index + length) {
+        checkAccess();
+        if (index < 0 || capacity() < index + length || dst.length < dstIndex + length) {
             throw new IndexOutOfBoundsException();
         }
         for (int i = 0; i < length; i++) {
@@ -475,6 +477,10 @@ public final class ByteBufAdaptor extends ByteBuf {
 
     @Override
     public ByteBuf getBytes(int index, ByteBuffer dst) {
+        checkAccess();
+        if (index < 0 || capacity() < index + dst.remaining()) {
+            throw new IndexOutOfBoundsException();
+        }
         while (dst.hasRemaining()) {
             dst.put(getByte(index));
             index++;
@@ -492,6 +498,7 @@ public final class ByteBufAdaptor extends ByteBuf {
 
     @Override
     public int getBytes(int index, GatheringByteChannel out, int length) throws IOException {
+        checkAccess();
         ByteBuffer transfer = ByteBuffer.allocate(length);
         buffer.copyInto(index, transfer, 0, length);
         return out.write(transfer);
@@ -499,6 +506,7 @@ public final class ByteBufAdaptor extends ByteBuf {
 
     @Override
     public int getBytes(int index, FileChannel out, long position, int length) throws IOException {
+        checkAccess();
         ByteBuffer transfer = ByteBuffer.allocate(length);
         buffer.copyInto(index, transfer, 0, length);
         return out.write(transfer, position);
@@ -940,8 +948,9 @@ public final class ByteBufAdaptor extends ByteBuf {
 
     @Override
     public ByteBuf readBytes(int length) {
+        checkAccess();
         Buffer copy = preferredBufferAllocator().allocate(length);
-        buffer.copyInto(0, copy, readerIndex(), length);
+        buffer.copyInto(readerIndex(), copy, 0, length);
         readerIndex(readerIndex() + length);
         return wrap(copy).writerIndex(length);
     }
@@ -1015,6 +1024,7 @@ public final class ByteBufAdaptor extends ByteBuf {
 
     @Override
     public int readBytes(GatheringByteChannel out, int length) throws IOException {
+        checkAccess();
         ByteBuffer[] components = new ByteBuffer[buffer.countReadableComponents()];
         buffer.forEachReadable(0, (i, component) -> {
             components[i] = component.readableBuffer();
@@ -1301,31 +1311,30 @@ public final class ByteBufAdaptor extends ByteBuf {
         if (!buffer.isAccessible()) {
             return -1;
         }
-        int inc, start, end;
         if (fromIndex <= toIndex) {
-            inc = 1;
-            start = fromIndex;
-            end = toIndex - 1;
-            if (start < 0) {
-                start = 0; // Required to pass regression tests.
+            if (fromIndex < 0) {
+                fromIndex = 0; // Required to pass regression tests.
             }
-            if (capacity() <= end) {
+            if (capacity() < toIndex) {
                 throw new IndexOutOfBoundsException();
+            }
+            for (; fromIndex < toIndex; fromIndex++) {
+                if (getByte(fromIndex) == value) {
+                    return fromIndex;
+                }
             }
         } else {
-            inc = -1;
-            start = fromIndex - 1;
-            end = toIndex;
-            if (capacity() <= start) {
-                start = capacity() - 1; // Required to pass regression tests.
+            if (capacity() < fromIndex) {
+                fromIndex = capacity(); // Required to pass regression tests.
             }
-            if (end < 0) {
+            fromIndex--;
+            if (toIndex < 0) {
                 throw new IndexOutOfBoundsException();
             }
-        }
-        for (int i = start; i != end; i += inc) {
-            if (getByte(i) == value) {
-                return i;
+            for (; fromIndex > toIndex; fromIndex--) {
+                if (getByte(fromIndex) == value) {
+                    return fromIndex;
+                }
             }
         }
         return -1;
@@ -1376,7 +1385,7 @@ public final class ByteBufAdaptor extends ByteBuf {
     @Override
     public int forEachByteDesc(int index, int length, ByteProcessor processor) {
         checkAccess();
-        int bytes = buffer.openReverseCursor(index, length).process(processor);
+        int bytes = buffer.openReverseCursor(index + length - 1, length).process(processor);
         return bytes == -1 ? -1 : index - bytes;
     }
 
@@ -1559,41 +1568,29 @@ public final class ByteBufAdaptor extends ByteBuf {
 
     @Override
     public int hashCode() {
-        int hash = 4242;
-        int capacity = capacity();
-        for (int i = 0; i < capacity; i++) {
-            hash = 31 * hash + getByte(i);
-        }
-        return hash;
+        return ByteBufUtil.hashCode(this);
     }
 
     @Override
     public boolean equals(Object obj) {
         if (obj instanceof ByteBufConvertible) {
             ByteBuf other = ((ByteBufConvertible) obj).asByteBuf();
-            boolean equal = true;
-            int capacity = capacity();
-            if (other.capacity() != capacity) {
-                return false;
-            }
-            for (int i = 0; i < capacity; i++) {
-                equal &= getByte(i) == other.getByte(i);
-            }
-            return equal;
+            return this == other || ByteBufUtil.equals(this, other);
         }
         return false;
     }
 
     @Override
     public int compareTo(ByteBuf buffer) {
-        var cap = Math.min(capacity(), buffer.capacity());
-        for (int i = 0; i < cap; i++) {
-            int cmp = Byte.compare(getByte(i), buffer.getByte(i));
-            if (cmp != 0) {
-                return cmp;
-            }
+        ByteOrder orderThis = order();
+        ByteOrder orderThat = buffer.order();
+        try {
+            // Little-ending implementation of the compare seems to be broken.
+            return ByteBufUtil.compare(order(ByteOrder.BIG_ENDIAN), buffer.order(ByteOrder.BIG_ENDIAN));
+        } finally {
+            order(orderThis);
+            buffer.order(orderThat);
         }
-        return Integer.compare(capacity(), buffer.capacity());
     }
 
     @Override
