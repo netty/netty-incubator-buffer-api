@@ -877,7 +877,7 @@ final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> implement
 
     @Override
     public byte getByte(int roff) {
-        return prepRead(roff, Byte.BYTES).getByte(subOffset);
+        return prepGet(roff, Byte.BYTES).getByte(subOffset);
     }
 
     @Override
@@ -887,7 +887,7 @@ final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> implement
 
     @Override
     public int getUnsignedByte(int roff) {
-        return prepRead(roff, Byte.BYTES).getUnsignedByte(subOffset);
+        return prepGet(roff, Byte.BYTES).getUnsignedByte(subOffset);
     }
 
     @Override
@@ -921,7 +921,7 @@ final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> implement
 
     @Override
     public char getChar(int roff) {
-        return prepRead(roff, 2).getChar(subOffset);
+        return prepGet(roff, 2).getChar(subOffset);
     }
 
     @Override
@@ -943,7 +943,7 @@ final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> implement
 
     @Override
     public short getShort(int roff) {
-        return prepRead(roff, Short.BYTES).getShort(subOffset);
+        return prepGet(roff, Short.BYTES).getShort(subOffset);
     }
 
     @Override
@@ -953,7 +953,7 @@ final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> implement
 
     @Override
     public int getUnsignedShort(int roff) {
-        return prepRead(roff, Short.BYTES).getUnsignedShort(subOffset);
+        return prepGet(roff, Short.BYTES).getUnsignedShort(subOffset);
     }
 
     @Override
@@ -987,7 +987,7 @@ final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> implement
 
     @Override
     public int getMedium(int roff) {
-        return prepRead(roff, 3).getMedium(subOffset);
+        return prepGet(roff, 3).getMedium(subOffset);
     }
 
     @Override
@@ -997,7 +997,7 @@ final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> implement
 
     @Override
     public int getUnsignedMedium(int roff) {
-        return prepRead(roff, 3).getMedium(subOffset);
+        return prepGet(roff, 3).getMedium(subOffset);
     }
 
     @Override
@@ -1031,7 +1031,7 @@ final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> implement
 
     @Override
     public int getInt(int roff) {
-        return prepRead(roff, Integer.BYTES).getInt(subOffset);
+        return prepGet(roff, Integer.BYTES).getInt(subOffset);
     }
 
     @Override
@@ -1041,7 +1041,7 @@ final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> implement
 
     @Override
     public long getUnsignedInt(int roff) {
-        return prepRead(roff, Integer.BYTES).getUnsignedInt(subOffset);
+        return prepGet(roff, Integer.BYTES).getUnsignedInt(subOffset);
     }
 
     @Override
@@ -1075,7 +1075,7 @@ final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> implement
 
     @Override
     public float getFloat(int roff) {
-        return prepRead(roff, Float.BYTES).getFloat(subOffset);
+        return prepGet(roff, Float.BYTES).getFloat(subOffset);
     }
 
     @Override
@@ -1097,7 +1097,7 @@ final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> implement
 
     @Override
     public long getLong(int roff) {
-        return prepRead(roff, Long.BYTES).getLong(subOffset);
+        return prepGet(roff, Long.BYTES).getLong(subOffset);
     }
 
     @Override
@@ -1119,7 +1119,7 @@ final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> implement
 
     @Override
     public double getDouble(int roff) {
-        return prepRead(roff, Double.BYTES).getDouble(subOffset);
+        return prepGet(roff, Double.BYTES).getDouble(subOffset);
     }
 
     @Override
@@ -1238,6 +1238,17 @@ final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> implement
 
     private void checkReadBounds(int index, int size) {
         if (index < 0 || woff < index + size) {
+            throw indexOutOfBounds(index, false);
+        }
+    }
+
+    private BufferAccessors prepGet(int index, int size) {
+        checkGetBounds(index, size);
+        return chooseBuffer(index, size);
+    }
+
+    private void checkGetBounds(int index, int size) {
+        if (index < 0 || capacity < index + size) {
             throw indexOutOfBounds(index, false);
         }
     }

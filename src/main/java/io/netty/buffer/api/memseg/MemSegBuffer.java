@@ -589,7 +589,7 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
 
     @Override
     public byte getByte(int roff) {
-        checkRead(roff, Byte.BYTES);
+        checkGet(roff, Byte.BYTES);
         return getByteAtOffset(seg, roff);
     }
 
@@ -603,7 +603,7 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
 
     @Override
     public int getUnsignedByte(int roff) {
-        checkRead(roff, Byte.BYTES);
+        checkGet(roff, Byte.BYTES);
         return getByteAtOffset(seg, roff) & 0xFF;
     }
 
@@ -659,7 +659,7 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
 
     @Override
     public char getChar(int roff) {
-        checkRead(roff, 2);
+        checkGet(roff, 2);
         return getCharAtOffset(seg, roff, order);
     }
 
@@ -694,7 +694,7 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
 
     @Override
     public short getShort(int roff) {
-        checkRead(roff, Short.BYTES);
+        checkGet(roff, Short.BYTES);
         return getShortAtOffset(seg, roff, order);
     }
 
@@ -708,7 +708,7 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
 
     @Override
     public int getUnsignedShort(int roff) {
-        checkRead(roff, Short.BYTES);
+        checkGet(roff, Short.BYTES);
         return getShortAtOffset(seg, roff, order) & 0xFFFF;
     }
 
@@ -770,7 +770,7 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
 
     @Override
     public int getMedium(int roff) {
-        checkRead(roff, 3);
+        checkGet(roff, 3);
         return order == ByteOrder.BIG_ENDIAN?
                 getByteAtOffset(seg, roff) << 16 |
                 (getByteAtOffset(seg, roff + 1) & 0xFF) << 8 |
@@ -796,7 +796,7 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
 
     @Override
     public int getUnsignedMedium(int roff) {
-        checkRead(roff, 3);
+        checkGet(roff, 3);
         return order == ByteOrder.BIG_ENDIAN?
                 (getByteAtOffset(seg, roff) << 16 |
                 (getByteAtOffset(seg, roff + 1) & 0xFF) << 8 |
@@ -878,7 +878,7 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
 
     @Override
     public int getInt(int roff) {
-        checkRead(roff, Integer.BYTES);
+        checkGet(roff, Integer.BYTES);
         return getIntAtOffset(seg, roff, order);
     }
 
@@ -892,7 +892,7 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
 
     @Override
     public long getUnsignedInt(int roff) {
-        checkRead(roff, Integer.BYTES);
+        checkGet(roff, Integer.BYTES);
         return getIntAtOffset(seg, roff, order) & 0xFFFFFFFFL;
     }
 
@@ -948,7 +948,7 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
 
     @Override
     public float getFloat(int roff) {
-        checkRead(roff, Float.BYTES);
+        checkGet(roff, Float.BYTES);
         return getFloatAtOffset(seg, roff, order);
     }
 
@@ -983,7 +983,7 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
 
     @Override
     public long getLong(int roff) {
-        checkRead(roff, Long.BYTES);
+        checkGet(roff, Long.BYTES);
         return getLongAtOffset(seg, roff, order);
     }
 
@@ -1018,7 +1018,7 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
 
     @Override
     public double getDouble(int roff) {
-        checkRead(roff, Double.BYTES);
+        checkGet(roff, Double.BYTES);
         return getDoubleAtOffset(seg, roff, order);
     }
 
@@ -1089,6 +1089,12 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
 
     private void checkRead(int index, int size) {
         if (index < 0 || woff < index + size) {
+            throw readAccessCheckException(index);
+        }
+    }
+
+    private void checkGet(int index, int size) {
+        if (index < 0 || seg.byteSize() < index + size) {
             throw readAccessCheckException(index);
         }
     }

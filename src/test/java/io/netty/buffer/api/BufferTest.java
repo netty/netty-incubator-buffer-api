@@ -3215,19 +3215,37 @@ public class BufferTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedGetOfByteMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
+    void offsettedGetOfByteMustNotBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.getByte(0));
+            buf.getByte(0);
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedGetOfByteReadOnlyMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
+    void offsettedGetOfByteMustBoundsCheckWhenReadOffsetIsGreaterThanCapacity(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getByte(0));
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.getByte(8));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    void offsettedGetOfByteReadOnlyMustNotBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
+        try (BufferAllocator allocator = fixture.createAllocator();
+             Buffer buf = allocator.allocate(8)) {
+            buf.readOnly(true).getByte(0);
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    void offsettedGetOfByteReadOnlyMustBoundsCheckWhenReadOffsetIsGreaterThanCapacity(Fixture fixture) {
+        try (BufferAllocator allocator = fixture.createAllocator();
+             Buffer buf = allocator.allocate(8)) {
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getByte(8));
         }
     }
 
@@ -3343,42 +3361,79 @@ public class BufferTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedGetOfUnsignedByteMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanWriteOffset(Fixture fixture) {
+    void offsettedGetOfUnsignedByteMustNotBoundsCheckWhenReadOffsetAndSizeIsGreaterThanWriteOffset(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
             int value = 0x01;
             buf.writeUnsignedByte(value);
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.getUnsignedByte(1));
+            buf.getUnsignedByte(1);
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedGetOfUnsignedByteReadOnlyMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanWriteOffset(
+    void offsettedGetOfUnsignedByteMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanCapacity(Fixture fixture) {
+        try (BufferAllocator allocator = fixture.createAllocator();
+             Buffer buf = allocator.allocate(8)) {
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.getUnsignedByte(8));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    void offsettedGetOfUnsignedByteReadOnlyMustNotBoundsCheckWhenReadOffsetAndSizeIsGreaterThanWriteOffset(
             Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
             int value = 0x01;
             buf.writeUnsignedByte(value);
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getUnsignedByte(1));
+            buf.readOnly(true).getUnsignedByte(1);
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedGetOfUnsignedByteMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
+    void offsettedGetOfUnsignedByteReadOnlyMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanCapacity(
+            Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.getUnsignedByte(0));
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getUnsignedByte(8));
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedGetOfUnsignedByteReadOnlyMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
+    void offsettedGetOfUnsignedByteMustNotBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getUnsignedByte(0));
+            buf.getUnsignedByte(0);
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    void offsettedGetOfUnsignedByteMustBoundsCheckWhenReadOffsetIsGreaterThanCapacity(Fixture fixture) {
+        try (BufferAllocator allocator = fixture.createAllocator();
+             Buffer buf = allocator.allocate(8)) {
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.getUnsignedByte(8));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    void offsettedGetOfUnsignedByteReadOnlyMustNotBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
+        try (BufferAllocator allocator = fixture.createAllocator();
+             Buffer buf = allocator.allocate(8)) {
+            buf.readOnly(true).getUnsignedByte(0);
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    void offsettedGetOfUnsignedByteReadOnlyMustBoundsCheckWhenReadOffsetIsGreaterThanCapacity(Fixture fixture) {
+        try (BufferAllocator allocator = fixture.createAllocator();
+             Buffer buf = allocator.allocate(8)) {
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getUnsignedByte(8));
         }
     }
 
@@ -3660,41 +3715,77 @@ public class BufferTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedGetOfCharMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanWriteOffset(Fixture fixture) {
+    void offsettedGetOfCharMustNotBoundsCheckWhenReadOffsetAndSizeIsGreaterThanWriteOffset(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
             char value = 0x0102;
             buf.writeChar(value);
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.getChar(1));
+            buf.getChar(1);
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedGetOfCharReadOnlyMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanWriteOffset(Fixture fixture) {
+    void offsettedGetOfCharMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanCapacity(Fixture fixture) {
+        try (BufferAllocator allocator = fixture.createAllocator();
+             Buffer buf = allocator.allocate(8)) {
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.getChar(7));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    void offsettedGetOfCharReadOnlyMustNotBoundsCheckWhenReadOffsetAndSizeIsGreaterThanWriteOffset(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
             char value = 0x0102;
             buf.writeChar(value);
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getChar(1));
+            buf.readOnly(true).getChar(1);
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedGetOfCharMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
+    void offsettedGetOfCharReadOnlyMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanCapacity(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.getChar(0));
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getChar(7));
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedGetOfCharReadOnlyMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
+    void offsettedGetOfCharMustNotBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getChar(0));
+            buf.getChar(0);
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    void offsettedGetOfCharMustBoundsCheckWhenReadOffsetIsGreaterThanCapacity(Fixture fixture) {
+        try (BufferAllocator allocator = fixture.createAllocator();
+             Buffer buf = allocator.allocate(8)) {
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.getChar(8));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    void offsettedGetOfCharReadOnlyMustNotBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
+        try (BufferAllocator allocator = fixture.createAllocator();
+             Buffer buf = allocator.allocate(8)) {
+            buf.readOnly(true).getChar(0);
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    void offsettedGetOfCharReadOnlyMustBoundsCheckWhenReadOffsetIsGreaterThanCapacity(Fixture fixture) {
+        try (BufferAllocator allocator = fixture.createAllocator();
+             Buffer buf = allocator.allocate(8)) {
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getChar(8));
         }
     }
 
@@ -3893,41 +3984,77 @@ public class BufferTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedGetOfShortMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanWriteOffset(Fixture fixture) {
+    void offsettedGetOfShortMustNotBoundsCheckWhenReadOffsetAndSizeIsGreaterThanWriteOffset(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
             short value = 0x0102;
             buf.writeShort(value);
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.getShort(1));
+            buf.getShort(1);
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedGetOfShortReadOnlyMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanWriteOffset(Fixture fixture) {
+    void offsettedGetOfShortMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanCapacity(Fixture fixture) {
+        try (BufferAllocator allocator = fixture.createAllocator();
+             Buffer buf = allocator.allocate(8)) {
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.getShort(7));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    void offsettedGetOfShortReadOnlyMustNotBoundsCheckWhenReadOffsetAndSizeIsGreaterThanWriteOffset(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
             short value = 0x0102;
             buf.writeShort(value);
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getShort(1));
+            buf.readOnly(true).getShort(1);
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedGetOfShortMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
+    void offsettedGetOfShortReadOnlyMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanCapacity(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.getShort(0));
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getShort(7));
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedGetOfShortReadOnlyMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
+    void offsettedGetOfShortMustNotBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getShort(0));
+            buf.getShort(0);
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    void offsettedGetOfShortMustBoundsCheckWhenReadOffsetIsGreaterThanCapacity(Fixture fixture) {
+        try (BufferAllocator allocator = fixture.createAllocator();
+             Buffer buf = allocator.allocate(8)) {
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.getShort(7));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    void offsettedGetOfShortReadOnlyMustNotBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
+        try (BufferAllocator allocator = fixture.createAllocator();
+             Buffer buf = allocator.allocate(8)) {
+            buf.readOnly(true).getShort(0);
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    void offsettedGetOfShortReadOnlyMustBoundsCheckWhenReadOffsetIsGreaterThanCapacity(Fixture fixture) {
+        try (BufferAllocator allocator = fixture.createAllocator();
+             Buffer buf = allocator.allocate(8)) {
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getShort(7));
         }
     }
 
@@ -4043,42 +4170,79 @@ public class BufferTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedGetOfUnsignedShortMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanWriteOffset(Fixture fixture) {
+    void offsettedGetOfUnsignedShortMustNotBoundsCheckWhenReadOffsetAndSizeIsGreaterThanWriteOffset(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
             int value = 0x0102;
             buf.writeUnsignedShort(value);
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.getUnsignedShort(1));
+            buf.getUnsignedShort(1);
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedGetOfUnsignedShortReadOnlyMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanWriteOffset(
+    void offsettedGetOfUnsignedShortMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanCapacity(Fixture fixture) {
+        try (BufferAllocator allocator = fixture.createAllocator();
+             Buffer buf = allocator.allocate(8)) {
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.getUnsignedShort(7));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    void offsettedGetOfUnsignedShortReadOnlyMustNotBoundsCheckWhenReadOffsetAndSizeIsGreaterThanWriteOffset(
             Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
             int value = 0x0102;
             buf.writeUnsignedShort(value);
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getUnsignedShort(1));
+            buf.readOnly(true).getUnsignedShort(1);
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedGetOfUnsignedShortMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
+    void offsettedGetOfUnsignedShortReadOnlyMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanCapacity(
+            Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.getUnsignedShort(0));
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getUnsignedShort(7));
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedGetOfUnsignedShortReadOnlyMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
+    void offsettedGetOfUnsignedShortMustNotBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getUnsignedShort(0));
+            buf.getUnsignedShort(0);
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    void offsettedGetOfUnsignedShortMustBoundsCheckWhenReadOffsetIsGreaterThanCapacity(Fixture fixture) {
+        try (BufferAllocator allocator = fixture.createAllocator();
+             Buffer buf = allocator.allocate(8)) {
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.getUnsignedShort(7));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    void offsettedGetOfUnsignedShortReadOnlyMustNotBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
+        try (BufferAllocator allocator = fixture.createAllocator();
+             Buffer buf = allocator.allocate(8)) {
+            buf.readOnly(true).getUnsignedShort(0);
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    void offsettedGetOfUnsignedShortReadOnlyMustBoundsCheckWhenReadOffsetIsGreaterThanCapacity(Fixture fixture) {
+        try (BufferAllocator allocator = fixture.createAllocator();
+             Buffer buf = allocator.allocate(8)) {
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getUnsignedShort(7));
         }
     }
 
@@ -4360,32 +4524,70 @@ public class BufferTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedGetOfMediumMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanWriteOffset(Fixture fixture) {
+    void offsettedGetOfMediumMustNotBoundsCheckWhenReadOffsetAndSizeIsGreaterThanWriteOffset(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
             int value = 0x010203;
             buf.writeMedium(value);
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.getMedium(1));
+            buf.getMedium(1);
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedGetOfMediumReadOnlyMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanWriteOffset(Fixture fixture) {
+    void offsettedGetOfMediumMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanCapacity(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
             int value = 0x010203;
             buf.writeMedium(value);
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getMedium(1));
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.getMedium(6));
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedGetOfMediumMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
+    void offsettedGetOfMediumReadOnlyMustNotBoundsCheckWhenReadOffsetAndSizeIsGreaterThanWriteOffset(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.getMedium(0));
+            int value = 0x010203;
+            buf.writeMedium(value);
+            buf.readOnly(true).getMedium(1);
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    void offsettedGetOfMediumReadOnlyMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanCapacity(Fixture fixture) {
+        try (BufferAllocator allocator = fixture.createAllocator();
+             Buffer buf = allocator.allocate(8)) {
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getMedium(6));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    void offsettedGetOfMediumMustNotBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
+        try (BufferAllocator allocator = fixture.createAllocator();
+             Buffer buf = allocator.allocate(8)) {
+            buf.getMedium(0);
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    void offsettedGetOfMediumMustBoundsCheckWhenReadOffsetIsGreaterThanCapacity(Fixture fixture) {
+        try (BufferAllocator allocator = fixture.createAllocator();
+             Buffer buf = allocator.allocate(8)) {
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.getMedium(8));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    void offsettedGetOfMediumReadOnlyMustNotBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
+        try (BufferAllocator allocator = fixture.createAllocator();
+             Buffer buf = allocator.allocate(8)) {
+            buf.readOnly(true).getMedium(0);
         }
     }
 
@@ -4394,7 +4596,7 @@ public class BufferTest {
     void offsettedGetOfMediumReadOnlyMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getMedium(0));
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getMedium(8));
         }
     }
 
@@ -4510,42 +4712,79 @@ public class BufferTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedGetOfUnsignedMediumMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanWriteOffset(Fixture fixture) {
+    void offsettedGetOfUnsignedMediumMustNotBoundsCheckWhenReadOffsetAndSizeIsGreaterThanWriteOffset(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
             int value = 0x010203;
             buf.writeUnsignedMedium(value);
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.getUnsignedMedium(1));
+            buf.getUnsignedMedium(1);
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedGetOfUnsignedMediumReadOnlyMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanWriteOffset(
+    void offsettedGetOfUnsignedMediumMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanCapacity(Fixture fixture) {
+        try (BufferAllocator allocator = fixture.createAllocator();
+             Buffer buf = allocator.allocate(8)) {
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.getUnsignedMedium(6));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    void offsettedGetOfUnsignedMediumReadOnlyMustNotBoundsCheckWhenReadOffsetAndSizeIsGreaterThanWriteOffset(
             Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
             int value = 0x010203;
             buf.writeUnsignedMedium(value);
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getUnsignedMedium(1));
+            buf.readOnly(true).getUnsignedMedium(1);
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedGetOfUnsignedMediumMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
+    void offsettedGetOfUnsignedMediumReadOnlyMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanCapacity(
+            Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.getUnsignedMedium(0));
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getUnsignedMedium(6));
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedGetOfUnsignedMediumReadOnlyMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
+    void offsettedGetOfUnsignedMediumMustNotBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getUnsignedMedium(0));
+            buf.getUnsignedMedium(0);
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    void offsettedGetOfUnsignedMediumMustBoundsCheckWhenReadOffsetIsGreaterThanCapacity(Fixture fixture) {
+        try (BufferAllocator allocator = fixture.createAllocator();
+             Buffer buf = allocator.allocate(8)) {
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.getUnsignedMedium(6));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    void offsettedGetOfUnsignedMediumReadOnlyMustNotBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
+        try (BufferAllocator allocator = fixture.createAllocator();
+             Buffer buf = allocator.allocate(8)) {
+            buf.readOnly(true).getUnsignedMedium(0);
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    void offsettedGetOfUnsignedMediumReadOnlyMustBoundsCheckWhenReadOffsetIsGreaterThanCapacity(Fixture fixture) {
+        try (BufferAllocator allocator = fixture.createAllocator();
+             Buffer buf = allocator.allocate(8)) {
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getUnsignedMedium(8));
         }
     }
 
@@ -4849,19 +5088,37 @@ public class BufferTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedGetOfIntMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
+    void offsettedGetOfIntMustNotBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.getInt(0));
+            buf.getInt(0);
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedGetOfIntReadOnlyMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
+    void offsettedGetOfIntMustBoundsCheckWhenReadOffsetIsGreaterThanCapacity(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getInt(0));
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.getInt(8));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    void offsettedGetOfIntReadOnlyMustNotBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
+        try (BufferAllocator allocator = fixture.createAllocator();
+             Buffer buf = allocator.allocate(8)) {
+            buf.readOnly(true).getInt(0);
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    void offsettedGetOfIntReadOnlyMustBoundsCheckWhenReadOffsetIsGreaterThanCapacity(Fixture fixture) {
+        try (BufferAllocator allocator = fixture.createAllocator();
+             Buffer buf = allocator.allocate(8)) {
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getInt(8));
         }
     }
 
@@ -4977,42 +5234,79 @@ public class BufferTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedGetOfUnsignedIntMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanWriteOffset(Fixture fixture) {
+    void offsettedGetOfUnsignedIntMustNotBoundsCheckWhenReadOffsetAndSizeIsGreaterThanWriteOffset(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
             long value = 0x01020304;
             buf.writeUnsignedInt(value);
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.getUnsignedInt(1));
+            buf.getUnsignedInt(1);
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedGetOfUnsignedIntReadOnlyMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanWriteOffset(
+    void offsettedGetOfUnsignedIntMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanCapacity(Fixture fixture) {
+        try (BufferAllocator allocator = fixture.createAllocator();
+             Buffer buf = allocator.allocate(8)) {
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.getUnsignedInt(5));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    void offsettedGetOfUnsignedIntReadOnlyMustNotBoundsCheckWhenReadOffsetAndSizeIsGreaterThanWriteOffset(
             Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
             long value = 0x01020304;
             buf.writeUnsignedInt(value);
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getUnsignedInt(1));
+            buf.readOnly(true).getUnsignedInt(1);
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedGetOfUnsignedIntMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
+    void offsettedGetOfUnsignedIntReadOnlyMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanCapacity(
+            Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.getUnsignedInt(0));
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getUnsignedInt(5));
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedGetOfUnsignedIntReadOnlyMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
+    void offsettedGetOfUnsignedIntMustNotBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getUnsignedInt(0));
+            buf.getUnsignedInt(0);
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    void offsettedGetOfUnsignedIntMustBoundsCheckWhenReadOffsetIsGreaterThanCapacity(Fixture fixture) {
+        try (BufferAllocator allocator = fixture.createAllocator();
+             Buffer buf = allocator.allocate(8)) {
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.getUnsignedInt(8));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    void offsettedGetOfUnsignedIntReadOnlyMustNotBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
+        try (BufferAllocator allocator = fixture.createAllocator();
+             Buffer buf = allocator.allocate(8)) {
+            buf.readOnly(true).getUnsignedInt(0);
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    void offsettedGetOfUnsignedIntReadOnlyMustBoundsCheckWhenReadOffsetIsGreaterThanCapacity(Fixture fixture) {
+        try (BufferAllocator allocator = fixture.createAllocator();
+             Buffer buf = allocator.allocate(8)) {
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getUnsignedInt(8));
         }
     }
 
@@ -5294,41 +5588,77 @@ public class BufferTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedGetOfFloatMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanWriteOffset(Fixture fixture) {
+    void offsettedGetOfFloatMustNotBoundsCheckWhenReadOffsetAndSizeIsGreaterThanWriteOffset(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
             float value = Float.intBitsToFloat(0x01020304);
             buf.writeFloat(value);
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.getFloat(1));
+            buf.getFloat(1);
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedGetOfFloatReadOnlyMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanWriteOffset(Fixture fixture) {
+    void offsettedGetOfFloatMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanCapacity(Fixture fixture) {
+        try (BufferAllocator allocator = fixture.createAllocator();
+             Buffer buf = allocator.allocate(8)) {
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.getFloat(7));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    void offsettedGetOfFloatReadOnlyMustNotBoundsCheckWhenReadOffsetAndSizeIsGreaterThanWriteOffset(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
             float value = Float.intBitsToFloat(0x01020304);
             buf.writeFloat(value);
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getFloat(1));
+            buf.readOnly(true).getFloat(1);
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedGetOfFloatMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
+    void offsettedGetOfFloatReadOnlyMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanCapacity(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.getFloat(0));
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getFloat(5));
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedGetOfFloatReadOnlyMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
+    void offsettedGetOfFloatMustNotBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getFloat(0));
+            buf.getFloat(0);
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    void offsettedGetOfFloatMustBoundsCheckWhenReadOffsetIsGreaterThanCapacity(Fixture fixture) {
+        try (BufferAllocator allocator = fixture.createAllocator();
+             Buffer buf = allocator.allocate(8)) {
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.getFloat(8));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    void offsettedGetOfFloatReadOnlyMustNotBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
+        try (BufferAllocator allocator = fixture.createAllocator();
+             Buffer buf = allocator.allocate(8)) {
+            buf.readOnly(true).getFloat(0);
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    void offsettedGetOfFloatReadOnlyMustBoundsCheckWhenReadOffsetIsGreaterThan(Fixture fixture) {
+        try (BufferAllocator allocator = fixture.createAllocator();
+             Buffer buf = allocator.allocate(8)) {
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getFloat(8));
         }
     }
 
@@ -5549,19 +5879,37 @@ public class BufferTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedGetOfLongMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
+    void offsettedGetOfLongMustNotBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.getLong(0));
+            buf.getLong(0);
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedGetOfLongReadOnlyMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
+    void offsettedGetOfLongMustBoundsCheckWhenReadOffsetIsGreaterThanCapacity(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getLong(0));
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.getLong(8));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    void offsettedGetOfLongReadOnlyMustNotBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
+        try (BufferAllocator allocator = fixture.createAllocator();
+             Buffer buf = allocator.allocate(8)) {
+            buf.readOnly(true).getLong(0);
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    void offsettedGetOfLongReadOnlyMustBoundsCheckWhenReadOffsetIsGreaterThanCapacity(Fixture fixture) {
+        try (BufferAllocator allocator = fixture.createAllocator();
+             Buffer buf = allocator.allocate(8)) {
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getLong(8));
         }
     }
 
@@ -5782,19 +6130,37 @@ public class BufferTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedGetOfDoubleMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
+    void offsettedGetOfDoubleMustNotBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.getDouble(0));
+            buf.getDouble(0);
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void offsettedGetOfDoubleReadOnlyMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
+    void offsettedGetOfDoubleMustBoundsCheckWhenReadOffsetIsGreaterThanCapacity(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getDouble(0));
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.getDouble(8));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    void offsettedGetOfDoubleReadOnlyMustNotBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
+        try (BufferAllocator allocator = fixture.createAllocator();
+             Buffer buf = allocator.allocate(8)) {
+            buf.readOnly(true).getDouble(0);
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    void offsettedGetOfDoubleReadOnlyMustBoundsCheckWhenReadOffsetIsGreaterThanCapacity(Fixture fixture) {
+        try (BufferAllocator allocator = fixture.createAllocator();
+             Buffer buf = allocator.allocate(8)) {
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getDouble(8));
         }
     }
 
