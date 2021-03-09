@@ -59,15 +59,43 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 public class BufferTest {
-    private static volatile Fixture[] fixtures;
     private static ExecutorService executor;
 
+    private static final Memoize<Fixture[]> ALL_COMBINATIONS = new Memoize<>(
+            () -> fixtureCombinations().toArray(Fixture[]::new));
+    private static final Memoize<Fixture[]> NON_SLICED = new Memoize<>(
+            () -> Arrays.stream(ALL_COMBINATIONS.get()).filter(f -> !f.isSlice()).toArray(Fixture[]::new));
+    private static final Memoize<Fixture[]> NON_COMPOSITE = new Memoize<>(
+            () -> Arrays.stream(ALL_COMBINATIONS.get()).filter(f -> !f.isComposite()).toArray(Fixture[]::new));
+    private static final Memoize<Fixture[]> HEAP_ALLOCS = new Memoize<>(
+            () -> Arrays.stream(ALL_COMBINATIONS.get()).filter(f -> f.isHeap()).toArray(Fixture[]::new));
+    private static final Memoize<Fixture[]> DIRECT_ALLOCS = new Memoize<>(
+            () -> Arrays.stream(ALL_COMBINATIONS.get()).filter(f -> f.isDirect()).toArray(Fixture[]::new));
+    private static final Memoize<Fixture[]> POOLED_ALLOCS = new Memoize<>(
+            () -> Arrays.stream(ALL_COMBINATIONS.get()).filter(f -> f.isPooled()).toArray(Fixture[]::new));
+
     static Fixture[] allocators() {
-        Fixture[] fxs = fixtures;
-        if (fxs != null) {
-            return fxs;
-        }
-        return fixtures = fixtureCombinations().toArray(Fixture[]::new);
+        return ALL_COMBINATIONS.get();
+    }
+
+    static Fixture[] nonSliceAllocators() {
+        return NON_SLICED.get();
+    }
+
+    static Fixture[] nonCompositeAllocators() {
+        return NON_COMPOSITE.get();
+    }
+
+    static Fixture[] heapAllocators() {
+        return HEAP_ALLOCS.get();
+    }
+
+    static Fixture[] directAllocators() {
+        return DIRECT_ALLOCS.get();
+    }
+
+    static Fixture[] pooledAllocators() {
+        return POOLED_ALLOCS.get();
     }
 
     static List<Fixture> initialAllocators() {
@@ -78,35 +106,7 @@ public class BufferTest {
                 new Fixture("pooledDirect", BufferAllocator::pooledDirect, POOLED, DIRECT, CLEANER));
     }
 
-    static Stream<Fixture> nonSliceAllocators() {
-        return fixtureCombinations().filter(f -> !f.isSlice());
-    }
-
-    static Stream<Fixture> nonCompositeAllocators() {
-        return fixtureCombinations().filter(f -> !f.isComposite());
-    }
-
-    static Stream<Fixture> heapAllocators() {
-        return fixtureCombinations().filter(Fixture::isHeap);
-    }
-
-    static Stream<Fixture> directAllocators() {
-        return fixtureCombinations().filter(Fixture::isDirect);
-    }
-
-    static Stream<Fixture> directPooledAllocators() {
-        return fixtureCombinations().filter(f -> f.isDirect() && f.isCleaner() && f.isPooled());
-    }
-
-    static Stream<Fixture> pooledAllocators() {
-        return fixtureCombinations().filter(Fixture::isPooled);
-    }
-
     private static Stream<Fixture> fixtureCombinations() {
-        Fixture[] fxs = fixtures;
-        if (fxs != null) {
-            return Arrays.stream(fxs);
-        }
         List<Fixture> initFixtures = initialAllocators();
         Builder<Fixture> builder = Stream.builder();
         initFixtures.forEach(builder);
