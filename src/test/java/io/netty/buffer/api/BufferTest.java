@@ -584,6 +584,28 @@ public class BufferTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
+    public void setWriterOffsetMustThrowOutsideOfWritableRegion(Fixture fixture) {
+        try (BufferAllocator allocator = fixture.createAllocator();
+             Buffer buf = allocator.allocate(8)) {
+            // Writer offset cannot be negative.
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.writerOffset(-1));
+
+            buf.writerOffset(4);
+            buf.readerOffset(4);
+
+            // Cannot set writer offset before reader offset.
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.writerOffset(3));
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.writerOffset(0));
+
+            buf.writerOffset(buf.capacity());
+
+            // Cannot set writer offset beyond capacity.
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.writerOffset(buf.capacity() + 1));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
     void setReaderOffsetMustNotThrowWithinBounds(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
@@ -2454,30 +2476,30 @@ public class BufferTest {
     }
 
     private static void verifyWriteAccessible(Buffer buf) {
-        buf.writerOffset(0).writeByte((byte) 32);
-        assertThat(buf.readerOffset(0).readByte()).isEqualTo((byte) 32);
-        buf.writerOffset(0).writeUnsignedByte(32);
-        assertThat(buf.readerOffset(0).readUnsignedByte()).isEqualTo(32);
-        buf.writerOffset(0).writeChar('3');
-        assertThat(buf.readerOffset(0).readChar()).isEqualTo('3');
-        buf.writerOffset(0).writeShort((short) 32);
-        assertThat(buf.readerOffset(0).readShort()).isEqualTo((short) 32);
-        buf.writerOffset(0).writeUnsignedShort(32);
-        assertThat(buf.readerOffset(0).readUnsignedShort()).isEqualTo(32);
-        buf.writerOffset(0).writeMedium(32);
-        assertThat(buf.readerOffset(0).readMedium()).isEqualTo(32);
-        buf.writerOffset(0).writeUnsignedMedium(32);
-        assertThat(buf.readerOffset(0).readUnsignedMedium()).isEqualTo(32);
-        buf.writerOffset(0).writeInt(32);
-        assertThat(buf.readerOffset(0).readInt()).isEqualTo(32);
-        buf.writerOffset(0).writeUnsignedInt(32);
-        assertThat(buf.readerOffset(0).readUnsignedInt()).isEqualTo(32L);
-        buf.writerOffset(0).writeFloat(3.2f);
-        assertThat(buf.readerOffset(0).readFloat()).isEqualTo(3.2f);
-        buf.writerOffset(0).writeLong(32);
-        assertThat(buf.readerOffset(0).readLong()).isEqualTo(32L);
-        buf.writerOffset(0).writeDouble(3.2);
-        assertThat(buf.readerOffset(0).readDouble()).isEqualTo(3.2);
+        buf.reset().writeByte((byte) 32);
+        assertThat(buf.readByte()).isEqualTo((byte) 32);
+        buf.reset().writerOffset(0).writeUnsignedByte(32);
+        assertThat(buf.readUnsignedByte()).isEqualTo(32);
+        buf.reset().writerOffset(0).writeChar('3');
+        assertThat(buf.readChar()).isEqualTo('3');
+        buf.reset().writerOffset(0).writeShort((short) 32);
+        assertThat(buf.readShort()).isEqualTo((short) 32);
+        buf.reset().writerOffset(0).writeUnsignedShort(32);
+        assertThat(buf.readUnsignedShort()).isEqualTo(32);
+        buf.reset().writerOffset(0).writeMedium(32);
+        assertThat(buf.readMedium()).isEqualTo(32);
+        buf.reset().writerOffset(0).writeUnsignedMedium(32);
+        assertThat(buf.readUnsignedMedium()).isEqualTo(32);
+        buf.reset().writerOffset(0).writeInt(32);
+        assertThat(buf.readInt()).isEqualTo(32);
+        buf.reset().writerOffset(0).writeUnsignedInt(32);
+        assertThat(buf.readUnsignedInt()).isEqualTo(32L);
+        buf.reset().writerOffset(0).writeFloat(3.2f);
+        assertThat(buf.readFloat()).isEqualTo(3.2f);
+        buf.reset().writerOffset(0).writeLong(32);
+        assertThat(buf.readLong()).isEqualTo(32L);
+        buf.reset().writerOffset(0).writeDouble(3.2);
+        assertThat(buf.readDouble()).isEqualTo(3.2);
 
         buf.setByte(0, (byte) 32);
         assertThat(buf.getByte(0)).isEqualTo((byte) 32);

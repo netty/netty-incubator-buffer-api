@@ -133,7 +133,7 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
 
     @Override
     public Buffer fill(byte value) {
-        checkWrite(0, capacity());
+        checkSet(0, capacity());
         seg.fill(value);
         return this;
     }
@@ -281,7 +281,7 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
     public void copyInto(int srcPos, Buffer dest, int destPos, int length) {
         if (dest instanceof MemSegBuffer) {
             var memSegBuf = (MemSegBuffer) dest;
-            memSegBuf.checkWrite(destPos, length);
+            memSegBuf.checkSet(destPos, length);
             copyInto(srcPos, memSegBuf.seg, destPos, length);
             return;
         }
@@ -824,7 +824,7 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
 
     @Override
     public Buffer setMedium(int woff, int value) {
-        checkWrite(woff, 3);
+        checkSet(woff, 3);
         if (order == ByteOrder.BIG_ENDIAN) {
             setByteAtOffset(wseg, woff, (byte) (value >> 16));
             setByteAtOffset(wseg, woff + 1, (byte) (value >> 8 & 0xFF));
@@ -855,7 +855,7 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
 
     @Override
     public Buffer setUnsignedMedium(int woff, int value) {
-        checkWrite(woff, 3);
+        checkSet(woff, 3);
         if (order == ByteOrder.BIG_ENDIAN) {
             setByteAtOffset(wseg, woff, (byte) (value >> 16));
             setByteAtOffset(wseg, woff + 1, (byte) (value >> 8 & 0xFF));
@@ -1100,6 +1100,12 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
     }
 
     private void checkWrite(int index, int size) {
+        if (index < roff || wseg.byteSize() < index + size) {
+            throw writeAccessCheckException(index);
+        }
+    }
+
+    private void checkSet(int index, int size) {
         if (index < 0 || wseg.byteSize() < index + size) {
             throw writeAccessCheckException(index);
         }
@@ -1143,7 +1149,7 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
     private IndexOutOfBoundsException outOfBounds(int index) {
         return new IndexOutOfBoundsException(
                 "Index " + index + " is out of bounds: [read 0 to " + woff + ", write 0 to " +
-                (seg.byteSize() - 1) + "].");
+                seg.byteSize() + "].");
     }
 
     Object recoverableMemory() {

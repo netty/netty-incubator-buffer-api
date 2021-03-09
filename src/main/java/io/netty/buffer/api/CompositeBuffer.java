@@ -1279,7 +1279,7 @@ final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> implement
         }
         return new IndexOutOfBoundsException(
                 "Index " + index + " is out of bounds: [read 0 to " + woff + ", write 0 to " +
-                (capacity - 1) + "].");
+                capacity + "].");
     }
 
     private static IllegalStateException bufferIsClosed() {
