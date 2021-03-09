@@ -20,6 +20,8 @@ import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.CompositeByteBuf;
 import io.netty.buffer.api.BufferAllocator;
 
+import static java.nio.ByteOrder.BIG_ENDIAN;
+
 public class ByteBufAllocatorAdaptor implements ByteBufAllocator, AutoCloseable {
     private final BufferAllocator onheap;
     private final BufferAllocator offheap;
@@ -53,7 +55,7 @@ public class ByteBufAllocatorAdaptor implements ByteBufAllocator, AutoCloseable 
 
     @Override
     public ByteBuf buffer(int initialCapacity) {
-        return new ByteBufAdaptor(this, onheap.allocate(initialCapacity));
+        return new ByteBufAdaptor(this, onheap.allocate(initialCapacity).order(BIG_ENDIAN));
     }
 
     @Override
@@ -98,7 +100,7 @@ public class ByteBufAllocatorAdaptor implements ByteBufAllocator, AutoCloseable 
 
     @Override
     public ByteBuf directBuffer(int initialCapacity) {
-        return new ByteBufAdaptor(this, offheap.allocate(initialCapacity));
+        return new ByteBufAdaptor(this, offheap.allocate(initialCapacity).order(BIG_ENDIAN));
     }
 
     @Override
