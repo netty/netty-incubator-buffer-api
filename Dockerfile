@@ -2,7 +2,7 @@
 FROM fedora:33
 RUN dnf -y install file findutils unzip zip libXtst-devel libXt-devel libXrender-devel libXrandr-devel \
            libXi-devel cups-devel fontconfig-devel alsa-lib-devel make autoconf diffutils git clang \
-           java-latest-openjdk-devel
+           java-latest-openjdk-devel automake libtool
 
 # Build panama-foreign openjdk
 WORKDIR /home/build
