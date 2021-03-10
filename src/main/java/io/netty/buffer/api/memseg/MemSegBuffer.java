@@ -133,7 +133,7 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
 
     @Override
     public Buffer fill(byte value) {
-        checkWrite(0, capacity());
+        checkSet(0, capacity());
         seg.fill(value);
         return this;
     }
@@ -281,7 +281,7 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
     public void copyInto(int srcPos, Buffer dest, int destPos, int length) {
         if (dest instanceof MemSegBuffer) {
             var memSegBuf = (MemSegBuffer) dest;
-            memSegBuf.checkWrite(destPos, length);
+            memSegBuf.checkSet(destPos, length);
             copyInto(srcPos, memSegBuf.seg, destPos, length);
             return;
         }
@@ -589,7 +589,7 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
 
     @Override
     public byte getByte(int roff) {
-        checkRead(roff, Byte.BYTES);
+        checkGet(roff, Byte.BYTES);
         return getByteAtOffset(seg, roff);
     }
 
@@ -603,7 +603,7 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
 
     @Override
     public int getUnsignedByte(int roff) {
-        checkRead(roff, Byte.BYTES);
+        checkGet(roff, Byte.BYTES);
         return getByteAtOffset(seg, roff) & 0xFF;
     }
 
@@ -659,7 +659,7 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
 
     @Override
     public char getChar(int roff) {
-        checkRead(roff, 2);
+        checkGet(roff, 2);
         return getCharAtOffset(seg, roff, order);
     }
 
@@ -694,7 +694,7 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
 
     @Override
     public short getShort(int roff) {
-        checkRead(roff, Short.BYTES);
+        checkGet(roff, Short.BYTES);
         return getShortAtOffset(seg, roff, order);
     }
 
@@ -708,7 +708,7 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
 
     @Override
     public int getUnsignedShort(int roff) {
-        checkRead(roff, Short.BYTES);
+        checkGet(roff, Short.BYTES);
         return getShortAtOffset(seg, roff, order) & 0xFFFF;
     }
 
@@ -770,7 +770,7 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
 
     @Override
     public int getMedium(int roff) {
-        checkRead(roff, 3);
+        checkGet(roff, 3);
         return order == ByteOrder.BIG_ENDIAN?
                 getByteAtOffset(seg, roff) << 16 |
                 (getByteAtOffset(seg, roff + 1) & 0xFF) << 8 |
@@ -796,7 +796,7 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
 
     @Override
     public int getUnsignedMedium(int roff) {
-        checkRead(roff, 3);
+        checkGet(roff, 3);
         return order == ByteOrder.BIG_ENDIAN?
                 (getByteAtOffset(seg, roff) << 16 |
                 (getByteAtOffset(seg, roff + 1) & 0xFF) << 8 |
@@ -824,7 +824,7 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
 
     @Override
     public Buffer setMedium(int woff, int value) {
-        checkWrite(woff, 3);
+        checkSet(woff, 3);
         if (order == ByteOrder.BIG_ENDIAN) {
             setByteAtOffset(wseg, woff, (byte) (value >> 16));
             setByteAtOffset(wseg, woff + 1, (byte) (value >> 8 & 0xFF));
@@ -855,7 +855,7 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
 
     @Override
     public Buffer setUnsignedMedium(int woff, int value) {
-        checkWrite(woff, 3);
+        checkSet(woff, 3);
         if (order == ByteOrder.BIG_ENDIAN) {
             setByteAtOffset(wseg, woff, (byte) (value >> 16));
             setByteAtOffset(wseg, woff + 1, (byte) (value >> 8 & 0xFF));
@@ -878,7 +878,7 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
 
     @Override
     public int getInt(int roff) {
-        checkRead(roff, Integer.BYTES);
+        checkGet(roff, Integer.BYTES);
         return getIntAtOffset(seg, roff, order);
     }
 
@@ -892,7 +892,7 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
 
     @Override
     public long getUnsignedInt(int roff) {
-        checkRead(roff, Integer.BYTES);
+        checkGet(roff, Integer.BYTES);
         return getIntAtOffset(seg, roff, order) & 0xFFFFFFFFL;
     }
 
@@ -948,7 +948,7 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
 
     @Override
     public float getFloat(int roff) {
-        checkRead(roff, Float.BYTES);
+        checkGet(roff, Float.BYTES);
         return getFloatAtOffset(seg, roff, order);
     }
 
@@ -983,7 +983,7 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
 
     @Override
     public long getLong(int roff) {
-        checkRead(roff, Long.BYTES);
+        checkGet(roff, Long.BYTES);
         return getLongAtOffset(seg, roff, order);
     }
 
@@ -1018,7 +1018,7 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
 
     @Override
     public double getDouble(int roff) {
-        checkRead(roff, Double.BYTES);
+        checkGet(roff, Double.BYTES);
         return getDoubleAtOffset(seg, roff, order);
     }
 
@@ -1093,7 +1093,19 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
         }
     }
 
+    private void checkGet(int index, int size) {
+        if (index < 0 || seg.byteSize() < index + size) {
+            throw readAccessCheckException(index);
+        }
+    }
+
     private void checkWrite(int index, int size) {
+        if (index < roff || wseg.byteSize() < index + size) {
+            throw writeAccessCheckException(index);
+        }
+    }
+
+    private void checkSet(int index, int size) {
         if (index < 0 || wseg.byteSize() < index + size) {
             throw writeAccessCheckException(index);
         }
@@ -1137,7 +1149,7 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
     private IndexOutOfBoundsException outOfBounds(int index) {
         return new IndexOutOfBoundsException(
                 "Index " + index + " is out of bounds: [read 0 to " + woff + ", write 0 to " +
-                (seg.byteSize() - 1) + "].");
+                seg.byteSize() + "].");
     }
 
     Object recoverableMemory() {

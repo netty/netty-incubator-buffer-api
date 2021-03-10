@@ -2,7 +2,7 @@
 FROM fedora:33
 RUN dnf -y install file findutils unzip zip libXtst-devel libXt-devel libXrender-devel libXrandr-devel \
            libXi-devel cups-devel fontconfig-devel alsa-lib-devel make autoconf diffutils git clang \
-           java-latest-openjdk-devel
+           java-latest-openjdk-devel automake libtool
 
 # Build panama-foreign openjdk
 WORKDIR /home/build
@@ -24,7 +24,7 @@ ENV PATH=/home/build/apache-maven-3.6.3/bin:$PATH
 # Prepare a snapshot of Netty 5
 RUN git clone -b master https://github.com/netty/netty.git netty
 WORKDIR /home/build/netty
-RUN mvn install -DskipTests -T1C -B -am -pl buffer,handler
+RUN mvn install -DskipTests -T1C -B -am
 WORKDIR /home/build
 
 # Prepare our own build

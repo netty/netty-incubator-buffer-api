@@ -83,10 +83,12 @@ abstract class LifecycleTracer {
         }
 
         void addTrace(Trace trace) {
-            if (traces.size() == MAX_TRACE_POINTS) {
-                traces.pollFirst();
+            synchronized (traces) {
+                if (traces.size() == MAX_TRACE_POINTS) {
+                    traces.pollFirst();
+                }
+                traces.addLast(trace);
             }
-            traces.addLast(trace);
         }
 
         @Override
@@ -118,9 +120,11 @@ abstract class LifecycleTracer {
 
         @Override
         <E extends Throwable> E attachTrace(E throwable) {
-            long timestamp = System.nanoTime();
-            for (Trace trace : traces) {
-                trace.attach(throwable, timestamp);
+            synchronized (traces) {
+                long timestamp = System.nanoTime();
+                for (Trace trace : traces) {
+                    trace.attach(throwable, timestamp);
+                }
             }
             return throwable;
         }
