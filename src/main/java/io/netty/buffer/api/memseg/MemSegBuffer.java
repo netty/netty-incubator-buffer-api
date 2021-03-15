@@ -71,12 +71,12 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
     private int roff;
     private int woff;
 
-    MemSegBuffer(MemorySegment baseSegment, MemorySegment viewSegment, Drop<MemSegBuffer> drop, AllocatorControl alloc) {
+    MemSegBuffer(MemorySegment base, MemorySegment view, Drop<MemSegBuffer> drop, AllocatorControl alloc) {
         super(new MakeInaccisbleOnDrop(ArcDrop.wrap(drop)));
         this.alloc = alloc;
-        base = baseSegment;
-        seg = viewSegment;
-        wseg = viewSegment;
+        this.base = base;
+        seg = view;
+        wseg = view;
         order = ByteOrder.nativeOrder();
     }
 
