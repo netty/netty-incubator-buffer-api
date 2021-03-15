@@ -34,7 +34,7 @@ public abstract class AbstractMemorySegmentManager implements MemoryManager {
         if (cleaner != null) {
             segment = segment.registerCleaner(cleaner);
         }
-        return new MemSegBuffer(segment, convert(drop), alloc);
+        return new MemSegBuffer(segment, segment, convert(drop), alloc);
     }
 
     @Override
@@ -43,7 +43,7 @@ public abstract class AbstractMemorySegmentManager implements MemoryManager {
         if (cleaner != null) {
             segment = segment.registerCleaner(cleaner);
         }
-        return new MemSegBuffer(segment, convert(drop), alloc);
+        return new MemSegBuffer(segment, segment, convert(drop), alloc);
     }
 
     protected abstract MemorySegment createSegment(long size);
@@ -57,6 +57,11 @@ public abstract class AbstractMemorySegmentManager implements MemoryManager {
     public Object unwrapRecoverableMemory(Buffer buf) {
         var b = (MemSegBuffer) buf;
         return b.recoverableMemory();
+    }
+
+    @Override
+    public int capacityOfRecoverableMemory(Object memory) {
+        return ((RecoverableMemory) memory).capacity();
     }
 
     @Override

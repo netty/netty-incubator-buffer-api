@@ -37,7 +37,7 @@ public abstract class RcSupport<I extends Rc<I>, T extends RcSupport<I, T>> impl
     @Override
     public final I acquire() {
         if (acquires < 0) {
-            throw attachTrace(new IllegalStateException("Resource is closed."));
+            throw attachTrace(new IllegalStateException("This resource is closed: " + this + '.'));
         }
         if (acquires == Integer.MAX_VALUE) {
             throw new IllegalStateException("Cannot acquire more references; counter would overflow.");

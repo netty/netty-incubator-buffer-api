@@ -45,6 +45,7 @@ class CleanerPooledDrop implements Drop<Buffer> {
         GatedCleanable c = (GatedCleanable) CLEANABLE.getAndSet(this, null);
         if (c != null) {
             c.clean();
+            delegate.drop(buf);
         }
     }
 
@@ -57,24 +58,38 @@ class CleanerPooledDrop implements Drop<Buffer> {
             c.clean();
         }
 
-        var pool = this.pool;
         var mem = manager.unwrapRecoverableMemory(buf);
-        var delegate = this.delegate;
-        WeakReference<Buffer> ref = new WeakReference<>(buf);
+        WeakReference<CleanerPooledDrop> ref = new WeakReference<>(this);
         AtomicBoolean gate = new AtomicBoolean(true);
-        cleanable = new GatedCleanable(gate, CLEANER.register(this, () -> {
-            if (gate.getAndSet(false)) {
-                Buffer b = ref.get();
-                if (b == null) {
-                    pool.recoverMemory(mem);
-                } else {
-                    delegate.drop(b);
-                }
-            }
-        }));
+        cleanable = new GatedCleanable(gate, CLEANER.register(this, new CleanAction(pool, mem, ref, gate)));
     }
 
-    private static class GatedCleanable implements Cleanable {
+    private static final class CleanAction implements Runnable {
+        private final SizeClassedMemoryPool pool;
+        private final Object mem;
+        private final WeakReference<CleanerPooledDrop> ref;
+        private final AtomicBoolean gate;
+
+        private CleanAction(SizeClassedMemoryPool pool, Object mem, WeakReference<CleanerPooledDrop> ref,
+                            AtomicBoolean gate) {
+            this.pool = pool;
+            this.mem = mem;
+            this.ref = ref;
+            this.gate = gate;
+        }
+
+        @Override
+        public void run() {
+            if (gate.getAndSet(false)) {
+                var monitored = ref.get();
+                if (monitored == null) {
+                    pool.recoverMemory(mem);
+                }
+            }
+        }
+    }
+
+    private static final class GatedCleanable implements Cleanable {
         private final AtomicBoolean gate;
         private final Cleanable cleanable;
 

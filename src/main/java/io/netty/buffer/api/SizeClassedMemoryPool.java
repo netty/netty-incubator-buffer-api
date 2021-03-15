@@ -28,7 +28,7 @@ class SizeClassedMemoryPool implements BufferAllocator, AllocatorControl, Drop<B
     private static final VarHandle CLOSE = Statics.findVarHandle(
             lookup(), SizeClassedMemoryPool.class, "closed", boolean.class);
     private final MemoryManager manager;
-    private final ConcurrentHashMap<Integer, ConcurrentLinkedQueue<Send<Buffer>>> pool;
+    private final ConcurrentHashMap<Integer, ConcurrentLinkedQueue<Object>> pool;
     @SuppressWarnings("unused")
     private volatile boolean closed;
 
@@ -41,9 +41,9 @@ class SizeClassedMemoryPool implements BufferAllocator, AllocatorControl, Drop<B
     public Buffer allocate(int size) {
         BufferAllocator.checkSize(size);
         var sizeClassPool = getSizeClassPool(size);
-        Send<Buffer> send = sizeClassPool.poll();
-        if (send != null) {
-            return send.receive()
+        Object memory = sizeClassPool.poll();
+        if (memory != null) {
+            return recoverMemoryIntoBuffer(memory)
                        .reset()
                        .readOnly(false)
                        .fill((byte) 0)
@@ -71,10 +71,10 @@ class SizeClassedMemoryPool implements BufferAllocator, AllocatorControl, Drop<B
         if (CLOSE.compareAndSet(this, false, true)) {
             var capturedExceptions = new ArrayList<Exception>(4);
             pool.forEach((k, v) -> {
-                Send<Buffer> send;
-                while ((send = v.poll()) != null) {
+                Object memory;
+                while ((memory = v.poll()) != null) {
                     try {
-                        send.receive().close();
+                        dispose(recoverMemoryIntoBuffer(memory));
                     } catch (Exception e) {
                         capturedExceptions.add(e);
                     }
@@ -94,12 +94,13 @@ class SizeClassedMemoryPool implements BufferAllocator, AllocatorControl, Drop<B
             dispose(buf);
             return;
         }
-        var sizeClassPool = getSizeClassPool(buf.capacity());
-        sizeClassPool.offer(buf.send());
+        Object mem = manager.unwrapRecoverableMemory(buf);
+        var sizeClassPool = getSizeClassPool(manager.capacityOfRecoverableMemory(mem));
+        sizeClassPool.offer(mem);
         if (closed) {
-            Send<Buffer> send;
-            while ((send = sizeClassPool.poll()) != null) {
-                send.receive().close();
+            Object memory;
+            while ((memory = sizeClassPool.poll()) != null) {
+                dispose(recoverMemoryIntoBuffer(memory));
             }
         }
     }
@@ -107,27 +108,28 @@ class SizeClassedMemoryPool implements BufferAllocator, AllocatorControl, Drop<B
     @Override
     public Object allocateUntethered(Buffer originator, int size) {
         var sizeClassPool = getSizeClassPool(size);
-        Send<Buffer> send = sizeClassPool.poll();
-        Buffer untetheredBuf;
-        if (send != null) {
-            var transfer = (TransferSend<Buffer, Buffer>) send;
-            var owned = transfer.unsafeUnwrapOwned();
-            untetheredBuf = owned.transferOwnership(NO_OP_DROP);
-        } else {
-            untetheredBuf = createBuf(size, NO_OP_DROP);
+        Object memory = sizeClassPool.poll();
+        if (memory == null) {
+            Buffer untetheredBuf = createBuf(size, NO_OP_DROP);
+            memory = manager.unwrapRecoverableMemory(untetheredBuf);
         }
-        return manager.unwrapRecoverableMemory(untetheredBuf);
+        return memory;
     }
 
     @Override
     public void recoverMemory(Object memory) {
-        var drop = getDrop();
-        var buf = manager.recoverMemory(memory, drop);
-        drop.attach(buf);
+        Buffer buf = recoverMemoryIntoBuffer(memory);
         buf.close();
     }
 
-    private ConcurrentLinkedQueue<Send<Buffer>> getSizeClassPool(int size) {
+    private Buffer recoverMemoryIntoBuffer(Object memory) {
+        var drop = getDrop();
+        var buf = manager.recoverMemory(memory, drop);
+        drop.attach(buf);
+        return buf;
+    }
+
+    private ConcurrentLinkedQueue<Object> getSizeClassPool(int size) {
         return pool.computeIfAbsent(size, k -> new ConcurrentLinkedQueue<>());
     }
 

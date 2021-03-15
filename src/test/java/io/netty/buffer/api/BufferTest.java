@@ -927,6 +927,51 @@ public class BufferTest {
     }
 
     @ParameterizedTest
+    @MethodSource("nonCompositeAllocators")
+    public void acquireComposingAndSlicingMustIncrementBorrowsWithData(Fixture fixture) {
+        try (BufferAllocator allocator = fixture.createAllocator();
+             Buffer buf = allocator.allocate(8)) {
+            buf.writeByte((byte) 1);
+            int borrows = buf.countBorrows();
+            try (Buffer ignored = buf.acquire()) {
+                assertEquals(borrows + 1, buf.countBorrows());
+                try (Buffer slice = buf.slice()) {
+                    assertEquals(1, slice.capacity());
+                    int sliceBorrows = slice.countBorrows();
+                    assertEquals(borrows + 2, buf.countBorrows());
+                    try (Buffer ignored1 = Buffer.compose(allocator, buf, slice)) {
+                        assertEquals(borrows + 3, buf.countBorrows());
+                        assertEquals(sliceBorrows + 1, slice.countBorrows());
+                    }
+                    assertEquals(sliceBorrows, slice.countBorrows());
+                    assertEquals(borrows + 2, buf.countBorrows());
+                }
+                assertEquals(borrows + 1, buf.countBorrows());
+            }
+            assertEquals(borrows, buf.countBorrows());
+        }
+    }
+
+    @Disabled
+    @ParameterizedTest
+    @MethodSource("allocators")
+    public void sliceMustBecomeOwnedOnSourceBufferClose(Fixture fixture) {
+        try (BufferAllocator allocator = fixture.createAllocator()) {
+            Buffer buf = allocator.allocate(8);
+            buf.writeInt(42);
+            try (Buffer slice = buf.slice()) {
+                buf.close();
+                assertFalse(buf.isAccessible());
+                assertTrue(slice.isOwned());
+                try (Buffer receive = slice.send().receive()) {
+                    assertTrue(receive.isOwned());
+                    assertFalse(slice.isAccessible());
+                }
+            }
+        }
+    }
+
+    @ParameterizedTest
     @MethodSource("allocators")
     void copyIntoByteArray(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
