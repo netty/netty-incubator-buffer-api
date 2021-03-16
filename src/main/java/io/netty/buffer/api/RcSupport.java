@@ -98,7 +98,7 @@ public abstract class RcSupport<I extends Rc<I>, T extends RcSupport<I, T>> impl
      */
     protected IllegalStateException notSendableException() {
         return new IllegalStateException(
-                "Cannot send() a reference counted object with " + acquires + " outstanding acquires: " + this + '.');
+                "Cannot send() a reference counted object with " + countBorrows() + " borrows: " + this + '.');
     }
 
     @Override
