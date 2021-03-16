@@ -58,32 +58,72 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
     static {
         CLOSED_SEGMENT = MemorySegment.ofArray(new byte[0]);
         CLOSED_SEGMENT.close();
-        SEGMENT_CLOSE = buf -> {
-            try (var ignore = buf.seg) {
-                buf.makeInaccessible();
+        SEGMENT_CLOSE = new Drop<MemSegBuffer>() {
+            @Override
+            public void drop(MemSegBuffer buf) {
+                buf.base.close();
+            }
+
+            @Override
+            public String toString() {
+                return "SEGMENT_CLOSE";
             }
         };
     }
 
     private final AllocatorControl alloc;
-    private final boolean isSendable;
+    private MemorySegment base;
     private MemorySegment seg;
     private MemorySegment wseg;
     private ByteOrder order;
     private int roff;
     private int woff;
 
-    MemSegBuffer(MemorySegment segmet, Drop<MemSegBuffer> drop, AllocatorControl alloc) {
-        this(segmet, drop, alloc, true);
+    MemSegBuffer(MemorySegment base, MemorySegment view, Drop<MemSegBuffer> drop, AllocatorControl alloc) {
+        super(new MakeInaccisbleOnDrop(ArcDrop.wrap(drop)));
+        this.alloc = alloc;
+        this.base = base;
+        seg = view;
+        wseg = view;
+        order = ByteOrder.nativeOrder();
     }
 
-    private MemSegBuffer(MemorySegment segment, Drop<MemSegBuffer> drop, AllocatorControl alloc, boolean isSendable) {
-        super(drop);
-        this.alloc = alloc;
-        seg = segment;
-        wseg = segment;
-        this.isSendable = isSendable;
-        order = ByteOrder.nativeOrder();
+    private static final class MakeInaccisbleOnDrop implements Drop<MemSegBuffer> {
+        final Drop<MemSegBuffer> delegate;
+
+        private MakeInaccisbleOnDrop(Drop<MemSegBuffer> delegate) {
+            this.delegate = delegate;
+        }
+
+        @Override
+        public void drop(MemSegBuffer buf) {
+            try {
+                delegate.drop(buf);
+            } finally {
+                buf.makeInaccessible();
+            }
+        }
+
+        @Override
+        public void attach(MemSegBuffer buf) {
+            delegate.attach(buf);
+        }
+
+        @Override
+        public String toString() {
+            return "MemSegDrop(" + delegate + ')';
+        }
+    }
+
+    @Override
+    protected Drop<MemSegBuffer> unsafeGetDrop() {
+        MakeInaccisbleOnDrop drop = (MakeInaccisbleOnDrop) super.unsafeGetDrop();
+        return drop.delegate;
+    }
+
+    @Override
+    protected void unsafeSetDrop(Drop<MemSegBuffer> replacement) {
+        super.unsafeSetDrop(new MakeInaccisbleOnDrop(replacement));
     }
 
     @Override
@@ -233,14 +273,12 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
         if (length < 0) {
             throw new IllegalArgumentException("Length cannot be negative: " + length + '.');
         }
+        if (!isAccessible()) {
+            throw new IllegalStateException("This buffer is closed: " + this + '.');
+        }
         var slice = seg.asSlice(offset, length);
-        acquire();
-        Drop<MemSegBuffer> drop = b -> {
-            close();
-            b.makeInaccessible();
-        };
-        var sendable = false; // Sending implies ownership change, which we can't do for slices.
-        return new MemSegBuffer(slice, drop, alloc, sendable)
+        Drop<MemSegBuffer> drop = ArcDrop.acquire(unsafeGetDrop());
+        return new MemSegBuffer(base, slice, drop, alloc)
                 .writerOffset(length)
                 .order(order())
                 .readOnly(readOnly());
@@ -482,19 +520,22 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
 
         // Release old memory segment:
         var drop = unsafeGetDrop();
-        if (drop instanceof BifurcatedDrop) {
-            // Disconnect from the bifurcated drop, since we'll get our own fresh memory segment.
+        if (drop instanceof ArcDrop) {
+            // Disconnect from the current arc drop, since we'll get our own fresh memory segment.
             int roff = this.roff;
             int woff = this.woff;
             drop.drop(this);
-            drop = ((BifurcatedDrop) drop).unwrap();
-            unsafeSetDrop(drop);
+            while (drop instanceof ArcDrop) {
+                drop = ((ArcDrop) drop).unwrap();
+            }
+            unsafeSetDrop(new ArcDrop(drop));
             this.roff = roff;
             this.woff = woff;
         } else {
             alloc.recoverMemory(recoverableMemory());
         }
 
+        base = newSegment;
         seg = newSegment;
         wseg = newSegment;
         drop.attach(this);
@@ -505,19 +546,10 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
         if (!isOwned()) {
             throw attachTrace(new IllegalStateException("Cannot bifurcate a buffer that is not owned."));
         }
-        var drop = unsafeGetDrop();
-        if (seg.ownerThread() != null) {
-            seg = seg.share();
-            drop.attach(this);
-        }
-        if (drop instanceof BifurcatedDrop) {
-            ((BifurcatedDrop) drop).increment();
-        } else {
-            drop = new BifurcatedDrop(new MemSegBuffer(seg, drop, alloc), drop);
-            unsafeSetDrop(drop);
-        }
+        var drop = (ArcDrop) unsafeGetDrop();
+        unsafeSetDrop(new ArcDrop(drop));
         var bifurcatedSeg = seg.asSlice(0, woff);
-        var bifurcatedBuf = new MemSegBuffer(bifurcatedSeg, drop, alloc);
+        var bifurcatedBuf = new MemSegBuffer(base, bifurcatedSeg, new ArcDrop(drop.increment()), alloc);
         bifurcatedBuf.woff = woff;
         bifurcatedBuf.roff = roff;
         bifurcatedBuf.order(order);
@@ -1052,11 +1084,12 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
         var readOnly = readOnly();
         boolean isConfined = seg.ownerThread() == null;
         MemorySegment transferSegment = isConfined? seg : seg.share();
+        MemorySegment base = this.base;
         makeInaccessible();
         return new Owned<MemSegBuffer>() {
             @Override
             public MemSegBuffer transferOwnership(Drop<MemSegBuffer> drop) {
-                MemSegBuffer copy = new MemSegBuffer(transferSegment, drop, alloc);
+                MemSegBuffer copy = new MemSegBuffer(base, transferSegment, drop, alloc);
                 copy.order = order;
                 copy.roff = roff;
                 copy.woff = woff;
@@ -1067,6 +1100,7 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
     }
 
     void makeInaccessible() {
+        base = CLOSED_SEGMENT;
         seg = CLOSED_SEGMENT;
         wseg = CLOSED_SEGMENT;
         roff = 0;
@@ -1074,17 +1108,13 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
     }
 
     @Override
-    protected IllegalStateException notSendableException() {
-        if (!isSendable) {
-            return new IllegalStateException(
-                    "Cannot send() this buffer. This buffer might be a slice of another buffer.");
-        }
-        return super.notSendableException();
+    public boolean isOwned() {
+        return super.isOwned() && ((ArcDrop) unsafeGetDrop()).isOwned();
     }
 
     @Override
-    public boolean isOwned() {
-        return isSendable && super.isOwned();
+    public int countBorrows() {
+        return super.countBorrows() + ((ArcDrop) unsafeGetDrop()).countBorrows();
     }
 
     private void checkRead(int index, int size) {
@@ -1153,7 +1183,7 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
     }
 
     Object recoverableMemory() {
-        return new RecoverableMemory(seg, alloc);
+        return new RecoverableMemory(base, alloc);
     }
 
     // <editor-fold name="BufferIntegratable methods">
@@ -1226,7 +1256,11 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
         }
 
         Buffer recover(Drop<MemSegBuffer> drop) {
-            return new MemSegBuffer(segment, drop, alloc);
+            return new MemSegBuffer(segment, segment, ArcDrop.acquire(drop), alloc);
+        }
+
+        int capacity() {
+            return (int) segment.byteSize();
         }
     }
 }

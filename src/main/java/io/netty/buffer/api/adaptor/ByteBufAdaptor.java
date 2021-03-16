@@ -19,6 +19,8 @@ import io.netty.buffer.ByteBufConvertible;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.ByteBufUtil;
+import io.netty.buffer.DuplicatedByteBuf;
+import io.netty.buffer.SlicedByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.buffer.api.Buffer;
 import io.netty.buffer.api.BufferAllocator;
@@ -957,8 +959,8 @@ public final class ByteBufAdaptor extends ByteBuf {
 
     @Override
     public ByteBuf readSlice(int length) {
-        ByteBuf slice = readRetainedSlice(length);
-        release();
+        ByteBuf slice = slice(readerIndex(), length);
+        buffer.readerOffset(buffer.readerOffset() + length);
         return slice;
     }
 
@@ -1411,22 +1413,18 @@ public final class ByteBufAdaptor extends ByteBuf {
 
     @Override
     public ByteBuf slice() {
-        ByteBuf slice = retainedSlice();
-        release();
-        return slice;
+        return slice(readerIndex(), readableBytes());
     }
 
     @Override
     public ByteBuf retainedSlice() {
-        checkAccess();
-        return wrap(buffer.slice());
+        return retainedSlice(readerIndex(), readableBytes());
     }
 
     @Override
     public ByteBuf slice(int index, int length) {
-        ByteBuf slice = retainedSlice(index, length);
-        release();
-        return slice;
+        checkAccess();
+        return new Slice(this, index, length);
     }
 
     @Override
@@ -1439,11 +1437,55 @@ public final class ByteBufAdaptor extends ByteBuf {
         }
     }
 
+    private static final class Slice extends SlicedByteBuf {
+        private final int indexAdjustment;
+        private final int lengthAdjustment;
+
+        Slice(ByteBuf buffer, int index, int length) {
+            super(buffer, index, length);
+            indexAdjustment = index;
+            lengthAdjustment = length;
+        }
+
+        @Override
+        public ByteBuf retainedDuplicate() {
+            return new Slice(unwrap().retainedDuplicate(), indexAdjustment, lengthAdjustment);
+        }
+
+        @Override
+        public ByteBuf retainedSlice(int index, int length) {
+            checkIndex(index, length);
+            return unwrap().retainedSlice(indexAdjustment + index, length);
+        }
+    }
+
+    private static final class Duplicate extends DuplicatedByteBuf {
+        Duplicate(ByteBufAdaptor byteBuf) {
+            super(byteBuf);
+        }
+
+        @Override
+        public ByteBuf duplicate() {
+            ((ByteBufAdaptor) unwrap()).checkAccess();
+            return new Duplicate((ByteBufAdaptor) unwrap());
+        }
+
+        @Override
+        public ByteBuf retainedDuplicate() {
+            return unwrap().retainedDuplicate();
+        }
+
+        @Override
+        public ByteBuf retainedSlice(int index, int length) {
+            return unwrap().retainedSlice(index, length);
+        }
+    }
+
     @Override
     public ByteBuf duplicate() {
-        ByteBuf duplicate = retainedDuplicate();
-        release();
-        return duplicate;
+        checkAccess();
+        Duplicate duplicatedByteBuf = new Duplicate(this);
+        return duplicatedByteBuf.setIndex(readerIndex(), writerIndex());
     }
 
     @Override

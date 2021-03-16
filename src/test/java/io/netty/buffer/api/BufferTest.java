@@ -63,8 +63,6 @@ public class BufferTest {
 
     private static final Memoize<Fixture[]> ALL_COMBINATIONS = new Memoize<>(
             () -> fixtureCombinations().toArray(Fixture[]::new));
-    private static final Memoize<Fixture[]> NON_SLICED = new Memoize<>(
-            () -> Arrays.stream(ALL_COMBINATIONS.get()).filter(f -> !f.isSlice()).toArray(Fixture[]::new));
     private static final Memoize<Fixture[]> NON_COMPOSITE = new Memoize<>(
             () -> Arrays.stream(ALL_COMBINATIONS.get()).filter(f -> !f.isComposite()).toArray(Fixture[]::new));
     private static final Memoize<Fixture[]> HEAP_ALLOCS = new Memoize<>(
@@ -76,10 +74,6 @@ public class BufferTest {
 
     static Fixture[] allocators() {
         return ALL_COMBINATIONS.get();
-    }
-
-    static Fixture[] nonSliceAllocators() {
-        return NON_SLICED.get();
     }
 
     static Fixture[] nonCompositeAllocators() {
@@ -349,7 +343,7 @@ public class BufferTest {
     }
 
     @ParameterizedTest
-    @MethodSource("nonSliceAllocators")
+    @MethodSource("allocators")
     void allocateAndSendToThread(Fixture fixture) throws Exception {
         try (BufferAllocator allocator = fixture.createAllocator()) {
             ArrayBlockingQueue<Send<Buffer>> queue = new ArrayBlockingQueue<>(10);
@@ -369,7 +363,7 @@ public class BufferTest {
     }
 
     @ParameterizedTest
-    @MethodSource("nonSliceAllocators")
+    @MethodSource("allocators")
     void allocateAndSendToThreadViaSyncQueue(Fixture fixture) throws Exception {
         SynchronousQueue<Send<Buffer>> queue = new SynchronousQueue<>();
         Future<Byte> future = executor.submit(() -> {
@@ -388,7 +382,7 @@ public class BufferTest {
     }
 
     @ParameterizedTest
-    @MethodSource("nonSliceAllocators")
+    @MethodSource("allocators")
     void sendMustThrowWhenBufIsAcquired(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
@@ -403,7 +397,7 @@ public class BufferTest {
     }
 
     @ParameterizedTest
-    @MethodSource("nonSliceAllocators")
+    @MethodSource("allocators")
     public void originalBufferMustNotBeAccessibleAfterSend(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer orig = allocator.allocate(24)) {
@@ -505,7 +499,7 @@ public class BufferTest {
     }
 
     @ParameterizedTest
-    @MethodSource("nonSliceAllocators")
+    @MethodSource("allocators")
     public void cannotSendMoreThanOnce(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
@@ -822,7 +816,7 @@ public class BufferTest {
     }
 
     @ParameterizedTest
-    @MethodSource("nonSliceAllocators")
+    @MethodSource("allocators")
     void sendOnSliceWithoutOffsetAndSizeMustThrow(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
@@ -837,7 +831,7 @@ public class BufferTest {
     }
 
     @ParameterizedTest
-    @MethodSource("nonSliceAllocators")
+    @MethodSource("allocators")
     void sendOnSliceWithOffsetAndSizeMustThrow(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
@@ -923,6 +917,51 @@ public class BufferTest {
                 assertEquals(borrows + 1, buf.countBorrows());
             }
             assertEquals(borrows, buf.countBorrows());
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("nonCompositeAllocators")
+    public void acquireComposingAndSlicingMustIncrementBorrowsWithData(Fixture fixture) {
+        try (BufferAllocator allocator = fixture.createAllocator();
+             Buffer buf = allocator.allocate(8)) {
+            buf.writeByte((byte) 1);
+            int borrows = buf.countBorrows();
+            try (Buffer ignored = buf.acquire()) {
+                assertEquals(borrows + 1, buf.countBorrows());
+                try (Buffer slice = buf.slice()) {
+                    assertEquals(1, slice.capacity());
+                    int sliceBorrows = slice.countBorrows();
+                    assertEquals(borrows + 2, buf.countBorrows());
+                    try (Buffer ignored1 = Buffer.compose(allocator, buf, slice)) {
+                        assertEquals(borrows + 3, buf.countBorrows());
+                        assertEquals(sliceBorrows + 1, slice.countBorrows());
+                    }
+                    assertEquals(sliceBorrows, slice.countBorrows());
+                    assertEquals(borrows + 2, buf.countBorrows());
+                }
+                assertEquals(borrows + 1, buf.countBorrows());
+            }
+            assertEquals(borrows, buf.countBorrows());
+        }
+    }
+
+    @Disabled
+    @ParameterizedTest
+    @MethodSource("allocators")
+    public void sliceMustBecomeOwnedOnSourceBufferClose(Fixture fixture) {
+        try (BufferAllocator allocator = fixture.createAllocator()) {
+            Buffer buf = allocator.allocate(8);
+            buf.writeInt(42);
+            try (Buffer slice = buf.slice()) {
+                buf.close();
+                assertFalse(buf.isAccessible());
+                assertTrue(slice.isOwned());
+                try (Buffer receive = slice.send().receive()) {
+                    assertTrue(receive.isOwned());
+                    assertFalse(slice.isAccessible());
+                }
+            }
         }
     }
 
@@ -1737,7 +1776,7 @@ public class BufferTest {
     }
 
     @ParameterizedTest
-    @MethodSource("nonSliceAllocators")
+    @MethodSource("allocators")
     public void ensureWritableMustThrowForNegativeSize(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
@@ -1746,7 +1785,7 @@ public class BufferTest {
     }
 
     @ParameterizedTest
-    @MethodSource("nonSliceAllocators")
+    @MethodSource("allocators")
     public void ensureWritableMustThrowIfRequestedSizeWouldGrowBeyondMaxAllowed(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(512)) {
@@ -1755,7 +1794,7 @@ public class BufferTest {
     }
 
     @ParameterizedTest
-    @MethodSource("nonSliceAllocators")
+    @MethodSource("allocators")
     public void ensureWritableMustNotThrowWhenSpaceIsAlreadyAvailable(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
@@ -1766,7 +1805,7 @@ public class BufferTest {
     }
 
     @ParameterizedTest
-    @MethodSource("nonSliceAllocators")
+    @MethodSource("allocators")
     public void ensureWritableMustExpandBufferCapacity(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
@@ -1801,7 +1840,7 @@ public class BufferTest {
     }
 
     @ParameterizedTest
-    @MethodSource("nonSliceAllocators")
+    @MethodSource("allocators")
     public void mustBeAbleToSliceAfterEnsureWritable(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(4)) {
@@ -1816,7 +1855,7 @@ public class BufferTest {
     }
 
     @ParameterizedTest
-    @MethodSource("nonSliceAllocators")
+    @MethodSource("allocators")
     public void ensureWritableOnCompositeBuffersMustRespectExistingBigEndianByteOrder(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator()) {
             Buffer composite;
@@ -1833,7 +1872,7 @@ public class BufferTest {
     }
 
     @ParameterizedTest
-    @MethodSource("nonSliceAllocators")
+    @MethodSource("allocators")
     public void ensureWritableOnCompositeBuffersMustRespectExistingLittleEndianByteOrder(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator()) {
             Buffer composite;
@@ -1850,7 +1889,7 @@ public class BufferTest {
     }
 
     @ParameterizedTest
-    @MethodSource("nonSliceAllocators")
+    @MethodSource("allocators")
     public void ensureWritableWithCompactionMustNotAllocateIfCompactionIsEnough(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(64)) {
@@ -2175,7 +2214,7 @@ public class BufferTest {
     }
 
     @ParameterizedTest
-    @MethodSource("nonSliceAllocators")
+    @MethodSource("allocators")
     public void bifurcateOfNonOwnedBufferMustThrow(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
@@ -2188,7 +2227,7 @@ public class BufferTest {
     }
 
     @ParameterizedTest
-    @MethodSource("nonSliceAllocators")
+    @MethodSource("allocators")
     public void bifurcatedPartMustContainFirstHalfOfBuffer(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(16).order(BIG_ENDIAN)) {
@@ -2224,7 +2263,7 @@ public class BufferTest {
     }
 
     @ParameterizedTest
-    @MethodSource("nonSliceAllocators")
+    @MethodSource("allocators")
     public void bifurcatedPartsMustBeIndividuallySendable(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(16).order(BIG_ENDIAN)) {
@@ -2253,7 +2292,7 @@ public class BufferTest {
     }
 
     @ParameterizedTest
-    @MethodSource("nonSliceAllocators")
+    @MethodSource("allocators")
     public void mustBePossibleToBifurcateMoreThanOnce(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(16).order(BIG_ENDIAN)) {
@@ -2281,7 +2320,7 @@ public class BufferTest {
     }
 
     @ParameterizedTest
-    @MethodSource("nonSliceAllocators")
+    @MethodSource("allocators")
     public void bifurcatedBufferMustHaveSameByteOrderAsParent(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8).order(BIG_ENDIAN)) {
@@ -2299,7 +2338,7 @@ public class BufferTest {
     }
 
     @ParameterizedTest
-    @MethodSource("nonSliceAllocators")
+    @MethodSource("allocators")
     public void ensureWritableOnBifurcatedBuffers(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
@@ -2318,7 +2357,7 @@ public class BufferTest {
     }
 
     @ParameterizedTest
-    @MethodSource("nonSliceAllocators")
+    @MethodSource("allocators")
     public void ensureWritableOnBifurcatedBuffersWithOddOffsets(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(10).order(BIG_ENDIAN)) {
@@ -2367,7 +2406,7 @@ public class BufferTest {
     }
 
     @ParameterizedTest
-    @MethodSource("nonSliceAllocators")
+    @MethodSource("allocators")
     public void bifurcatedBuffersMustBeAccessibleInOtherThreads(Fixture fixture) throws Exception {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
@@ -2387,7 +2426,7 @@ public class BufferTest {
     }
 
     @ParameterizedTest
-    @MethodSource("nonSliceAllocators")
+    @MethodSource("allocators")
     public void sendMustNotMakeBifurcatedBuffersInaccessible(Fixture fixture) throws Exception {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(16)) {
@@ -2411,7 +2450,7 @@ public class BufferTest {
     }
 
     @ParameterizedTest
-    @MethodSource("nonSliceAllocators")
+    @MethodSource("allocators")
     public void compactMustDiscardReadBytes(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(16, BIG_ENDIAN)) {
@@ -2433,7 +2472,7 @@ public class BufferTest {
     }
 
     @ParameterizedTest
-    @MethodSource("nonSliceAllocators")
+    @MethodSource("allocators")
     public void compactMustThrowForUnownedBuffer(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8, BIG_ENDIAN)) {
@@ -2548,7 +2587,7 @@ public class BufferTest {
     }
 
     @ParameterizedTest
-    @MethodSource("nonSliceAllocators")
+    @MethodSource("allocators")
     public void readOnlyBufferMustRemainReadOnlyAfterSend(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
@@ -2613,7 +2652,7 @@ public class BufferTest {
     }
 
     @ParameterizedTest
-    @MethodSource("nonSliceAllocators")
+    @MethodSource("allocators")
     public void bifurcateOfReadOnlyBufferMustBeReadOnly(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(16)) {
@@ -2665,7 +2704,7 @@ public class BufferTest {
     }
 
     @ParameterizedTest
-    @MethodSource("nonSliceAllocators")
+    @MethodSource("allocators")
     public void compactOnReadOnlyBufferMustThrow(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
@@ -2675,7 +2714,7 @@ public class BufferTest {
     }
 
     @ParameterizedTest
-    @MethodSource("nonSliceAllocators")
+    @MethodSource("allocators")
     public void ensureWritableOnReadOnlyBufferMustThrow(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
@@ -2685,7 +2724,7 @@ public class BufferTest {
     }
 
     @ParameterizedTest
-    @MethodSource("nonSliceAllocators")
+    @MethodSource("allocators")
     public void copyIntoOnReadOnlyBufferMustThrow(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer dest = allocator.allocate(8)) {

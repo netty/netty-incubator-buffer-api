@@ -21,7 +21,15 @@ import java.lang.ref.Cleaner;
 
 interface Statics {
     Cleaner CLEANER = Cleaner.create();
-    Drop<Buffer> NO_OP_DROP = buf -> {
+    Drop<Buffer> NO_OP_DROP = new Drop<Buffer>() {
+        @Override
+        public void drop(Buffer obj) {
+        }
+
+        @Override
+        public String toString() {
+            return "NO_OP_DROP";
+        }
     };
 
     static VarHandle findVarHandle(Lookup lookup, Class<?> recv, String name, Class<?> type) {

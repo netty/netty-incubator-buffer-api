@@ -20,33 +20,47 @@ import io.netty.buffer.api.Drop;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 
-class BifurcatedDrop implements Drop<MemSegBuffer> {
+final class ArcDrop implements Drop<MemSegBuffer> {
     private static final VarHandle COUNT;
     static {
         try {
-            COUNT = MethodHandles.lookup().findVarHandle(BifurcatedDrop.class, "count", int.class);
+            COUNT = MethodHandles.lookup().findVarHandle(ArcDrop.class, "count", int.class);
         } catch (Exception e) {
             throw new ExceptionInInitializerError(e);
         }
     }
 
-    private final MemSegBuffer originalBuf;
     private final Drop<MemSegBuffer> delegate;
     @SuppressWarnings("FieldMayBeFinal")
     private volatile int count;
 
-    BifurcatedDrop(MemSegBuffer originalBuf, Drop<MemSegBuffer> delegate) {
-        this.originalBuf = originalBuf;
+    ArcDrop(Drop<MemSegBuffer> delegate) {
         this.delegate = delegate;
-        count = 2; // These are created by buffer bifurcation, so we initially have 2 references to this drop.
+        count = 1;
     }
 
-    void increment() {
+    static Drop<MemSegBuffer> wrap(Drop<MemSegBuffer> drop) {
+        if (drop.getClass() == ArcDrop.class) {
+            return drop;
+        }
+        return new ArcDrop(drop);
+    }
+
+    static Drop<MemSegBuffer> acquire(Drop<MemSegBuffer> drop) {
+        if (drop.getClass() == ArcDrop.class) {
+            ((ArcDrop) drop).increment();
+            return drop;
+        }
+        return new ArcDrop(drop);
+    }
+
+    ArcDrop increment() {
         int c;
         do {
             c = count;
             checkValidState(c);
         } while (!COUNT.compareAndSet(this, c, c + 1));
+        return this;
     }
 
     @Override
@@ -59,10 +73,8 @@ class BifurcatedDrop implements Drop<MemSegBuffer> {
             checkValidState(c);
         } while (!COUNT.compareAndSet(this, c, n));
         if (n == 0) {
-            delegate.attach(originalBuf);
-            delegate.drop(originalBuf);
+            delegate.drop(buf);
         }
-        buf.makeInaccessible();
     }
 
     @Override
@@ -70,8 +82,26 @@ class BifurcatedDrop implements Drop<MemSegBuffer> {
         delegate.attach(obj);
     }
 
+    boolean isOwned() {
+        return count <= 1;
+    }
+
+    int countBorrows() {
+        return count - 1;
+    }
+
     Drop<MemSegBuffer> unwrap() {
         return delegate;
+    }
+
+    @Override
+    public String toString() {
+        StringBuilder builder = new StringBuilder().append("ArcDrop(").append(count).append(", ");
+        Drop<MemSegBuffer> drop = this;
+        while ((drop = ((ArcDrop) drop).unwrap()) instanceof ArcDrop) {
+            builder.append(((ArcDrop) drop).count).append(", ");
+        }
+        return builder.append(drop).append(')').toString();
     }
 
     private static void checkValidState(int count) {

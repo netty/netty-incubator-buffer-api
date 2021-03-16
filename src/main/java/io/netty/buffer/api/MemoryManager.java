@@ -34,5 +34,6 @@ public interface MemoryManager {
     Buffer allocateShared(AllocatorControl allo, long size, Drop<Buffer> drop, Cleaner cleaner);
     Drop<Buffer> drop();
     Object unwrapRecoverableMemory(Buffer buf);
+    int capacityOfRecoverableMemory(Object memory);
     Buffer recoverMemory(Object recoverableMemory, Drop<Buffer> drop);
 }
