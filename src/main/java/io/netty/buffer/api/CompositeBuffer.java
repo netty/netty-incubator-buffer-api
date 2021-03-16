@@ -48,7 +48,6 @@ final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> implement
 
     private final BufferAllocator allocator;
     private final TornBufferAccessors tornBufAccessors;
-    private final boolean isSendable;
     private Buffer[] bufs;
     private int[] offsets; // The offset, for the composite buffer, where each constituent buffer starts.
     private int capacity;
@@ -60,7 +59,7 @@ final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> implement
     private boolean readOnly;
 
     CompositeBuffer(BufferAllocator allocator, Deref<Buffer>[] refs) {
-        this(allocator, true, filterExternalBufs(refs), COMPOSITE_DROP, false);
+        this(allocator, filterExternalBufs(refs), COMPOSITE_DROP, false);
     }
 
     private static Buffer[] filterExternalBufs(Deref<Buffer>[] refs) {
@@ -114,11 +113,10 @@ final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> implement
         return Stream.of(buf);
     }
 
-    private CompositeBuffer(BufferAllocator allocator, boolean isSendable, Buffer[] bufs, Drop<CompositeBuffer> drop,
+    private CompositeBuffer(BufferAllocator allocator, Buffer[] bufs, Drop<CompositeBuffer> drop,
                             boolean acquireBufs) {
         super(drop);
         this.allocator = allocator;
-        this.isSendable = isSendable;
         if (acquireBufs) {
             for (Buffer buf : bufs) {
                 buf.acquire();
@@ -305,46 +303,31 @@ final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> implement
                     offset + ", and length was " + length + '.');
         }
         Buffer choice = (Buffer) chooseBuffer(offset, 0);
-        Buffer[] slices = null;
-        acquire(); // Increase reference count of the original composite buffer.
-        Drop<CompositeBuffer> drop = obj -> {
-            close(); // Decrement the reference count of the original composite buffer.
-            COMPOSITE_DROP.drop(obj);
-        };
+        Buffer[] slices;
 
-        try {
-            if (length > 0) {
-                slices = new Buffer[bufs.length];
-                int off = subOffset;
-                int cap = length;
-                int i;
-                for (i = searchOffsets(offset); cap > 0; i++) {
-                    var buf = bufs[i];
-                    int avail = buf.capacity() - off;
-                    slices[i] = buf.slice(off, Math.min(cap, avail));
-                    cap -= avail;
-                    off = 0;
-                }
-                slices = Arrays.copyOf(slices, i);
-            } else {
-                // Specialize for length == 0, since we must slice from at least one constituent buffer.
-                slices = new Buffer[] { choice.slice(subOffset, 0) };
+        if (length > 0) {
+            slices = new Buffer[bufs.length];
+            int off = subOffset;
+            int cap = length;
+            int i;
+            for (i = searchOffsets(offset); cap > 0; i++) {
+                var buf = bufs[i];
+                int avail = buf.capacity() - off;
+                slices[i] = buf.slice(off, Math.min(cap, avail));
+                cap -= avail;
+                off = 0;
             }
-
-            return new CompositeBuffer(allocator, false, slices, drop, true);
-        } catch (Throwable throwable) {
-            // We called acquire prior to the try-clause. We need to undo that if we're not creating a composite buffer:
-            close();
-            throw throwable;
-        } finally {
-            if (slices != null) {
-                for (Buffer slice : slices) {
-                    if (slice != null) {
-                        slice.close(); // Ownership now transfers to the composite buffer.
-                    }
-                }
-            }
+            slices = Arrays.copyOf(slices, i);
+        } else {
+            // Specialize for length == 0, since we must slice from at least one constituent buffer.
+            slices = new Buffer[] { choice.slice(subOffset, 0) };
         }
+
+        // Use the constructor that skips filtering out empty buffers, and skips acquiring on the buffers.
+        // This is important because 1) slice() already acquired the buffers, and 2) if this slice is empty
+        // then we need to keep holding on to it to prevent this originating composite buffer from getting
+        // ownership. If it did, its behaviour would be inconsistent with that of a non-composite buffer.
+        return new CompositeBuffer(allocator, slices, COMPOSITE_DROP, false);
     }
 
     @Override
@@ -757,7 +740,7 @@ final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> implement
         }
         if (bufs.length == 0) {
             // Bifurcating a zero-length buffer is trivial.
-            return new CompositeBuffer(allocator, true, bufs, unsafeGetDrop(), true).order(order);
+            return new CompositeBuffer(allocator, bufs, unsafeGetDrop(), true).order(order);
         }
 
         int i = searchOffsets(woff);
@@ -769,7 +752,7 @@ final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> implement
         }
         computeBufferOffsets();
         try {
-            var compositeBuf = new CompositeBuffer(allocator, true, bifs, unsafeGetDrop(), true);
+            var compositeBuf = new CompositeBuffer(allocator, bifs, unsafeGetDrop(), true);
             compositeBuf.order = order; // Preserve byte order even if bifs array is empty.
             return compositeBuf;
         } finally {
@@ -1172,7 +1155,7 @@ final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> implement
                 for (int i = 0; i < sends.length; i++) {
                     received[i] = sends[i].receive();
                 }
-                var composite = new CompositeBuffer(allocator, true, received, drop, true);
+                var composite = new CompositeBuffer(allocator, received, drop, true);
                 composite.readOnly = readOnly;
                 drop.attach(composite);
                 return composite;
@@ -1188,17 +1171,8 @@ final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> implement
     }
 
     @Override
-    protected IllegalStateException notSendableException() {
-        if (!isSendable) {
-            return new IllegalStateException(
-                    "Cannot send() this buffer. This buffer might be a slice of another buffer.");
-        }
-        return super.notSendableException();
-    }
-
-    @Override
     public boolean isOwned() {
-        return isSendable && super.isOwned() && allConstituentsAreOwned();
+        return super.isOwned() && allConstituentsAreOwned();
     }
 
     private boolean allConstituentsAreOwned() {
