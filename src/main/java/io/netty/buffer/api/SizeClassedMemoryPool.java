@@ -106,6 +106,11 @@ class SizeClassedMemoryPool implements BufferAllocator, AllocatorControl, Drop<B
     }
 
     @Override
+    public String toString() {
+        return "SizeClassedMemoryPool";
+    }
+
+    @Override
     public Object allocateUntethered(Buffer originator, int size) {
         var sizeClassPool = getSizeClassPool(size);
         Object memory = sizeClassPool.poll();

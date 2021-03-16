@@ -64,6 +64,11 @@ class CleanerPooledDrop implements Drop<Buffer> {
         cleanable = new GatedCleanable(gate, CLEANER.register(this, new CleanAction(pool, mem, ref, gate)));
     }
 
+    @Override
+    public String toString() {
+        return "CleanerPooledDrop(" + delegate + ')';
+    }
+
     private static final class CleanAction implements Runnable {
         private final SizeClassedMemoryPool pool;
         private final Object mem;

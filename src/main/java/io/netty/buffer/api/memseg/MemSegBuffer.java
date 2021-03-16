@@ -58,8 +58,16 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
     static {
         CLOSED_SEGMENT = MemorySegment.ofArray(new byte[0]);
         CLOSED_SEGMENT.close();
-        SEGMENT_CLOSE = buf -> {
-            buf.base.close();
+        SEGMENT_CLOSE = new Drop<MemSegBuffer>() {
+            @Override
+            public void drop(MemSegBuffer buf) {
+                buf.base.close();
+            }
+
+            @Override
+            public String toString() {
+                return "SEGMENT_CLOSE";
+            }
         };
     }
 
@@ -99,6 +107,11 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
         @Override
         public void attach(MemSegBuffer buf) {
             delegate.attach(buf);
+        }
+
+        @Override
+        public String toString() {
+            return "MemSegDrop(" + delegate + ')';
         }
     }
 

@@ -94,6 +94,16 @@ final class ArcDrop implements Drop<MemSegBuffer> {
         return delegate;
     }
 
+    @Override
+    public String toString() {
+        StringBuilder builder = new StringBuilder().append("ArcDrop(").append(count).append(", ");
+        Drop<MemSegBuffer> drop = this;
+        while ((drop = ((ArcDrop) drop).unwrap()) instanceof ArcDrop) {
+            builder.append(((ArcDrop) drop).count).append(", ");
+        }
+        return builder.append(drop).append(')').toString();
+    }
+
     private static void checkValidState(int count) {
         if (count == 0) {
             throw new IllegalStateException("Underlying resources have already been freed.");

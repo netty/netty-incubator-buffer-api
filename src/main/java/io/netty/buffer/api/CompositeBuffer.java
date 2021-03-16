@@ -31,11 +31,19 @@ final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> implement
      * non-composite copy of the buffer.
      */
     private static final int MAX_CAPACITY = Integer.MAX_VALUE - 8;
-    private static final Drop<CompositeBuffer> COMPOSITE_DROP = buf -> {
-        for (Buffer b : buf.bufs) {
-            b.close();
+    private static final Drop<CompositeBuffer> COMPOSITE_DROP = new Drop<CompositeBuffer>() {
+        @Override
+        public void drop(CompositeBuffer buf) {
+            for (Buffer b : buf.bufs) {
+                b.close();
+            }
+            buf.makeInaccessible();
         }
-        buf.makeInaccessible();
+
+        @Override
+        public String toString() {
+            return "COMPOSITE_DROP";
+        }
     };
 
     private final BufferAllocator allocator;
