@@ -13,14 +13,14 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package io.netty.buffer.api.memseg;
+package io.netty.buffer.api.internal;
 
 import io.netty.buffer.api.Drop;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 
-final class ArcDrop implements Drop<MemSegBuffer> {
+public final class ArcDrop<T> implements Drop<T> {
     private static final VarHandle COUNT;
     static {
         try {
@@ -30,31 +30,31 @@ final class ArcDrop implements Drop<MemSegBuffer> {
         }
     }
 
-    private final Drop<MemSegBuffer> delegate;
+    private final Drop<T> delegate;
     @SuppressWarnings("FieldMayBeFinal")
     private volatile int count;
 
-    ArcDrop(Drop<MemSegBuffer> delegate) {
+    public ArcDrop(Drop<T> delegate) {
         this.delegate = delegate;
         count = 1;
     }
 
-    static Drop<MemSegBuffer> wrap(Drop<MemSegBuffer> drop) {
+    public static <X> Drop<X> wrap(Drop<X> drop) {
         if (drop.getClass() == ArcDrop.class) {
             return drop;
         }
-        return new ArcDrop(drop);
+        return new ArcDrop<X>(drop);
     }
 
-    static Drop<MemSegBuffer> acquire(Drop<MemSegBuffer> drop) {
+    public static <X> Drop<X> acquire(Drop<X> drop) {
         if (drop.getClass() == ArcDrop.class) {
-            ((ArcDrop) drop).increment();
+            ((ArcDrop<X>) drop).increment();
             return drop;
         }
-        return new ArcDrop(drop);
+        return new ArcDrop<X>(drop);
     }
 
-    ArcDrop increment() {
+    public ArcDrop<T> increment() {
         int c;
         do {
             c = count;
@@ -64,7 +64,7 @@ final class ArcDrop implements Drop<MemSegBuffer> {
     }
 
     @Override
-    public void drop(MemSegBuffer buf) {
+    public void drop(T obj) {
         int c;
         int n;
         do {
@@ -73,33 +73,33 @@ final class ArcDrop implements Drop<MemSegBuffer> {
             checkValidState(c);
         } while (!COUNT.compareAndSet(this, c, n));
         if (n == 0) {
-            delegate.drop(buf);
+            delegate.drop(obj);
         }
     }
 
     @Override
-    public void attach(MemSegBuffer obj) {
+    public void attach(T obj) {
         delegate.attach(obj);
     }
 
-    boolean isOwned() {
+    public boolean isOwned() {
         return count <= 1;
     }
 
-    int countBorrows() {
+    public int countBorrows() {
         return count - 1;
     }
 
-    Drop<MemSegBuffer> unwrap() {
+    public Drop<T> unwrap() {
         return delegate;
     }
 
     @Override
     public String toString() {
         StringBuilder builder = new StringBuilder().append("ArcDrop(").append(count).append(", ");
-        Drop<MemSegBuffer> drop = this;
-        while ((drop = ((ArcDrop) drop).unwrap()) instanceof ArcDrop) {
-            builder.append(((ArcDrop) drop).count).append(", ");
+        Drop<T> drop = this;
+        while ((drop = ((ArcDrop<T>) drop).unwrap()) instanceof ArcDrop) {
+            builder.append(((ArcDrop<T>) drop).count).append(", ");
         }
         return builder.append(drop).append(')').toString();
     }

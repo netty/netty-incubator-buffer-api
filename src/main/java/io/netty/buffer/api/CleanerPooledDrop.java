@@ -20,8 +20,8 @@ import java.lang.ref.Cleaner.Cleanable;
 import java.lang.ref.WeakReference;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import static io.netty.buffer.api.Statics.CLEANER;
-import static io.netty.buffer.api.Statics.findVarHandle;
+import static io.netty.buffer.api.internal.Statics.CLEANER;
+import static io.netty.buffer.api.internal.Statics.findVarHandle;
 import static java.lang.invoke.MethodHandles.lookup;
 
 class CleanerPooledDrop implements Drop<Buffer> {

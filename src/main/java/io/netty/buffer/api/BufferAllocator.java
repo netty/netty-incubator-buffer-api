@@ -15,6 +15,8 @@
  */
 package io.netty.buffer.api;
 
+import io.netty.buffer.api.internal.Statics;
+
 import java.nio.ByteOrder;
 
 /**
@@ -75,18 +77,18 @@ public interface BufferAllocator extends AutoCloseable {
     }
 
     static BufferAllocator heap() {
-        return new ManagedBufferAllocator(MemoryManager.getHeapMemoryManager(), Statics.CLEANER);
+        return new ManagedBufferAllocator(MemoryManagers.getManagers().getHeapMemoryManager(), Statics.CLEANER);
     }
 
     static BufferAllocator direct() {
-        return new ManagedBufferAllocator(MemoryManager.getNativeMemoryManager(), Statics.CLEANER);
+        return new ManagedBufferAllocator(MemoryManagers.getManagers().getNativeMemoryManager(), Statics.CLEANER);
     }
 
     static BufferAllocator pooledHeap() {
-        return new SizeClassedMemoryPool(MemoryManager.getHeapMemoryManager());
+        return new SizeClassedMemoryPool(MemoryManagers.getManagers().getHeapMemoryManager());
     }
 
     static BufferAllocator pooledDirect() {
-        return new SizeClassedMemoryPool(MemoryManager.getNativeMemoryManager());
+        return new SizeClassedMemoryPool(MemoryManagers.getManagers().getNativeMemoryManager());
     }
 }

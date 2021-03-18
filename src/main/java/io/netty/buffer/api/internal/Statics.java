@@ -13,13 +13,17 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package io.netty.buffer.api;
+package io.netty.buffer.api.internal;
+
+import io.netty.buffer.api.Buffer;
+import io.netty.buffer.api.Drop;
 
 import java.lang.invoke.MethodHandles.Lookup;
 import java.lang.invoke.VarHandle;
 import java.lang.ref.Cleaner;
+import java.nio.ByteOrder;
 
-interface Statics {
+public interface Statics {
     Cleaner CLEANER = Cleaner.create();
     Drop<Buffer> NO_OP_DROP = new Drop<Buffer>() {
         @Override
@@ -37,6 +41,31 @@ interface Statics {
             return lookup.findVarHandle(recv, name, type);
         } catch (Exception e) {
             throw new ExceptionInInitializerError(e);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    static <T, R> Drop<R> convert(Drop<T> drop) {
+        return (Drop<R>) drop;
+    }
+
+    static void copyToViaReverseCursor(Buffer src, int srcPos, Buffer dest, int destPos, int length) {
+        // Iterate in reverse to account for src and dest buffer overlap.
+        var itr = src.openReverseCursor(srcPos + length - 1, length);
+        ByteOrder prevOrder = dest.order();
+        // We read longs in BE, in reverse, so they need to be flipped for writing.
+        dest.order(ByteOrder.LITTLE_ENDIAN);
+        try {
+            while (itr.readLong()) {
+                long val = itr.getLong();
+                length -= Long.BYTES;
+                dest.setLong(destPos + length, val);
+            }
+            while (itr.readByte()) {
+                dest.setByte(destPos + --length, itr.getByte());
+            }
+        } finally {
+            dest.order(prevOrder);
         }
     }
 }

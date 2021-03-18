@@ -69,7 +69,7 @@
   <properties>
     <javaModuleName>io.netty.incubator.buffer</javaModuleName>
     <netty.version>5.0.0.Final-SNAPSHOT</netty.version>
-    <netty.build.version>28</netty.build.version>
+    <netty.build.version>29-SNAPSHOT</netty.build.version>
     <java.version>16</java.version>
     <junit.version>5.7.0</junit.version>
     <surefire.version>3.0.0-M5</surefire.version>
@@ -122,7 +122,7 @@
       </plugin>
       <plugin>
         <artifactId>maven-checkstyle-plugin</artifactId>
-        <version>3.1.0</version>
+        <version>3.1.2</version>
         <executions>
           <execution>
             <id>check-style</id>
@@ -148,7 +148,7 @@
           <dependency>
             <groupId>com.puppycrawl.tools</groupId>
             <artifactId>checkstyle</artifactId>
-            <version>8.29</version>
+            <version>8.41</version>
           </dependency>
           <dependency>
             <groupId>io.netty</groupId>
@@ -235,7 +235,7 @@
       <plugin>
         <groupId>org.apache.felix</groupId>
         <artifactId>maven-bundle-plugin</artifactId>
-        <version>2.5.4</version>
+        <version>5.1.1</version>
         <executions>
           <execution>
             <id>generate-manifest</id>
@@ -399,6 +399,7 @@
       <artifactId>netty-buffer</artifactId>
       <version>${netty.version}</version>
       <type>test-jar</type>
+      <classifier>tests</classifier>
       <scope>test</scope>
     </dependency>
     <dependency>

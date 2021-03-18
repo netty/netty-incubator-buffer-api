@@ -17,7 +17,7 @@ package io.netty.buffer.api;
 
 import java.lang.ref.Cleaner;
 
-import static io.netty.buffer.api.Statics.NO_OP_DROP;
+import static io.netty.buffer.api.internal.Statics.NO_OP_DROP;
 
 class ManagedBufferAllocator implements BufferAllocator, AllocatorControl {
     private final MemoryManager manager;
@@ -44,6 +44,6 @@ class ManagedBufferAllocator implements BufferAllocator, AllocatorControl {
     @Override
     public void recoverMemory(Object memory) {
         // Free the recovered memory.
-        manager.recoverMemory(memory, manager.drop()).close();
+        manager.recoverMemory(this, memory, manager.drop()).close();
     }
 }

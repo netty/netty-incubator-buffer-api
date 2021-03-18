@@ -397,6 +397,11 @@ final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> implement
     }
 
     @Override
+    public ByteCursor openCursor() {
+        return openCursor(readerOffset(), readableBytes());
+    }
+
+    @Override
     public ByteCursor openCursor(int fromOffset, int length) {
         if (fromOffset < 0) {
             throw new IllegalArgumentException("The fromOffset cannot be negative: " + fromOffset + '.');
@@ -1147,6 +1152,7 @@ final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> implement
             }
             throw throwable;
         }
+        boolean readOnly = this.readOnly;
         makeInaccessible();
         return new Owned<CompositeBuffer>() {
             @Override
@@ -1167,6 +1173,7 @@ final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> implement
         capacity = 0;
         roff = 0;
         woff = 0;
+        readOnly = false;
         closed = true;
     }
 

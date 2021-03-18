@@ -31,6 +31,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.ReadOnlyBufferException;
 import java.text.ParseException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
@@ -50,6 +51,7 @@ import static io.netty.buffer.api.Fixture.Properties.COMPOSITE;
 import static io.netty.buffer.api.Fixture.Properties.DIRECT;
 import static io.netty.buffer.api.Fixture.Properties.HEAP;
 import static io.netty.buffer.api.Fixture.Properties.POOLED;
+import static io.netty.buffer.api.MemoryManagers.using;
 import static java.nio.ByteOrder.BIG_ENDIAN;
 import static java.nio.ByteOrder.LITTLE_ENDIAN;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -102,6 +104,20 @@ public class BufferTest {
 
     private static Stream<Fixture> fixtureCombinations() {
         List<Fixture> initFixtures = initialAllocators();
+
+        // Multiply by all MemoryManagers.
+        List<MemoryManagers> loadableManagers = new ArrayList<>();
+        MemoryManagers.getAllManagers().forEach(provider -> {
+            loadableManagers.add(provider.get());
+        });
+        initFixtures = initFixtures.stream().flatMap(f -> {
+            Stream.Builder<Fixture> builder = Stream.builder();
+            for (MemoryManagers managers : loadableManagers) {
+                builder.add(new Fixture(f + "/" + managers, () -> using(managers, f), f.getProperties()));
+            }
+            return builder.build();
+        }).toList();
+
         Builder<Fixture> builder = Stream.builder();
         initFixtures.forEach(builder);
 
@@ -2499,6 +2515,17 @@ public class BufferTest {
 
     @ParameterizedTest
     @MethodSource("allocators")
+    public void closedBuffersAreNotReadOnly(Fixture fixture) {
+        try (BufferAllocator allocator = fixture.createAllocator()) {
+            Buffer buf = allocator.allocate(8);
+            buf.readOnly(true);
+            buf.close();
+            assertFalse(buf.readOnly());
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
     public void readOnlyBufferMustBecomeWritableAgainAfterTogglingReadOnlyOff(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
@@ -2833,10 +2860,12 @@ public class BufferTest {
 
             if (component.hasReadableArray()) {
                 byte[] array = component.readableArray();
+                byte[] arrayCopy = new byte[component.readableArrayLength()];
+                System.arraycopy(array, component.readableArrayOffset(), arrayCopy, 0, arrayCopy.length);
                 if (buffer.order() == BIG_ENDIAN) {
-                    assertThat(array).containsExactly(0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08);
+                    assertThat(arrayCopy).containsExactly(0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08);
                 } else {
-                    assertThat(array).containsExactly(0x08, 0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01);
+                    assertThat(arrayCopy).containsExactly(0x08, 0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01);
                 }
             }
 
@@ -3013,12 +3042,16 @@ public class BufferTest {
                 assertThat(component.writableNativeAddress()).isZero();
             }
 
+            buf.writerOffset(0);
             if (component.hasWritableArray()) {
                 byte[] array = component.writableArray();
+                int offset = component.writableArrayOffset();
+                byte[] arrayCopy = new byte[component.writableArrayLength()];
+                System.arraycopy(array, offset, arrayCopy, 0, arrayCopy.length);
                 if (buffer.order() == BIG_ENDIAN) {
-                    assertThat(array).containsExactly(0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08);
+                    assertThat(arrayCopy).containsExactly(0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08);
                 } else {
-                    assertThat(array).containsExactly(0x08, 0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01);
+                    assertThat(arrayCopy).containsExactly(0x08, 0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01);
                 }
             }
 

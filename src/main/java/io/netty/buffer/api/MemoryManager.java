@@ -21,19 +21,11 @@ import io.netty.buffer.api.memseg.NativeMemorySegmentManager;
 import java.lang.ref.Cleaner;
 
 public interface MemoryManager {
-    static MemoryManager getHeapMemoryManager() {
-        return new HeapMemorySegmentManager();
-    }
-
-    static MemoryManager getNativeMemoryManager() {
-        return new NativeMemorySegmentManager();
-    }
-
     boolean isNative();
-    Buffer allocateConfined(AllocatorControl alloc, long size, Drop<Buffer> drop, Cleaner cleaner);
-    Buffer allocateShared(AllocatorControl allo, long size, Drop<Buffer> drop, Cleaner cleaner);
+    Buffer allocateConfined(AllocatorControl allocatorControl, long size, Drop<Buffer> drop, Cleaner cleaner);
+    Buffer allocateShared(AllocatorControl allocatorControl, long size, Drop<Buffer> drop, Cleaner cleaner);
     Drop<Buffer> drop();
     Object unwrapRecoverableMemory(Buffer buf);
     int capacityOfRecoverableMemory(Object memory);
-    Buffer recoverMemory(Object recoverableMemory, Drop<Buffer> drop);
+    Buffer recoverMemory(AllocatorControl allocatorControl, Object recoverableMemory, Drop<Buffer> drop);
 }
