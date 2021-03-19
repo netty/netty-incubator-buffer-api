@@ -68,4 +68,12 @@ public interface Statics {
             dest.order(prevOrder);
         }
     }
+
+    static IllegalStateException bufferIsClosed() {
+        return new IllegalStateException("This buffer is closed.");
+    }
+
+    static IllegalStateException bufferIsReadOnly() {
+        return new IllegalStateException("This buffer is read-only.");
+    }
 }

@@ -34,6 +34,9 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.ReadOnlyBufferException;
 
+import static io.netty.buffer.api.internal.Statics.bufferIsClosed;
+import static io.netty.buffer.api.internal.Statics.bufferIsReadOnly;
+
 class NioBuffer extends RcSupport<Buffer, NioBuffer> implements Buffer, ReadableComponent, WritableComponent {
     private static final ByteBuffer CLOSED_BUFFER = ByteBuffer.allocate(0);
 
@@ -417,9 +420,9 @@ class NioBuffer extends RcSupport<Buffer, NioBuffer> implements Buffer, Readable
         }
         var drop = (ArcDrop<NioBuffer>) unsafeGetDrop();
         unsafeSetDrop(new ArcDrop<>(drop));
-        var bifurcatedSeg = rmem.slice(0, woff);
+        var bifurcatedBuffer = rmem.slice(0, woff);
         // TODO maybe incrementing the existing ArcDrop is enough; maybe we don't need to wrap it in another ArcDrop.
-        var bifurcatedBuf = new NioBuffer(base, bifurcatedSeg, control, new ArcDrop<>(drop.increment()));
+        var bifurcatedBuf = new NioBuffer(base, bifurcatedBuffer, control, new ArcDrop<>(drop.increment()));
         bifurcatedBuf.woff = woff;
         bifurcatedBuf.roff = roff;
         bifurcatedBuf.order(order());
@@ -893,7 +896,7 @@ class NioBuffer extends RcSupport<Buffer, NioBuffer> implements Buffer, Readable
             wmem.putInt(woff, value);
             return this;
         } catch (IndexOutOfBoundsException e) {
-            throw checkWriteState(e, NioBuffer.this.woff);
+            throw checkWriteState(e, this.woff);
         } catch (ReadOnlyBufferException e) {
             throw bufferIsReadOnly();
         }
@@ -918,7 +921,7 @@ class NioBuffer extends RcSupport<Buffer, NioBuffer> implements Buffer, Readable
             wmem.putInt(woff, (int) (value & 0xFFFFFFFFL));
             return this;
         } catch (IndexOutOfBoundsException e) {
-            throw checkWriteState(e, NioBuffer.this.woff);
+            throw checkWriteState(e, this.woff);
         } catch (ReadOnlyBufferException e) {
             throw bufferIsReadOnly();
         }
@@ -1133,14 +1136,6 @@ class NioBuffer extends RcSupport<Buffer, NioBuffer> implements Buffer, Readable
             return bufferIsReadOnly();
         }
         return outOfBounds(index);
-    }
-
-    private static IllegalStateException bufferIsClosed() {
-        return new IllegalStateException("This buffer is closed.");
-    }
-
-    private static IllegalStateException bufferIsReadOnly() {
-        return new IllegalStateException("This buffer is read-only.");
     }
 
     private IndexOutOfBoundsException outOfBounds(int index) {

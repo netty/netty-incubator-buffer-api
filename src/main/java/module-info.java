@@ -32,5 +32,6 @@ module netty.incubator.buffer {
 
     provides io.netty.buffer.api.MemoryManagers with
             io.netty.buffer.api.memseg.SegmentMemoryManagers,
-            io.netty.buffer.api.bytebuffer.ByteBufferMemoryManagers;
+            io.netty.buffer.api.bytebuffer.ByteBufferMemoryManagers,
+            io.netty.buffer.api.unsafe.UnsafeMemoryManagers;
 }

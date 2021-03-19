@@ -78,6 +78,8 @@
       -server
       -dsa -da -ea:io.netty...
       -XX:+HeapDumpOnOutOfMemoryError
+      -Dio.netty.tryReflectionSetAccessible=true
+      --add-opens java.base/java.nio=io.netty.common
     </argLine.common>
 <!--    <argLine.printGC>-XX:+PrintGCDetails</argLine.printGC>-->
     <argLine.printGC/>
