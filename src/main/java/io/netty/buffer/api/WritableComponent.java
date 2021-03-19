@@ -35,6 +35,8 @@ public interface WritableComponent {
      *
      * @return A byte array of the contents of this component.
      * @throws UnsupportedOperationException if {@link #hasWritableArray()} returns {@code false}.
+     * @see #writableArrayOffset()
+     * @see #writableArrayLength()
      */
     byte[] writableArray();
 
@@ -45,6 +47,15 @@ public interface WritableComponent {
      * @throws UnsupportedOperationException if {@link #hasWritableArray()} returns {@code false}.
      */
     int writableArrayOffset();
+
+    /**
+     * The number of bytes in the {@link #writableArray()} that belong to this component.
+     *
+     * @return The number of bytes, from the {@link #writableArrayOffset()} into the {@link #writableArray()},
+     * that belong to this component.
+     * @throws UnsupportedOperationException if {@link #hasWritableArray()} returns {@code false}.
+     */
+    int writableArrayLength();
 
     /**
      * Give the native memory address backing this buffer, or return 0 if this buffer has no native memory address.

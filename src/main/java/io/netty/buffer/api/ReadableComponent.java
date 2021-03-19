@@ -42,6 +42,8 @@ public interface ReadableComponent {
      *
      * @return A byte array of the contents of this component.
      * @throws UnsupportedOperationException if {@link #hasReadableArray()} returns {@code false}.
+     * @see #readableArrayOffset()
+     * @see #readableArrayLength()
      */
     byte[] readableArray();
 
@@ -52,6 +54,15 @@ public interface ReadableComponent {
      * @throws UnsupportedOperationException if {@link #hasReadableArray()} returns {@code false}.
      */
     int readableArrayOffset();
+
+    /**
+     * The number of bytes in the {@link #readableArray()} that belong to this component.
+     *
+     * @return The number of bytes, from the {@link #readableArrayOffset()} into the {@link #readableArray()},
+     * that belong to this component.
+     * @throws UnsupportedOperationException if {@link #hasReadableArray()} returns {@code false}.
+     */
+    int readableArrayLength();
 
     /**
      * Give the native memory address backing this buffer, or return 0 if this buffer has no native memory address.

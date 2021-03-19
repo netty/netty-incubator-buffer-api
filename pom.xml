@@ -69,14 +69,11 @@
   <properties>
     <javaModuleName>io.netty.incubator.buffer</javaModuleName>
     <netty.version>5.0.0.Final-SNAPSHOT</netty.version>
-    <netty.build.version>28</netty.build.version>
+    <netty.build.version>29</netty.build.version>
     <java.version>16</java.version>
     <junit.version>5.7.0</junit.version>
     <surefire.version>3.0.0-M5</surefire.version>
     <skipTests>false</skipTests>
-    <argLine.java9.extras />
-    <!-- Export some stuff which is used during our tests -->
-    <argLine.java9>--illegal-access=deny ${argLine.java9.extras}</argLine.java9>
     <argLine.common>
       -server
       -dsa -da -ea:io.netty...
@@ -96,8 +93,20 @@
     </extensions>
     <plugins>
       <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <version>3.1.2</version>
+        <executions>
+          <execution>
+            <goals>
+              <goal>properties</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
         <artifactId>maven-compiler-plugin</artifactId>
-        <version>3.8.0</version>
+        <version>3.8.1</version>
         <configuration>
           <compilerVersion>${java.version}</compilerVersion>
           <fork>true</fork>
@@ -114,15 +123,18 @@
           <compilerArgs>
             <arg>--add-modules</arg>
             <arg>jdk.incubator.foreign</arg>
+
+            <!--
+             These two are really only needed for test-compile, but the maven-compiler-plugin cannot express that
+             -->
+            <arg>--patch-module</arg>
+            <arg>io.netty.buffer=${io.netty:netty-buffer:test-jar:tests}</arg>
           </compilerArgs>
-          <excludes>
-            <exclude>**/package-info.java</exclude>
-          </excludes>
         </configuration>
       </plugin>
       <plugin>
         <artifactId>maven-checkstyle-plugin</artifactId>
-        <version>3.1.0</version>
+        <version>3.1.2</version>
         <executions>
           <execution>
             <id>check-style</id>
@@ -148,7 +160,7 @@
           <dependency>
             <groupId>com.puppycrawl.tools</groupId>
             <artifactId>checkstyle</artifactId>
-            <version>8.29</version>
+            <version>8.41</version>
           </dependency>
           <dependency>
             <groupId>io.netty</groupId>
@@ -164,8 +176,7 @@
           <includes>
             <include>**/*Test*.java</include>
           </includes>
-          <runOrder>random</runOrder>
-          <argLine>${argLine.common} ${argLine.printGC} ${argLine.java9} --add-modules jdk.incubator.foreign</argLine>
+          <argLine>${argLine.common} ${argLine.printGC} --patch-module io.netty.buffer=${io.netty:netty-buffer:test-jar:tests} --add-modules jdk.incubator.foreign</argLine>
           <!-- Ensure the whole stacktrace is preserved when an exception is thrown. See https://issues.apache.org/jira/browse/SUREFIRE-1457 -->
           <trimStackTrace>false</trimStackTrace>
         </configuration>
@@ -235,7 +246,7 @@
       <plugin>
         <groupId>org.apache.felix</groupId>
         <artifactId>maven-bundle-plugin</artifactId>
-        <version>2.5.4</version>
+        <version>5.1.1</version>
         <executions>
           <execution>
             <id>generate-manifest</id>
@@ -399,6 +410,7 @@
       <artifactId>netty-buffer</artifactId>
       <version>${netty.version}</version>
       <type>test-jar</type>
+      <classifier>tests</classifier>
       <scope>test</scope>
     </dependency>
     <dependency>

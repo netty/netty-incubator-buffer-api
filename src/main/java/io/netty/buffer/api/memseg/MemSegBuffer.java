@@ -30,6 +30,8 @@ import io.netty.buffer.api.RcSupport;
 import io.netty.buffer.api.adaptor.BufferIntegratable;
 import io.netty.buffer.api.adaptor.ByteBufAdaptor;
 import io.netty.buffer.api.adaptor.ByteBufAllocatorAdaptor;
+import io.netty.buffer.api.internal.ArcDrop;
+import io.netty.buffer.api.internal.Statics;
 import jdk.incubator.foreign.MemorySegment;
 
 import java.nio.ByteBuffer;
@@ -153,9 +155,9 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
     }
 
     @Override
-    public MemSegBuffer readerOffset(int index) {
-        checkRead(index, 0);
-        roff = index;
+    public MemSegBuffer readerOffset(int offset) {
+        checkRead(offset, 0);
+        roff = offset;
         return this;
     }
 
@@ -165,9 +167,9 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
     }
 
     @Override
-    public MemSegBuffer writerOffset(int index) {
-        checkWrite(index, 0);
-        woff = index;
+    public MemSegBuffer writerOffset(int offset) {
+        checkWrite(offset, 0);
+        woff = offset;
         return this;
     }
 
@@ -191,6 +193,11 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
 
     @Override
     public int readableArrayOffset() {
+        throw new UnsupportedOperationException("This component has no backing array.");
+    }
+
+    @Override
+    public int readableArrayLength() {
         throw new UnsupportedOperationException("This component has no backing array.");
     }
 
@@ -226,6 +233,11 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
 
     @Override
     public int writableArrayOffset() {
+        throw new UnsupportedOperationException("This component has no backing array.");
+    }
+
+    @Override
+    public int writableArrayLength() {
         throw new UnsupportedOperationException("This component has no backing array.");
     }
 
@@ -324,23 +336,7 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
             return;
         }
 
-        // Iterate in reverse to account for src and dest buffer overlap.
-        var itr = openReverseCursor(srcPos + length - 1, length);
-        ByteOrder prevOrder = dest.order();
-        // We read longs in BE, in reverse, so they need to be flipped for writing.
-        dest.order(ByteOrder.LITTLE_ENDIAN);
-        try {
-            while (itr.readLong()) {
-                long val = itr.getLong();
-                length -= Long.BYTES;
-                dest.setLong(destPos + length, val);
-            }
-            while (itr.readByte()) {
-                dest.setByte(destPos + --length, itr.getByte());
-            }
-        } finally {
-            dest.order(prevOrder);
-        }
+        Statics.copyToViaReverseCursor(this, srcPos, dest, destPos, length);
     }
 
     @Override
@@ -526,12 +522,13 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
             int woff = this.woff;
             drop.drop(this);
             while (drop instanceof ArcDrop) {
-                drop = ((ArcDrop) drop).unwrap();
+                drop = ((ArcDrop<MemSegBuffer>) drop).unwrap();
             }
-            unsafeSetDrop(new ArcDrop(drop));
+            unsafeSetDrop(new ArcDrop<>(drop));
             this.roff = roff;
             this.woff = woff;
         } else {
+            // TODO would we ever get here?
             alloc.recoverMemory(recoverableMemory());
         }
 
@@ -546,10 +543,10 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
         if (!isOwned()) {
             throw attachTrace(new IllegalStateException("Cannot bifurcate a buffer that is not owned."));
         }
-        var drop = (ArcDrop) unsafeGetDrop();
-        unsafeSetDrop(new ArcDrop(drop));
+        var drop = (ArcDrop<MemSegBuffer>) unsafeGetDrop();
+        unsafeSetDrop(new ArcDrop<>(drop));
         var bifurcatedSeg = seg.asSlice(0, woff);
-        var bifurcatedBuf = new MemSegBuffer(base, bifurcatedSeg, new ArcDrop(drop.increment()), alloc);
+        var bifurcatedBuf = new MemSegBuffer(base, bifurcatedSeg, new ArcDrop<>(drop.increment()), alloc);
         bifurcatedBuf.woff = woff;
         bifurcatedBuf.roff = roff;
         bifurcatedBuf.order(order);
@@ -1083,7 +1080,7 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
         var woff = this.woff;
         var readOnly = readOnly();
         boolean isConfined = seg.ownerThread() == null;
-        MemorySegment transferSegment = isConfined? seg : seg.share();
+        MemorySegment transferSegment = isConfined? seg : seg.share(); // TODO remove confimenent checks
         MemorySegment base = this.base;
         makeInaccessible();
         return new Owned<MemSegBuffer>() {
@@ -1109,12 +1106,12 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
 
     @Override
     public boolean isOwned() {
-        return super.isOwned() && ((ArcDrop) unsafeGetDrop()).isOwned();
+        return super.isOwned() && ((ArcDrop<MemSegBuffer>) unsafeGetDrop()).isOwned();
     }
 
     @Override
     public int countBorrows() {
-        return super.countBorrows() + ((ArcDrop) unsafeGetDrop()).countBorrows();
+        return super.countBorrows() + ((ArcDrop<MemSegBuffer>) unsafeGetDrop()).countBorrows();
     }
 
     private void checkRead(int index, int size) {
@@ -1197,11 +1194,6 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
             return adaptor = new ByteBufAdaptor(alloc, this);
         }
         return bba;
-    }
-
-    @Override
-    public int readableBytes() {
-        return writerOffset() - readerOffset();
     }
 
     @Override

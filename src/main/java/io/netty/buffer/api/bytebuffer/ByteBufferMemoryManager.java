@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 The Netty Project
+ * Copyright 2021 The Netty Project
  *
  * The Netty Project licenses this file to you under the Apache License,
  * version 2.0 (the "License"); you may not use this file except in compliance
@@ -13,62 +13,64 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package io.netty.buffer.api.memseg;
+package io.netty.buffer.api.bytebuffer;
 
 import io.netty.buffer.api.AllocatorControl;
 import io.netty.buffer.api.Buffer;
 import io.netty.buffer.api.Drop;
 import io.netty.buffer.api.MemoryManager;
-import io.netty.buffer.api.memseg.MemSegBuffer.RecoverableMemory;
-import jdk.incubator.foreign.MemorySegment;
+import io.netty.buffer.api.internal.Statics;
 
 import java.lang.ref.Cleaner;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 
 import static io.netty.buffer.api.internal.Statics.convert;
 
-public abstract class AbstractMemorySegmentManager implements MemoryManager {
+public class ByteBufferMemoryManager implements MemoryManager {
+    private final boolean direct;
+
+    public ByteBufferMemoryManager(boolean direct) {
+        this.direct = direct;
+    }
+
     @Override
-    public abstract boolean isNative();
+    public boolean isNative() {
+        return direct;
+    }
 
     @Override
     public Buffer allocateConfined(AllocatorControl allocatorControl, long size, Drop<Buffer> drop, Cleaner cleaner) {
-        var segment = createSegment(size);
-        if (cleaner != null) {
-            segment = segment.registerCleaner(cleaner);
-        }
-        return new MemSegBuffer(segment, segment, convert(drop), allocatorControl);
+        return allocateShared(allocatorControl, size, drop, cleaner);
     }
 
     @Override
     public Buffer allocateShared(AllocatorControl allocatorControl, long size, Drop<Buffer> drop, Cleaner cleaner) {
-        var segment = createSegment(size).share();
-        if (cleaner != null) {
-            segment = segment.registerCleaner(cleaner);
-        }
-        return new MemSegBuffer(segment, segment, convert(drop), allocatorControl);
+        int capacity = Math.toIntExact(size);
+        ByteBuffer buffer = direct? ByteBuffer.allocateDirect(capacity) : ByteBuffer.allocate(capacity);
+        buffer.order(ByteOrder.nativeOrder());
+        return new NioBuffer(buffer, buffer, allocatorControl, convert(drop));
     }
-
-    protected abstract MemorySegment createSegment(long size);
 
     @Override
     public Drop<Buffer> drop() {
-        return convert(MemSegBuffer.SEGMENT_CLOSE);
+        return Statics.NO_OP_DROP;
     }
 
     @Override
     public Object unwrapRecoverableMemory(Buffer buf) {
-        var b = (MemSegBuffer) buf;
-        return b.recoverableMemory();
+        return ((NioBuffer) buf).recoverable();
     }
 
     @Override
     public int capacityOfRecoverableMemory(Object memory) {
-        return ((RecoverableMemory) memory).capacity();
+        //noinspection OverlyStrongTypeCast
+        return ((ByteBuffer) memory).capacity();
     }
 
     @Override
     public Buffer recoverMemory(AllocatorControl allocatorControl, Object recoverableMemory, Drop<Buffer> drop) {
-        var recovery = (RecoverableMemory) recoverableMemory; //  TODO get rid of RecoverableMemory
-        return recovery.recover(convert(drop));
+        ByteBuffer memory = (ByteBuffer) recoverableMemory;
+        return new NioBuffer(memory, memory, allocatorControl, convert(drop));
     }
 }

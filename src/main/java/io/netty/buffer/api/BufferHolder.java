@@ -18,7 +18,7 @@ package io.netty.buffer.api;
 import java.lang.invoke.VarHandle;
 import java.util.Objects;
 
-import static io.netty.buffer.api.Statics.findVarHandle;
+import static io.netty.buffer.api.internal.Statics.findVarHandle;
 import static java.lang.invoke.MethodHandles.lookup;
 
 /**

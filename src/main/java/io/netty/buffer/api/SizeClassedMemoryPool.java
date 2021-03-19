@@ -15,13 +15,15 @@
  */
 package io.netty.buffer.api;
 
+import io.netty.buffer.api.internal.Statics;
+
 import java.lang.invoke.VarHandle;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
-import static io.netty.buffer.api.Statics.NO_OP_DROP;
+import static io.netty.buffer.api.internal.Statics.NO_OP_DROP;
 import static java.lang.invoke.MethodHandles.lookup;
 
 class SizeClassedMemoryPool implements BufferAllocator, AllocatorControl, Drop<Buffer> {
@@ -129,7 +131,7 @@ class SizeClassedMemoryPool implements BufferAllocator, AllocatorControl, Drop<B
 
     private Buffer recoverMemoryIntoBuffer(Object memory) {
         var drop = getDrop();
-        var buf = manager.recoverMemory(memory, drop);
+        var buf = manager.recoverMemory(this, memory, drop);
         drop.attach(buf);
         return buf;
     }

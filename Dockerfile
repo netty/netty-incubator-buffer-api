@@ -29,7 +29,7 @@ WORKDIR /home/build
 
 # Prepare our own build
 COPY pom.xml pom.xml
-RUN mvn dependency:go-offline surefire:test -ntp
+RUN mvn dependency:go-offline surefire:test checkstyle:check -ntp
 
 # Copy over the project code and run our build
 COPY . .

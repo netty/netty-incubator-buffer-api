@@ -408,9 +408,7 @@ public interface Buffer extends Rc<Buffer>, BufferAccessors {
      *
      * @return A {@link ByteCursor} for iterating the readable bytes of this buffer.
      */
-    default ByteCursor openCursor() {
-        return openCursor(readerOffset(), readableBytes());
-    }
+    ByteCursor openCursor();
 
     /**
      * Open a cursor to iterate the given number bytes of this buffer, starting at the given offset.

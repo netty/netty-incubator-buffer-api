@@ -17,7 +17,7 @@ package io.netty.buffer.api;
 
 import java.lang.invoke.VarHandle;
 
-import static io.netty.buffer.api.Statics.findVarHandle;
+import static io.netty.buffer.api.internal.Statics.findVarHandle;
 import static java.lang.invoke.MethodHandles.lookup;
 
 class TransferSend<I extends Rc<I>, T extends Rc<I>> implements Send<I> {
