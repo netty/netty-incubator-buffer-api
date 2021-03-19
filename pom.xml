@@ -123,14 +123,13 @@
           <compilerArgs>
             <arg>--add-modules</arg>
             <arg>jdk.incubator.foreign</arg>
+
+            <!--
+             These two are really only needed for test-compile, but the maven-compiler-plugin cannot express that
+             -->
+            <arg>--patch-module</arg>
+            <arg>io.netty.buffer=${io.netty:netty-buffer:test-jar:tests}</arg>
           </compilerArgs>
-          <!-- Add the test-jar classes to the io.netty.buffer module for test-compile. -->
-          <testCompilerArgument>
-            --patch-module io.netty.buffer=${io.netty:netty-buffer:test-jar:tests}
-          </testCompilerArgument>
-          <excludes>
-            <exclude>**/package-info.java</exclude>
-          </excludes>
         </configuration>
       </plugin>
       <plugin>
