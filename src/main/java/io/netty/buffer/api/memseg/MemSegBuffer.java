@@ -508,8 +508,7 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
         // Allocate a bigger buffer.
         long newSize = capacity() + size - (long) writableBytes();
         BufferAllocator.checkSize(newSize);
-        RecoverableMemory recoverableMemory = (RecoverableMemory) alloc.allocateUntethered(this, (int) newSize);
-        var newSegment = recoverableMemory.segment;
+        MemorySegment newSegment = (MemorySegment) alloc.allocateUntethered(this, (int) newSize);
 
         // Copy contents.
         newSegment.copyFrom(seg);
@@ -1180,7 +1179,7 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
     }
 
     Object recoverableMemory() {
-        return new RecoverableMemory(base, alloc);
+        return base;
     }
 
     // <editor-fold name="BufferIntegratable methods">
@@ -1237,22 +1236,4 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
         return !isAccessible();
     }
     // </editor-fold>
-
-    static final class RecoverableMemory {
-        private final MemorySegment segment;
-        private final AllocatorControl alloc;
-
-        RecoverableMemory(MemorySegment segment, AllocatorControl alloc) {
-            this.segment = segment;
-            this.alloc = alloc;
-        }
-
-        Buffer recover(Drop<MemSegBuffer> drop) {
-            return new MemSegBuffer(segment, segment, ArcDrop.acquire(drop), alloc);
-        }
-
-        int capacity() {
-            return (int) segment.byteSize();
-        }
-    }
 }

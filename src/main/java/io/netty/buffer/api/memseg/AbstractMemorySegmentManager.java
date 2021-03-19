@@ -19,7 +19,7 @@ import io.netty.buffer.api.AllocatorControl;
 import io.netty.buffer.api.Buffer;
 import io.netty.buffer.api.Drop;
 import io.netty.buffer.api.MemoryManager;
-import io.netty.buffer.api.memseg.MemSegBuffer.RecoverableMemory;
+import io.netty.buffer.api.internal.ArcDrop;
 import jdk.incubator.foreign.MemorySegment;
 
 import java.lang.ref.Cleaner;
@@ -63,12 +63,12 @@ public abstract class AbstractMemorySegmentManager implements MemoryManager {
 
     @Override
     public int capacityOfRecoverableMemory(Object memory) {
-        return ((RecoverableMemory) memory).capacity();
+        return (int) ((MemorySegment) memory).byteSize();
     }
 
     @Override
     public Buffer recoverMemory(AllocatorControl allocatorControl, Object recoverableMemory, Drop<Buffer> drop) {
-        var recovery = (RecoverableMemory) recoverableMemory; //  TODO get rid of RecoverableMemory
-        return recovery.recover(convert(drop));
+        var segment = (MemorySegment) recoverableMemory;
+        return new MemSegBuffer(segment, segment, convert(ArcDrop.acquire(drop)), allocatorControl);
     }
 }
