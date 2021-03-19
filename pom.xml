@@ -176,8 +176,7 @@
           <includes>
             <include>**/*Test*.java</include>
           </includes>
-          <runOrder>random</runOrder>
-          <argLine>${argLine.common} ${argLine.printGC} --illegal-access=deny --patch-module io.netty.buffer=${io.netty:netty-buffer:test-jar:tests} --add-modules jdk.incubator.foreign</argLine>
+          <argLine>${argLine.common} ${argLine.printGC} --patch-module io.netty.buffer=${io.netty:netty-buffer:test-jar:tests} --add-modules jdk.incubator.foreign</argLine>
           <!-- Ensure the whole stacktrace is preserved when an exception is thrown. See https://issues.apache.org/jira/browse/SUREFIRE-1457 -->
           <trimStackTrace>false</trimStackTrace>
         </configuration>
