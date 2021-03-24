@@ -96,7 +96,6 @@ If we want to use the new buffer API in our server handlers, we have to extract 
 ----
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.api.Buffer;
-import io.netty.buffer.api.adaptor.ByteBufAdaptor;
 
 @Sharable
 public class EchoServerHandler implements ChannelHandler {
