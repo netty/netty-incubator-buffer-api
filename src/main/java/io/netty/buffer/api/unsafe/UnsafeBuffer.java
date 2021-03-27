@@ -87,7 +87,7 @@ public class UnsafeBuffer extends RcSupport<Buffer, UnsafeBuffer> implements Buf
 
     @Override
     public int capacity() {
-        return rsize;
+        return Math.max(0, rsize); // Use Math.max to make capacity of closed buffer equal to zero.
     }
 
     @Override
@@ -147,6 +147,9 @@ public class UnsafeBuffer extends RcSupport<Buffer, UnsafeBuffer> implements Buf
 
     @Override
     public Buffer slice(int offset, int length) {
+        if (length < 0) {
+            throw new IllegalArgumentException("Length cannot be negative: " + length + '.');
+        }
         checkGet(offset, length);
         ArcDrop<UnsafeBuffer> drop = (ArcDrop<UnsafeBuffer>) unsafeGetDrop();
         drop.increment();
@@ -1240,6 +1243,8 @@ public class UnsafeBuffer extends RcSupport<Buffer, UnsafeBuffer> implements Buf
     }
 
     void makeInaccessible() {
+        roff = 0;
+        woff = 0;
         rsize = CLOSED_SIZE;
         wsize = CLOSED_SIZE;
         readOnly = false;
@@ -1277,19 +1282,6 @@ public class UnsafeBuffer extends RcSupport<Buffer, UnsafeBuffer> implements Buf
         if (index < 0 || wsize < index + size) {
             throw writeAccessCheckException(index);
         }
-    }
-
-    private RuntimeException checkWriteState(IndexOutOfBoundsException ioobe, int offset) {
-        if (rsize == CLOSED_SIZE) {
-            return bufferIsClosed();
-        }
-        if (wsize != rsize) {
-            return bufferIsReadOnly();
-        }
-
-        IndexOutOfBoundsException exception = outOfBounds(offset);
-        exception.addSuppressed(ioobe);
-        return exception;
     }
 
     private RuntimeException readAccessCheckException(int index) {
