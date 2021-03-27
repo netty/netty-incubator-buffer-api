@@ -97,6 +97,7 @@ public class UnsafeBuffer extends RcSupport<Buffer, UnsafeBuffer> implements Buf
 
     @Override
     public Buffer readerOffset(int offset) {
+        checkRead(offset, 0);
         roff = offset;
         return this;
     }
@@ -108,6 +109,7 @@ public class UnsafeBuffer extends RcSupport<Buffer, UnsafeBuffer> implements Buf
 
     @Override
     public Buffer writerOffset(int offset) {
+        checkWrite(offset, 0);
         woff = offset;
         return this;
     }
@@ -115,6 +117,9 @@ public class UnsafeBuffer extends RcSupport<Buffer, UnsafeBuffer> implements Buf
     @Override
     public Buffer fill(byte value) {
         checkSet(0, capacity());
+        if (rsize == CLOSED_SIZE) {
+            throw bufferIsClosed();
+        }
         try {
             PlatformDependent.setMemory(base, address, rsize, value);
         } finally {
@@ -142,12 +147,7 @@ public class UnsafeBuffer extends RcSupport<Buffer, UnsafeBuffer> implements Buf
 
     @Override
     public Buffer slice(int offset, int length) {
-        if (length < 0) {
-            throw new IllegalArgumentException("Length cannot be negative: " + length + '.');
-        }
-        if (!isAccessible()) {
-            throw new IllegalStateException("This buffer is closed: " + this + '.');
-        }
+        checkGet(offset, length);
         ArcDrop<UnsafeBuffer> drop = (ArcDrop<UnsafeBuffer>) unsafeGetDrop();
         drop.increment();
         return new UnsafeBuffer(memory, baseOffset + offset, length, control, drop)
@@ -215,10 +215,13 @@ public class UnsafeBuffer extends RcSupport<Buffer, UnsafeBuffer> implements Buf
     @Override
     public void copyInto(int srcPos, Buffer dest, int destPos, int length) {
         checkCopyIntoArgs(srcPos, length, destPos, dest.capacity());
+        if (dest.readOnly()) {
+            throw bufferIsReadOnly();
+        }
         long nativeAddress = dest.nativeAddress();
         try {
             if (nativeAddress != 0) {
-                PlatformDependent.copyMemory(base, address + srcPos, null, nativeAddress, length);
+                PlatformDependent.copyMemory(base, address + srcPos, null, nativeAddress + destPos, length);
             } else if (dest instanceof UnsafeBuffer) {
                 UnsafeBuffer destUnsafe = (UnsafeBuffer) dest;
                 PlatformDependent.copyMemory(
@@ -345,7 +348,7 @@ public class UnsafeBuffer extends RcSupport<Buffer, UnsafeBuffer> implements Buf
                     index -= 7;
                     try {
                         long value = PlatformDependent.getLong(baseObj, baseAddress + index);
-                        longValue = BIG_ENDIAN_NATIVE_ORDER? value : Long.reverseBytes(value);
+                        longValue = BIG_ENDIAN_NATIVE_ORDER? Long.reverseBytes(value) : value;
                     } finally {
                         Reference.reachabilityFence(memory);
                     }
@@ -828,13 +831,14 @@ public class UnsafeBuffer extends RcSupport<Buffer, UnsafeBuffer> implements Buf
     @Override
     public int readMedium() {
         checkRead(roff, 3);
+        long offset = address + roff;
         int value = order() == ByteOrder.BIG_ENDIAN ?
-                loadByte(roff) << 16 |
-                (loadByte(roff + 1) & 0xFF) << 8 |
-                loadByte(roff + 2) & 0xFF :
-                loadByte(roff) & 0xFF |
-                (loadByte(roff + 1) & 0xFF) << 8 |
-                loadByte(roff + 2) << 16;
+                loadByte(offset) << 16 |
+                (loadByte(offset + 1) & 0xFF) << 8 |
+                loadByte(offset + 2) & 0xFF :
+                loadByte(offset) & 0xFF |
+                (loadByte(offset + 1) & 0xFF) << 8 |
+                loadByte(offset + 2) << 16;
         roff += 3;
         return value;
     }
@@ -842,25 +846,27 @@ public class UnsafeBuffer extends RcSupport<Buffer, UnsafeBuffer> implements Buf
     @Override
     public int getMedium(int roff) {
         checkGet(roff, 3);
+        long offset = address + roff;
         return order() == ByteOrder.BIG_ENDIAN?
-                loadByte(roff) << 16 |
-                (loadByte(roff + 1) & 0xFF) << 8 |
-                loadByte(roff + 2) & 0xFF :
-                loadByte(roff) & 0xFF |
-                (loadByte(roff + 1) & 0xFF) << 8 |
-                loadByte(roff + 2) << 16;
+                loadByte(offset) << 16 |
+                (loadByte(offset + 1) & 0xFF) << 8 |
+                loadByte(offset + 2) & 0xFF :
+                loadByte(offset) & 0xFF |
+                (loadByte(offset + 1) & 0xFF) << 8 |
+                loadByte(offset + 2) << 16;
     }
 
     @Override
     public int readUnsignedMedium() {
         checkRead(roff, 3);
+        long offset = address + roff;
         int value = order() == ByteOrder.BIG_ENDIAN?
-                (loadByte(roff) << 16 |
-                (loadByte(roff + 1) & 0xFF) << 8 |
-                loadByte(roff + 2) & 0xFF) & 0xFFFFFF :
-                (loadByte(roff) & 0xFF |
-                (loadByte(roff + 1) & 0xFF) << 8 |
-                loadByte(roff + 2) << 16) & 0xFFFFFF;
+                (loadByte(offset) << 16 |
+                (loadByte(offset + 1) & 0xFF) << 8 |
+                loadByte(offset + 2) & 0xFF) & 0xFFFFFF :
+                (loadByte(offset) & 0xFF |
+                (loadByte(offset + 1) & 0xFF) << 8 |
+                loadByte(offset + 2) << 16) & 0xFFFFFF;
         roff += 3;
         return value;
     }
@@ -868,26 +874,28 @@ public class UnsafeBuffer extends RcSupport<Buffer, UnsafeBuffer> implements Buf
     @Override
     public int getUnsignedMedium(int roff) {
         checkGet(roff, 3);
+        long offset = address + roff;
         return order() == ByteOrder.BIG_ENDIAN?
-                (loadByte(roff) << 16 |
-                (loadByte(roff + 1) & 0xFF) << 8 |
-                loadByte(roff + 2) & 0xFF) & 0xFFFFFF :
-                (loadByte(roff) & 0xFF |
-                (loadByte(roff + 1) & 0xFF) << 8 |
-                loadByte(roff + 2) << 16) & 0xFFFFFF;
+                (loadByte(offset) << 16 |
+                (loadByte(offset + 1) & 0xFF) << 8 |
+                loadByte(offset + 2) & 0xFF) & 0xFFFFFF :
+                (loadByte(offset) & 0xFF |
+                (loadByte(offset + 1) & 0xFF) << 8 |
+                loadByte(offset + 2) << 16) & 0xFFFFFF;
     }
 
     @Override
     public Buffer writeMedium(int value) {
         checkWrite(woff, 3);
+        long offset = address + woff;
         if (order() == ByteOrder.BIG_ENDIAN) {
-            storeByte(woff, (byte) (value >> 16));
-            storeByte(woff + 1, (byte) (value >> 8 & 0xFF));
-            storeByte(woff + 2, (byte) (value & 0xFF));
+            storeByte(offset, (byte) (value >> 16));
+            storeByte(offset + 1, (byte) (value >> 8 & 0xFF));
+            storeByte(offset + 2, (byte) (value & 0xFF));
         } else {
-            storeByte(woff, (byte) (value & 0xFF));
-            storeByte(woff + 1, (byte) (value >> 8 & 0xFF));
-            storeByte(woff + 2, (byte) (value >> 16 & 0xFF));
+            storeByte(offset, (byte) (value & 0xFF));
+            storeByte(offset + 1, (byte) (value >> 8 & 0xFF));
+            storeByte(offset + 2, (byte) (value >> 16 & 0xFF));
         }
         woff += 3;
         return this;
@@ -896,14 +904,15 @@ public class UnsafeBuffer extends RcSupport<Buffer, UnsafeBuffer> implements Buf
     @Override
     public Buffer setMedium(int woff, int value) {
         checkSet(woff, 3);
+        long offset = address + woff;
         if (order() == ByteOrder.BIG_ENDIAN) {
-            storeByte(woff, (byte) (value >> 16));
-            storeByte(woff + 1, (byte) (value >> 8 & 0xFF));
-            storeByte(woff + 2, (byte) (value & 0xFF));
+            storeByte(offset, (byte) (value >> 16));
+            storeByte(offset + 1, (byte) (value >> 8 & 0xFF));
+            storeByte(offset + 2, (byte) (value & 0xFF));
         } else {
-            storeByte(woff, (byte) (value & 0xFF));
-            storeByte(woff + 1, (byte) (value >> 8 & 0xFF));
-            storeByte(woff + 2, (byte) (value >> 16 & 0xFF));
+            storeByte(offset, (byte) (value & 0xFF));
+            storeByte(offset + 1, (byte) (value >> 8 & 0xFF));
+            storeByte(offset + 2, (byte) (value >> 16 & 0xFF));
         }
         return this;
     }
@@ -911,14 +920,15 @@ public class UnsafeBuffer extends RcSupport<Buffer, UnsafeBuffer> implements Buf
     @Override
     public Buffer writeUnsignedMedium(int value) {
         checkWrite(woff, 3);
+        long offset = address + woff;
         if (order() == ByteOrder.BIG_ENDIAN) {
-            storeByte(woff, (byte) (value >> 16));
-            storeByte(woff + 1, (byte) (value >> 8 & 0xFF));
-            storeByte(woff + 2, (byte) (value & 0xFF));
+            storeByte(offset, (byte) (value >> 16));
+            storeByte(offset + 1, (byte) (value >> 8 & 0xFF));
+            storeByte(offset + 2, (byte) (value & 0xFF));
         } else {
-            storeByte(woff, (byte) (value & 0xFF));
-            storeByte(woff + 1, (byte) (value >> 8 & 0xFF));
-            storeByte(woff + 2, (byte) (value >> 16 & 0xFF));
+            storeByte(offset, (byte) (value & 0xFF));
+            storeByte(offset + 1, (byte) (value >> 8 & 0xFF));
+            storeByte(offset + 2, (byte) (value >> 16 & 0xFF));
         }
         woff += 3;
         return this;
@@ -927,14 +937,15 @@ public class UnsafeBuffer extends RcSupport<Buffer, UnsafeBuffer> implements Buf
     @Override
     public Buffer setUnsignedMedium(int woff, int value) {
         checkSet(woff, 3);
+        long offset = address + woff;
         if (order() == ByteOrder.BIG_ENDIAN) {
-            storeByte(woff, (byte) (value >> 16));
-            storeByte(woff + 1, (byte) (value >> 8 & 0xFF));
-            storeByte(woff + 2, (byte) (value & 0xFF));
+            storeByte(offset, (byte) (value >> 16));
+            storeByte(offset + 1, (byte) (value >> 8 & 0xFF));
+            storeByte(offset + 2, (byte) (value & 0xFF));
         } else {
-            storeByte(woff, (byte) (value & 0xFF));
-            storeByte(woff + 1, (byte) (value >> 8 & 0xFF));
-            storeByte(woff + 2, (byte) (value >> 16 & 0xFF));
+            storeByte(offset, (byte) (value & 0xFF));
+            storeByte(offset + 1, (byte) (value >> 8 & 0xFF));
+            storeByte(offset + 2, (byte) (value >> 16 & 0xFF));
         }
         return this;
     }
@@ -1231,6 +1242,7 @@ public class UnsafeBuffer extends RcSupport<Buffer, UnsafeBuffer> implements Buf
     void makeInaccessible() {
         rsize = CLOSED_SIZE;
         wsize = CLOSED_SIZE;
+        readOnly = false;
     }
 
     @Override
