@@ -1678,7 +1678,7 @@ public class BufferTest {
             var initial = NativeMemorySegmentManager.MEM_USAGE_NATIVE.sum();
             var allocator = fixture.createAllocator();
             allocator.close();
-            int iterations = 50;
+            int iterations = 15;
             int allocationSize = 1024;
             for (int i = 0; i < iterations; i++) {
                 allocateAndForget(allocator, allocationSize);
@@ -1700,7 +1700,7 @@ public class BufferTest {
                 throws InterruptedException {
             var initial = NativeMemorySegmentManager.MEM_USAGE_NATIVE.sum();
             try (var allocator = fixture.createAllocator()) {
-                int iterations = 50;
+                int iterations = 15;
                 int allocationSize = 1024;
                 for (int i = 0; i < iterations; i++) {
                     allocateAndForget(allocator, allocationSize);
