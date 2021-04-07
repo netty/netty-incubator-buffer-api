@@ -37,7 +37,7 @@ class ManagedBufferAllocator implements BufferAllocator, AllocatorControl {
     @Override
     public Object allocateUntethered(Buffer originator, int size) {
         BufferAllocator.checkSize(size);
-        var buf = manager.allocateShared(this, size, NO_OP_DROP, null);
+        var buf = manager.allocateShared(this, size, NO_OP_DROP, cleaner);
         return manager.unwrapRecoverableMemory(buf);
     }
 

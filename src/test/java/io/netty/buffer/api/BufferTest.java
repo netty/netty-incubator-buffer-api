@@ -1683,8 +1683,8 @@ public class BufferTest {
             for (int i = 0; i < iterations; i++) {
                 allocateAndForget(allocator, allocationSize);
                 System.gc();
-                System.runFinalization();
             }
+            System.runFinalization();
             var sum = NativeMemorySegmentManager.MEM_USAGE_NATIVE.sum() - initial;
             var totalAllocated = (long) allocationSize * iterations;
             assertThat(sum).isLessThan(totalAllocated);
@@ -1705,8 +1705,8 @@ public class BufferTest {
                 for (int i = 0; i < iterations; i++) {
                     allocateAndForget(allocator, allocationSize);
                     System.gc();
-                    System.runFinalization();
                 }
+                System.runFinalization();
                 var sum = NativeMemorySegmentManager.MEM_USAGE_NATIVE.sum() - initial;
                 var totalAllocated = (long) allocationSize * iterations;
                 assertThat(sum).isLessThan(totalAllocated);
