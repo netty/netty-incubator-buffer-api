@@ -31,10 +31,14 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.ReadOnlyBufferException;
 import java.text.ParseException;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.time.temporal.TemporalUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.SplittableRandom;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -43,6 +47,7 @@ import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.stream.Stream;
 import java.util.stream.Stream.Builder;
 
@@ -64,7 +69,7 @@ public class BufferTest {
     private static ExecutorService executor;
 
     private static final Memoize<Fixture[]> ALL_COMBINATIONS = new Memoize<>(
-            () -> fixtureCombinations().toArray(Fixture[]::new));
+            () -> fixtureCombinations().filter(sample()).toArray(Fixture[]::new));
     private static final Memoize<Fixture[]> NON_COMPOSITE = new Memoize<>(
             () -> Arrays.stream(ALL_COMBINATIONS.get()).filter(f -> !f.isComposite()).toArray(Fixture[]::new));
     private static final Memoize<Fixture[]> HEAP_ALLOCS = new Memoize<>(
@@ -73,6 +78,19 @@ public class BufferTest {
             () -> Arrays.stream(ALL_COMBINATIONS.get()).filter(f -> f.isDirect()).toArray(Fixture[]::new));
     private static final Memoize<Fixture[]> POOLED_ALLOCS = new Memoize<>(
             () -> Arrays.stream(ALL_COMBINATIONS.get()).filter(f -> f.isPooled()).toArray(Fixture[]::new));
+    private static final Memoize<Fixture[]> POOLED_DIRECT_ALLOCS = new Memoize<>(
+            () -> Arrays.stream(ALL_COMBINATIONS.get()).filter(
+                    f -> f.isPooled() && f.isDirect()).toArray(Fixture[]::new));
+
+    private static Predicate<Fixture> sample() {
+        String sampleSetting = System.getProperty("sample");
+        if ("nosample".equalsIgnoreCase(sampleSetting)) {
+            return fixture -> true;
+        }
+        Instant today = Instant.now().truncatedTo(ChronoUnit.DAYS);
+        SplittableRandom rng = new SplittableRandom(today.hashCode());
+        return fixture -> rng.nextInt(0, 100) <= 2; // Filter out 97% of tests.
+    }
 
     static Fixture[] allocators() {
         return ALL_COMBINATIONS.get();
@@ -92,6 +110,10 @@ public class BufferTest {
 
     static Fixture[] pooledAllocators() {
         return POOLED_ALLOCS.get();
+    }
+
+    static Fixture[] pooledDirectAllocators() {
+        return POOLED_DIRECT_ALLOCS.get();
     }
 
     static List<Fixture> initialAllocators() {
@@ -962,7 +984,7 @@ public class BufferTest {
         }
     }
 
-    @Disabled
+    @Disabled // TODO
     @ParameterizedTest
     @MethodSource("allocators")
     public void sliceMustBecomeOwnedOnSourceBufferClose(Fixture fixture) {
@@ -1650,42 +1672,42 @@ public class BufferTest {
     @Nested
     @Isolated
     class CleanerTests {
-        @Disabled("Precise native memory accounting does not work since recent panama-foreign changes.")
         @ParameterizedTest
-        @MethodSource("io.netty.buffer.api.BufTest#directAllocators")
+        @MethodSource("io.netty.buffer.api.BufferTest#directAllocators")
         public void bufferMustBeClosedByCleaner(Fixture fixture) throws InterruptedException {
+            var initial = NativeMemorySegmentManager.MEM_USAGE_NATIVE.sum();
             var allocator = fixture.createAllocator();
             allocator.close();
-            int iterations = 100;
+            int iterations = 50;
             int allocationSize = 1024;
             for (int i = 0; i < iterations; i++) {
                 allocateAndForget(allocator, allocationSize);
                 System.gc();
                 System.runFinalization();
             }
-            var sum = NativeMemorySegmentManager.MEM_USAGE_NATIVE.sum();
+            var sum = NativeMemorySegmentManager.MEM_USAGE_NATIVE.sum() - initial;
             var totalAllocated = (long) allocationSize * iterations;
             assertThat(sum).isLessThan(totalAllocated);
         }
 
-        private void allocateAndForget(BufferAllocator allocator, int size) {
+        private static void allocateAndForget(BufferAllocator allocator, int size) {
             allocator.allocate(size);
         }
 
-        @Disabled("Precise native memory accounting does not work since recent panama-foreign changes.")
         @ParameterizedTest
-        @MethodSource("io.netty.buffer.api.BufTest#directPooledAllocators")
+        @MethodSource("io.netty.buffer.api.BufferTest#pooledDirectAllocators")
         public void buffersMustBeReusedByPoolingAllocatorEvenWhenDroppedByCleanerInsteadOfExplicitly(Fixture fixture)
                 throws InterruptedException {
+            var initial = NativeMemorySegmentManager.MEM_USAGE_NATIVE.sum();
             try (var allocator = fixture.createAllocator()) {
-                int iterations = 100;
+                int iterations = 50;
                 int allocationSize = 1024;
                 for (int i = 0; i < iterations; i++) {
                     allocateAndForget(allocator, allocationSize);
                     System.gc();
                     System.runFinalization();
                 }
-                var sum = NativeMemorySegmentManager.MEM_USAGE_NATIVE.sum();
+                var sum = NativeMemorySegmentManager.MEM_USAGE_NATIVE.sum() - initial;
                 var totalAllocated = (long) allocationSize * iterations;
                 assertThat(sum).isLessThan(totalAllocated);
             }

@@ -60,12 +60,19 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
 
     static {
         try (ResourceScope scope = ResourceScope.newSharedScope()) {
-            CLOSED_SEGMENT = MemorySegment.allocateNative(1, scope);
+            // We are not allowed to allocate a zero-sized native buffer, but we *can* take a zero-sized slice from it.
+            // We need the CLOSED_SEGMENT to have a size of zero, because we'll use its size for bounds checks after
+            // the buffer is closed.
+            MemorySegment segment = MemorySegment.allocateNative(1, scope);
+            CLOSED_SEGMENT = segment.asSlice(0, 0);
         }
         SEGMENT_CLOSE = new Drop<MemSegBuffer>() {
             @Override
             public void drop(MemSegBuffer buf) {
-                buf.base.scope().close();
+                ResourceScope scope = buf.base.scope();
+                if (!scope.isImplicit()) {
+                    scope.close();
+                }
             }
 
             @Override

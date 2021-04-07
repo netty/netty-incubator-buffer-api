@@ -173,6 +173,9 @@
           <argLine>${argLine.common} ${argLine.printGC} --add-modules jdk.incubator.foreign</argLine>
           <!-- Ensure the whole stacktrace is preserved when an exception is thrown. See https://issues.apache.org/jira/browse/SUREFIRE-1457 -->
           <trimStackTrace>false</trimStackTrace>
+          <systemProperties>
+            <sample>nosample</sample>
+          </systemProperties>
         </configuration>
         <dependencies>
           <!-- Declare the surefire dynamic dependencies explicitly, to speed up the docker build. -->

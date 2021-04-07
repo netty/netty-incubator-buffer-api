@@ -22,6 +22,8 @@ import java.lang.ref.Cleaner;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.LongAdder;
 
+import static jdk.incubator.foreign.ResourceScope.newSharedScope;
+
 public class NativeMemorySegmentManager extends AbstractMemorySegmentManager {
     public static final LongAdder MEM_USAGE_NATIVE = new LongAdder();
     private static final ConcurrentHashMap<Long, Runnable> CLEANUP_ACTIONS = new ConcurrentHashMap<>();
@@ -37,7 +39,7 @@ public class NativeMemorySegmentManager extends AbstractMemorySegmentManager {
 
     @Override
     protected MemorySegment createSegment(long size, Cleaner cleaner) {
-        final ResourceScope scope = ResourceScope.newSharedScope(cleaner);
+        final ResourceScope scope = cleaner == null ? newSharedScope() : newSharedScope(cleaner);
         scope.addOnClose(getCleanupAction(size));
         var segment = MemorySegment.allocateNative(size, scope);
         MEM_USAGE_NATIVE.add(size);
