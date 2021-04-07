@@ -17,6 +17,8 @@ package io.netty.buffer.api.memseg;
 
 import jdk.incubator.foreign.MemorySegment;
 
+import java.lang.ref.Cleaner;
+
 public class HeapMemorySegmentManager extends AbstractMemorySegmentManager {
     @Override
     public boolean isNative() {
@@ -24,7 +26,7 @@ public class HeapMemorySegmentManager extends AbstractMemorySegmentManager {
     }
 
     @Override
-    protected MemorySegment createSegment(long size) {
+    protected MemorySegment createSegment(long size, Cleaner cleaner) {
         return MemorySegment.ofArray(new byte[Math.toIntExact(size)]);
     }
 }

@@ -16,7 +16,9 @@
 package io.netty.buffer.api.memseg;
 
 import jdk.incubator.foreign.MemorySegment;
+import jdk.incubator.foreign.ResourceScope;
 
+import java.lang.ref.Cleaner;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.LongAdder;
 
@@ -34,9 +36,10 @@ public class NativeMemorySegmentManager extends AbstractMemorySegmentManager {
     }
 
     @Override
-    protected MemorySegment createSegment(long size) {
-        var segment = MemorySegment.allocateNative(size);
-//                                       .withCleanupAction(Statics.getCleanupAction(size));
+    protected MemorySegment createSegment(long size, Cleaner cleaner) {
+        final ResourceScope scope = ResourceScope.newSharedScope(cleaner);
+        scope.addOnClose(getCleanupAction(size));
+        var segment = MemorySegment.allocateNative(size, scope);
         MEM_USAGE_NATIVE.add(size);
         return segment;
     }
