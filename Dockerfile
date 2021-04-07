@@ -6,7 +6,7 @@ RUN dnf -y install file findutils unzip zip libXtst-devel libXt-devel libXrender
 
 # Build panama-foreign openjdk
 WORKDIR /home/build
-RUN git clone https://github.com/openjdk/panama-foreign.git panama-foreign
+RUN git clone --branch foreign-memaccess+abi https://github.com/openjdk/panama-foreign.git panama-foreign
 WORKDIR /home/build/panama-foreign
 RUN chmod +x configure
 RUN ./configure --with-debug-level=fastdebug \
