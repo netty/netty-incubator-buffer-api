@@ -22,7 +22,6 @@ import java.lang.ref.Cleaner;
 
 public interface MemoryManager {
     boolean isNative();
-    Buffer allocateConfined(AllocatorControl allocatorControl, long size, Drop<Buffer> drop, Cleaner cleaner);
     Buffer allocateShared(AllocatorControl allocatorControl, long size, Drop<Buffer> drop, Cleaner cleaner);
     Drop<Buffer> drop();
     Object unwrapRecoverableMemory(Buffer buf);

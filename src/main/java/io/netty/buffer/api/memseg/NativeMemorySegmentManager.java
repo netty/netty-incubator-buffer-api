@@ -16,16 +16,40 @@
 package io.netty.buffer.api.memseg;
 
 import jdk.incubator.foreign.MemorySegment;
+import jdk.incubator.foreign.ResourceScope;
 
+import java.lang.ref.Cleaner;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.LongAdder;
+import java.util.function.Function;
+
+import static jdk.incubator.foreign.ResourceScope.newSharedScope;
 
 public class NativeMemorySegmentManager extends AbstractMemorySegmentManager {
     public static final LongAdder MEM_USAGE_NATIVE = new LongAdder();
     private static final ConcurrentHashMap<Long, Runnable> CLEANUP_ACTIONS = new ConcurrentHashMap<>();
+    private static final Function<Long, Runnable> CLEANUP_ACTION_MAKER = s -> new ReduceNativeMemoryUsage(s);
 
     static Runnable getCleanupAction(long size) {
-        return CLEANUP_ACTIONS.computeIfAbsent(size, s -> () -> MEM_USAGE_NATIVE.add(-s));
+        return CLEANUP_ACTIONS.computeIfAbsent(size, CLEANUP_ACTION_MAKER);
+    }
+
+    private static final class ReduceNativeMemoryUsage implements Runnable {
+        private final long size;
+
+        private ReduceNativeMemoryUsage(long size) {
+            this.size = size;
+        }
+
+        @Override
+        public void run() {
+            MEM_USAGE_NATIVE.add(-size);
+        }
+
+        @Override
+        public String toString() {
+            return "ReduceNativeMemoryUsage(by " + size + " bytes)";
+        }
     }
 
     @Override
@@ -34,9 +58,10 @@ public class NativeMemorySegmentManager extends AbstractMemorySegmentManager {
     }
 
     @Override
-    protected MemorySegment createSegment(long size) {
-        var segment = MemorySegment.allocateNative(size);
-//                                       .withCleanupAction(Statics.getCleanupAction(size));
+    protected MemorySegment createSegment(long size, Cleaner cleaner) {
+        final ResourceScope scope = cleaner == null ? newSharedScope() : newSharedScope(cleaner);
+        scope.addOnClose(getCleanupAction(size));
+        var segment = MemorySegment.allocateNative(size, scope);
         MEM_USAGE_NATIVE.add(size);
         return segment;
     }

@@ -16,6 +16,7 @@
 package io.netty.buffer.api.benchmarks;
 
 import jdk.incubator.foreign.MemorySegment;
+import jdk.incubator.foreign.ResourceScope;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
@@ -65,30 +66,16 @@ public class MemorySegmentCloseBenchmark {
     }
 
     @Benchmark
-    public MemorySegment heapConfined() {
-        try (MemorySegment segment = MemorySegment.ofArray(array)) {
-            return segment;
-        }
-    }
-
-    @Benchmark
-    public MemorySegment heapShared() {
-        try (MemorySegment segment = MemorySegment.ofArray(array).share()) {
-            return segment;
-        }
-    }
-
-    @Benchmark
     public MemorySegment nativeConfined() {
-        try (MemorySegment segment = MemorySegment.allocateNative(size)) {
-            return segment;
+        try (ResourceScope scope = ResourceScope.newConfinedScope()) {
+            return MemorySegment.allocateNative(size, scope);
         }
     }
 
     @Benchmark
     public MemorySegment nativeShared() {
-        try (MemorySegment segment = MemorySegment.allocateNative(size).share()) {
-            return segment;
+        try (ResourceScope scope = ResourceScope.newSharedScope()) {
+            return MemorySegment.allocateNative(size, scope);
         }
     }
 }

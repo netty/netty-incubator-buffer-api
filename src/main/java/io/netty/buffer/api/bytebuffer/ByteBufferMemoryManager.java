@@ -40,11 +40,6 @@ public class ByteBufferMemoryManager implements MemoryManager {
     }
 
     @Override
-    public Buffer allocateConfined(AllocatorControl allocatorControl, long size, Drop<Buffer> drop, Cleaner cleaner) {
-        return allocateShared(allocatorControl, size, drop, cleaner);
-    }
-
-    @Override
     public Buffer allocateShared(AllocatorControl allocatorControl, long size, Drop<Buffer> drop, Cleaner cleaner) {
         int capacity = Math.toIntExact(size);
         ByteBuffer buffer = direct? ByteBuffer.allocateDirect(capacity) : ByteBuffer.allocate(capacity);

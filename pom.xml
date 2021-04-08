@@ -70,7 +70,7 @@
     <javaModuleName>io.netty.incubator.buffer</javaModuleName>
     <netty.version>5.0.0.Final-SNAPSHOT</netty.version>
     <netty.build.version>29</netty.build.version>
-    <java.version>16</java.version>
+    <java.version>17</java.version>
     <junit.version>5.7.0</junit.version>
     <surefire.version>3.0.0-M5</surefire.version>
     <skipTests>false</skipTests>
@@ -173,6 +173,9 @@
           <argLine>${argLine.common} ${argLine.printGC} --add-modules jdk.incubator.foreign</argLine>
           <!-- Ensure the whole stacktrace is preserved when an exception is thrown. See https://issues.apache.org/jira/browse/SUREFIRE-1457 -->
           <trimStackTrace>false</trimStackTrace>
+          <systemProperties>
+            <sample>nosample</sample>
+          </systemProperties>
         </configuration>
         <dependencies>
           <!-- Declare the surefire dynamic dependencies explicitly, to speed up the docker build. -->

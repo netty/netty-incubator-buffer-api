@@ -31,24 +31,12 @@ public abstract class AbstractMemorySegmentManager implements MemoryManager {
     public abstract boolean isNative();
 
     @Override
-    public Buffer allocateConfined(AllocatorControl allocatorControl, long size, Drop<Buffer> drop, Cleaner cleaner) {
-        var segment = createSegment(size);
-        if (cleaner != null) {
-            segment = segment.registerCleaner(cleaner);
-        }
-        return new MemSegBuffer(segment, segment, convert(drop), allocatorControl);
-    }
-
-    @Override
     public Buffer allocateShared(AllocatorControl allocatorControl, long size, Drop<Buffer> drop, Cleaner cleaner) {
-        var segment = createSegment(size).share();
-        if (cleaner != null) {
-            segment = segment.registerCleaner(cleaner);
-        }
+        var segment = createSegment(size, cleaner);
         return new MemSegBuffer(segment, segment, convert(drop), allocatorControl);
     }
 
-    protected abstract MemorySegment createSegment(long size);
+    protected abstract MemorySegment createSegment(long size, Cleaner cleaner);
 
     @Override
     public Drop<Buffer> drop() {

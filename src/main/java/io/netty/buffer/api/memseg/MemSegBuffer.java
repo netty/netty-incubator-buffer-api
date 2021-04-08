@@ -33,6 +33,7 @@ import io.netty.buffer.api.adaptor.ByteBufAllocatorAdaptor;
 import io.netty.buffer.api.internal.ArcDrop;
 import io.netty.buffer.api.internal.Statics;
 import jdk.incubator.foreign.MemorySegment;
+import jdk.incubator.foreign.ResourceScope;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -58,12 +59,20 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
     static final Drop<MemSegBuffer> SEGMENT_CLOSE;
 
     static {
-        CLOSED_SEGMENT = MemorySegment.ofArray(new byte[0]);
-        CLOSED_SEGMENT.close();
+        try (ResourceScope scope = ResourceScope.newSharedScope()) {
+            // We are not allowed to allocate a zero-sized native buffer, but we *can* take a zero-sized slice from it.
+            // We need the CLOSED_SEGMENT to have a size of zero, because we'll use its size for bounds checks after
+            // the buffer is closed.
+            MemorySegment segment = MemorySegment.allocateNative(1, scope);
+            CLOSED_SEGMENT = segment.asSlice(0, 0);
+        }
         SEGMENT_CLOSE = new Drop<MemSegBuffer>() {
             @Override
             public void drop(MemSegBuffer buf) {
-                buf.base.close();
+                ResourceScope scope = buf.base.scope();
+                if (!scope.isImplicit()) {
+                    scope.close();
+                }
             }
 
             @Override
@@ -298,16 +307,12 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
 
     @Override
     public void copyInto(int srcPos, byte[] dest, int destPos, int length) {
-        try (var target = MemorySegment.ofArray(dest)) {
-            copyInto(srcPos, target, destPos, length);
-        }
+        copyInto(srcPos, MemorySegment.ofArray(dest), destPos, length);
     }
 
     @Override
     public void copyInto(int srcPos, ByteBuffer dest, int destPos, int length) {
-        try (var target = MemorySegment.ofByteBuffer(dest.duplicate().clear())) {
-            copyInto(srcPos, target, destPos, length);
-        }
+        copyInto(srcPos, MemorySegment.ofByteBuffer(dest.duplicate().clear()), destPos, length);
     }
 
     private void copyInto(int srcPos, MemorySegment dest, int destPos, int length) {
@@ -1078,8 +1083,7 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
         var roff = this.roff;
         var woff = this.woff;
         var readOnly = readOnly();
-        boolean isConfined = seg.ownerThread() == null;
-        MemorySegment transferSegment = isConfined? seg : seg.share(); // TODO remove confimenent checks
+        MemorySegment transferSegment = seg;
         MemorySegment base = this.base;
         makeInaccessible();
         return new Owned<MemSegBuffer>() {
