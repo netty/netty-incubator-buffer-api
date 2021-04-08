@@ -69,18 +69,36 @@ public class BufferTest {
     private static ExecutorService executor;
 
     private static final Memoize<Fixture[]> ALL_COMBINATIONS = new Memoize<>(
-            () -> fixtureCombinations().filter(sample()).toArray(Fixture[]::new));
+            () -> fixtureCombinations().toArray(Fixture[]::new));
+    private static final Memoize<Fixture[]> ALL_ALLOCATORS = new Memoize<>(
+            () -> Arrays.stream(ALL_COMBINATIONS.get())
+                    .filter(sample())
+                    .toArray(Fixture[]::new));
     private static final Memoize<Fixture[]> NON_COMPOSITE = new Memoize<>(
-            () -> Arrays.stream(ALL_COMBINATIONS.get()).filter(f -> !f.isComposite()).toArray(Fixture[]::new));
+            () -> Arrays.stream(ALL_COMBINATIONS.get())
+                    .filter(f -> !f.isComposite())
+                    .filter(sample())
+                    .toArray(Fixture[]::new));
     private static final Memoize<Fixture[]> HEAP_ALLOCS = new Memoize<>(
-            () -> Arrays.stream(ALL_COMBINATIONS.get()).filter(f -> f.isHeap()).toArray(Fixture[]::new));
+            () -> Arrays.stream(ALL_COMBINATIONS.get())
+                    .filter(f -> f.isHeap())
+                    .filter(sample())
+                    .toArray(Fixture[]::new));
     private static final Memoize<Fixture[]> DIRECT_ALLOCS = new Memoize<>(
-            () -> Arrays.stream(ALL_COMBINATIONS.get()).filter(f -> f.isDirect()).toArray(Fixture[]::new));
+            () -> Arrays.stream(ALL_COMBINATIONS.get())
+                    .filter(f -> f.isDirect())
+                    .filter(sample())
+                    .toArray(Fixture[]::new));
     private static final Memoize<Fixture[]> POOLED_ALLOCS = new Memoize<>(
-            () -> Arrays.stream(ALL_COMBINATIONS.get()).filter(f -> f.isPooled()).toArray(Fixture[]::new));
+            () -> Arrays.stream(ALL_COMBINATIONS.get())
+                    .filter(f -> f.isPooled())
+                    .filter(sample())
+                    .toArray(Fixture[]::new));
     private static final Memoize<Fixture[]> POOLED_DIRECT_ALLOCS = new Memoize<>(
-            () -> Arrays.stream(ALL_COMBINATIONS.get()).filter(
-                    f -> f.isPooled() && f.isDirect()).toArray(Fixture[]::new));
+            () -> Arrays.stream(ALL_COMBINATIONS.get())
+                    .filter(f -> f.isPooled() && f.isDirect())
+                    .filter(sample())
+                    .toArray(Fixture[]::new));
 
     private static Predicate<Fixture> sample() {
         String sampleSetting = System.getProperty("sample");
@@ -89,11 +107,15 @@ public class BufferTest {
         }
         Instant today = Instant.now().truncatedTo(ChronoUnit.DAYS);
         SplittableRandom rng = new SplittableRandom(today.hashCode());
-        return fixture -> rng.nextInt(0, 100) <= 2; // Filter out 97% of tests.
+        AtomicInteger counter = new AtomicInteger();
+        return fixture -> {
+            boolean res = counter.getAndIncrement() < 1 || rng.nextInt(0, 100) <= 2;
+            return res;
+        }; // Filter out 97% of tests.
     }
 
     static Fixture[] allocators() {
-        return ALL_COMBINATIONS.get();
+        return ALL_ALLOCATORS.get();
     }
 
     static Fixture[] nonCompositeAllocators() {
@@ -1672,6 +1694,7 @@ public class BufferTest {
     @Nested
     @Isolated
     class CleanerTests {
+        @Disabled("Too slow, for now")
         @ParameterizedTest
         @MethodSource("io.netty.buffer.api.BufferTest#directAllocators")
         public void bufferMustBeClosedByCleaner(Fixture fixture) throws InterruptedException {
@@ -1694,6 +1717,7 @@ public class BufferTest {
             allocator.allocate(size);
         }
 
+        @Disabled("Too slow, for now")
         @ParameterizedTest
         @MethodSource("io.netty.buffer.api.BufferTest#pooledDirectAllocators")
         public void buffersMustBeReusedByPoolingAllocatorEvenWhenDroppedByCleanerInsteadOfExplicitly(Fixture fixture)
