@@ -18,7 +18,8 @@ clean:
 
 build: image
 	docker create --name build-container netty-incubator-buffer:build
-	docker start -a build-container || (docker cp build-container:/home/build/target . && false)
-	docker wait build-container || (docker cp build-container:/home/build/target . && false)
+	mkdir -p target/container-output
+	docker start -a build-container || (docker cp build-container:/home/build target/container-output && false)
+	docker wait build-container || (docker cp build-container:/home/build target/container-output && false)
 	docker cp build-container:/home/build/target .
 	docker rm build-container

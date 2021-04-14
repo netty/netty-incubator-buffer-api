@@ -45,6 +45,11 @@ public interface ByteCursor {
     /**
      * Return the last 8 bytes read by {@link #readLong()}.
      * If {@link #readLong()} has not been called on this cursor before, then {@code -1} is returned.
+     * <p>
+     * The long value is in the big-endian format, such that the highest-order by of the long value, is the byte that
+     * would otherwise have been produced by a {@link #readByte()} / {@link #getByte()} pair.
+     * This means that cursors that iterate in reverse, e.g. from {@link Buffer#openReverseCursor()}, return longs in a
+     * "mirrored" or "reversed" big-endian format.
      *
      * @return The 8 bytes, in big-endian format, that was read by the most recent successful call to
      * {@link #readLong()}.

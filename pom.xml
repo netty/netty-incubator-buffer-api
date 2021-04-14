@@ -75,12 +75,12 @@
     <surefire.version>3.0.0-M5</surefire.version>
     <skipTests>false</skipTests>
     <argLine.common>
-      -server
-      -dsa -da -ea:io.netty...
       -XX:+HeapDumpOnOutOfMemoryError
+      -Xmx2g
+      -Dio.netty.tryReflectionSetAccessible=true
+      --add-opens java.base/java.nio=io.netty.common
+      --add-modules jdk.incubator.foreign
     </argLine.common>
-<!--    <argLine.printGC>-XX:+PrintGCDetails</argLine.printGC>-->
-    <argLine.printGC/>
   </properties>
 
   <build>
@@ -170,9 +170,12 @@
           <includes>
             <include>**/*Test*.java</include>
           </includes>
-          <argLine>${argLine.common} ${argLine.printGC} --add-modules jdk.incubator.foreign</argLine>
+          <argLine>${argLine.common}</argLine>
           <!-- Ensure the whole stacktrace is preserved when an exception is thrown. See https://issues.apache.org/jira/browse/SUREFIRE-1457 -->
           <trimStackTrace>false</trimStackTrace>
+          <forkedProcessExitTimeoutInSeconds>600</forkedProcessExitTimeoutInSeconds>
+          <!-- Not reusing forks lets us be more frugal with memory. We have a lot of tests, and they need a lot of metadata -->
+          <reuseForks>false</reuseForks>
           <systemProperties>
             <sample>nosample</sample>
           </systemProperties>

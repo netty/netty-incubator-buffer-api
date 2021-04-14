@@ -38,6 +38,8 @@ import jdk.incubator.foreign.ResourceScope;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
+import static io.netty.buffer.api.internal.Statics.bufferIsClosed;
+import static io.netty.buffer.api.internal.Statics.bufferIsReadOnly;
 import static jdk.incubator.foreign.MemoryAccess.getByteAtOffset;
 import static jdk.incubator.foreign.MemoryAccess.getCharAtOffset;
 import static jdk.incubator.foreign.MemoryAccess.getDoubleAtOffset;
@@ -1166,14 +1168,6 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
             return bufferIsReadOnly();
         }
         return outOfBounds(index);
-    }
-
-    private static IllegalStateException bufferIsClosed() {
-        return new IllegalStateException("This buffer is closed.");
-    }
-
-    private static IllegalStateException bufferIsReadOnly() {
-        return new IllegalStateException("This buffer is read-only.");
     }
 
     private IndexOutOfBoundsException outOfBounds(int index) {
