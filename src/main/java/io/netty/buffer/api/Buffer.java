@@ -292,43 +292,6 @@ public interface Buffer extends Rc<Buffer>, BufferAccessors {
     boolean readOnly();
 
     /**
-     * Returns a slice of this buffer's readable bytes.
-     * Modifying the content of the returned buffer or this buffer affects each other's content,
-     * while they maintain separate offsets. This method is identical to
-     * {@code buf.slice(buf.readerOffset(), buf.readableBytes())}.
-     * This method does not modify {@link #readerOffset()} or {@link #writerOffset()} of this buffer.
-     * <p>
-     * This method increments the reference count of this buffer.
-     * The reference count is decremented again when the slice is deallocated.
-     * <p>
-     * The slice is created with a {@linkplain #writerOffset() write offset} equal to the length of the slice,
-     * so that the entire contents of the slice is ready to be read.
-     *
-     * @return A new buffer instance, with independent {@link #readerOffset()} and {@link #writerOffset()},
-     * that is a view of the readable region of this buffer.
-     */
-    default Buffer slice() {
-        return slice(readerOffset(), readableBytes());
-    }
-
-    /**
-     * Returns a slice of the given region of this buffer.
-     * Modifying the content of the returned buffer or this buffer affects each other's content,
-     * while they maintain separate offsets.
-     * This method does not modify {@link #readerOffset()} or {@link #writerOffset()} of this buffer.
-     * <p>
-     * This method increments the reference count of this buffer.
-     * The reference count is decremented again when the slice is deallocated.
-     * <p>
-     * The slice is created with a {@linkplain #writerOffset() write offset} equal to the length of the slice,
-     * so that the entire contents of the slice is ready to be read.
-     *
-     * @return A new buffer instance, with independent {@link #readerOffset()} and {@link #writerOffset()},
-     * that is a view of the given region of this buffer.
-     */
-    Buffer slice(int offset, int length);
-
-    /**
      * Copies the given length of data from this buffer into the given destination array, beginning at the given source
      * position in this buffer, and the given destination position in the destination array.
      * <p>
@@ -516,6 +479,43 @@ public interface Buffer extends Rc<Buffer>, BufferAccessors {
      *      * or is {@linkplain #readOnly() read-only}.
      */
     void ensureWritable(int size, boolean allowCompaction);
+
+    /**
+     * Returns a slice of this buffer's readable bytes.
+     * Modifying the content of the returned buffer or this buffer affects each other's content,
+     * while they maintain separate offsets. This method is identical to
+     * {@code buf.slice(buf.readerOffset(), buf.readableBytes())}.
+     * This method does not modify {@link #readerOffset()} or {@link #writerOffset()} of this buffer.
+     * <p>
+     * This method increments the reference count of this buffer.
+     * The reference count is decremented again when the slice is deallocated.
+     * <p>
+     * The slice is created with a {@linkplain #writerOffset() write offset} equal to the length of the slice,
+     * so that the entire contents of the slice is ready to be read.
+     *
+     * @return A new buffer instance, with independent {@link #readerOffset()} and {@link #writerOffset()},
+     * that is a view of the readable region of this buffer.
+     */
+    default Buffer slice() {
+        return slice(readerOffset(), readableBytes());
+    }
+
+    /**
+     * Returns a slice of the given region of this buffer.
+     * Modifying the content of the returned buffer or this buffer affects each other's content,
+     * while they maintain separate offsets.
+     * This method does not modify {@link #readerOffset()} or {@link #writerOffset()} of this buffer.
+     * <p>
+     * This method increments the reference count of this buffer.
+     * The reference count is decremented again when the slice is deallocated.
+     * <p>
+     * The slice is created with a {@linkplain #writerOffset() write offset} equal to the length of the slice,
+     * so that the entire contents of the slice is ready to be read.
+     *
+     * @return A new buffer instance, with independent {@link #readerOffset()} and {@link #writerOffset()},
+     * that is a view of the given region of this buffer.
+     */
+    Buffer slice(int offset, int length);
 
     /**
      * Split the buffer into two, at the {@linkplain #writerOffset() write offset} position.
