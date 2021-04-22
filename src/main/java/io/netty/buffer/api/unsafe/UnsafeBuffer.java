@@ -398,13 +398,16 @@ public class UnsafeBuffer extends RcSupport<Buffer, UnsafeBuffer> implements Buf
     }
 
     @Override
-    public void ensureWritable(int size, boolean allowCompaction) {
+    public void ensureWritable(int size, int minimumGrowth, boolean allowCompaction) {
         if (!isOwned()) {
             throw attachTrace(new IllegalStateException(
                     "Buffer is not owned. Only owned buffers can call ensureWritable."));
         }
         if (size < 0) {
             throw new IllegalArgumentException("Cannot ensure writable for a negative size: " + size + '.');
+        }
+        if (minimumGrowth < 0) {
+            throw new IllegalArgumentException("The minimum growth cannot be negative: " + minimumGrowth + '.');
         }
         if (rsize != wsize) {
             throw bufferIsReadOnly();
@@ -421,7 +424,7 @@ public class UnsafeBuffer extends RcSupport<Buffer, UnsafeBuffer> implements Buf
         }
 
         // Allocate a bigger buffer.
-        long newSize = capacity() + size - (long) writableBytes();
+        long newSize = capacity() + (long) Math.max(size - writableBytes(), minimumGrowth);
         BufferAllocator.checkSize(newSize);
         UnsafeMemory memory = (UnsafeMemory) control.allocateUntethered(this, (int) newSize);
 
@@ -455,27 +458,34 @@ public class UnsafeBuffer extends RcSupport<Buffer, UnsafeBuffer> implements Buf
     }
 
     @Override
-    public Buffer bifurcate() {
+    public Buffer bifurcate(int splitOffset) {
+        if (splitOffset < 0) {
+            throw new IllegalArgumentException("The split offset cannot be negative: " + splitOffset + '.');
+        }
+        if (capacity() < splitOffset) {
+            throw new IllegalArgumentException("The split offset cannot be greater than the buffer capacity, " +
+                    "but the split offset was " + splitOffset + ", and capacity is " + capacity() + '.');
+        }
         if (!isOwned()) {
             throw attachTrace(new IllegalStateException("Cannot bifurcate a buffer that is not owned."));
         }
         var drop = (ArcDrop<UnsafeBuffer>) unsafeGetDrop();
         unsafeSetDrop(new ArcDrop<>(drop));
         // TODO maybe incrementing the existing ArcDrop is enough; maybe we don't need to wrap it in another ArcDrop.
-        var bifurcatedBuf = new UnsafeBuffer(memory, baseOffset, woff, control, new ArcDrop<>(drop.increment()));
-        bifurcatedBuf.woff = woff;
-        bifurcatedBuf.roff = roff;
+        var bifurcatedBuf = new UnsafeBuffer(memory, baseOffset, splitOffset, control, new ArcDrop<>(drop.increment()));
+        bifurcatedBuf.woff = Math.min(woff, splitOffset);
+        bifurcatedBuf.roff = Math.min(roff, splitOffset);
         bifurcatedBuf.order(order());
         boolean readOnly = readOnly();
         bifurcatedBuf.readOnly(readOnly);
-        rsize -= woff;
-        baseOffset += woff;
-        address += woff;
+        rsize -= splitOffset;
+        baseOffset += splitOffset;
+        address += splitOffset;
         if (!readOnly) {
             wsize = rsize;
         }
-        woff = 0;
-        roff = 0;
+        woff = Math.max(woff, splitOffset) - splitOffset;
+        roff = Math.max(roff, splitOffset) - splitOffset;
         return bifurcatedBuf;
     }
 

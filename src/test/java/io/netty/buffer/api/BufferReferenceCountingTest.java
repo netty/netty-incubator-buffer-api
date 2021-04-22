@@ -403,6 +403,26 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
 
     @ParameterizedTest
     @MethodSource("allocators")
+    public void bifurcateWithNegativeOffsetMustThrow(Fixture fixture) {
+        try (BufferAllocator allocator = fixture.createAllocator();
+             Buffer buf = allocator.allocate(8)) {
+            buf.bifurcate(0).close();
+            assertThrows(IllegalArgumentException.class, () -> buf.bifurcate(-1));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    public void bifurcateWithOversizedOffsetMustThrow(Fixture fixture) {
+        try (BufferAllocator allocator = fixture.createAllocator();
+             Buffer buf = allocator.allocate(8)) {
+            assertThrows(IllegalArgumentException.class, () -> buf.bifurcate(9));
+            buf.bifurcate(8).close();
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
     public void bifurcateOfNonOwnedBufferMustThrow(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
@@ -410,6 +430,53 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
             try (Buffer acquired = buf.acquire()) {
                 var exc = assertThrows(IllegalStateException.class, () -> acquired.bifurcate());
                 assertThat(exc).hasMessageContaining("owned");
+            }
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    public void bifurcateOnOffsetOfNonOwnedBufferMustThrow(Fixture fixture) {
+        try (BufferAllocator allocator = fixture.createAllocator();
+             Buffer buf = allocator.allocate(8)) {
+            try (Buffer acquired = buf.acquire()) {
+                var exc = assertThrows(IllegalStateException.class, () -> acquired.bifurcate(4));
+                assertThat(exc).hasMessageContaining("owned");
+            }
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    public void bifurcateOnOffsetMustTruncateGreaterOffsets(Fixture fixture) {
+        try (BufferAllocator allocator = fixture.createAllocator();
+             Buffer buf = allocator.allocate(8)) {
+            buf.writeInt(0x01020304);
+            buf.writeByte((byte) 0x05);
+            buf.readInt();
+            try (Buffer bif = buf.bifurcate(2)) {
+                assertThat(buf.readerOffset()).isEqualTo(2);
+                assertThat(buf.writerOffset()).isEqualTo(3);
+
+                assertThat(bif.readerOffset()).isEqualTo(2);
+                assertThat(bif.writerOffset()).isEqualTo(2);
+            }
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    public void bifurcateOnOffsetMustExtendLesserOffsets(Fixture fixture) {
+        try (BufferAllocator allocator = fixture.createAllocator();
+             Buffer buf = allocator.allocate(8)) {
+            buf.writeInt(0x01020304);
+            buf.readInt();
+            try (Buffer bif = buf.bifurcate(6)) {
+                assertThat(buf.readerOffset()).isEqualTo(0);
+                assertThat(buf.writerOffset()).isEqualTo(0);
+
+                assertThat(bif.readerOffset()).isEqualTo(4);
+                assertThat(bif.writerOffset()).isEqualTo(4);
             }
         }
     }
@@ -502,6 +569,27 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
                         assertThrows(IndexOutOfBoundsException.class, () -> c.readByte());
                         assertThrows(IndexOutOfBoundsException.class, () -> buf.readByte());
                     }
+                }
+            }
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    public void mustBePossibleToBifurcateOwnedSlices(Fixture fixture) {
+        try (BufferAllocator allocator = fixture.createAllocator()) {
+            Buffer buf = allocator.allocate(16).order(BIG_ENDIAN);
+            buf.writeLong(0x0102030405060708L);
+            try (Buffer slice = buf.slice()) {
+                buf.close();
+                assertTrue(slice.isOwned());
+                try (Buffer bifurcate = slice.bifurcate(4)) {
+                    bifurcate.reset().ensureWritable(Long.BYTES);
+                    slice.reset().ensureWritable(Long.BYTES);
+                    assertThat(bifurcate.capacity()).isEqualTo(Long.BYTES);
+                    assertThat(slice.capacity()).isEqualTo(Long.BYTES);
+                    assertThat(bifurcate.getLong(0)).isEqualTo(0x01020304_00000000L);
+                    assertThat(slice.getLong(0)).isEqualTo(0x05060708_00000000L);
                 }
             }
         }

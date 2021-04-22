@@ -364,13 +364,16 @@ class NioBuffer extends RcSupport<Buffer, NioBuffer> implements Buffer, Readable
     }
 
     @Override
-    public void ensureWritable(int size, boolean allowCompaction) {
+    public void ensureWritable(int size, int minimumGrowth, boolean allowCompaction) {
         if (!isOwned()) {
             throw attachTrace(new IllegalStateException(
                     "Buffer is not owned. Only owned buffers can call ensureWritable."));
         }
         if (size < 0) {
             throw new IllegalArgumentException("Cannot ensure writable for a negative size: " + size + '.');
+        }
+        if (minimumGrowth < 0) {
+            throw new IllegalArgumentException("The minimum growth cannot be negative: " + minimumGrowth + '.');
         }
         if (rmem != wmem) {
             throw bufferIsReadOnly();
@@ -387,7 +390,7 @@ class NioBuffer extends RcSupport<Buffer, NioBuffer> implements Buffer, Readable
         }
 
         // Allocate a bigger buffer.
-        long newSize = capacity() + size - (long) writableBytes();
+        long newSize = capacity() + (long) Math.max(size - writableBytes(), minimumGrowth);
         BufferAllocator.checkSize(newSize);
         ByteBuffer buffer = (ByteBuffer) control.allocateUntethered(this, (int) newSize);
         buffer.order(order());
@@ -414,26 +417,33 @@ class NioBuffer extends RcSupport<Buffer, NioBuffer> implements Buffer, Readable
     }
 
     @Override
-    public Buffer bifurcate() {
+    public Buffer bifurcate(int splitOffset) {
+        if (splitOffset < 0) {
+            throw new IllegalArgumentException("The split offset cannot be negative: " + splitOffset + '.');
+        }
+        if (capacity() < splitOffset) {
+            throw new IllegalArgumentException("The split offset cannot be greater than the buffer capacity, " +
+                    "but the split offset was " + splitOffset + ", and capacity is " + capacity() + '.');
+        }
         if (!isOwned()) {
             throw attachTrace(new IllegalStateException("Cannot bifurcate a buffer that is not owned."));
         }
         var drop = (ArcDrop<NioBuffer>) unsafeGetDrop();
         unsafeSetDrop(new ArcDrop<>(drop));
-        var bifurcatedBuffer = rmem.slice(0, woff);
+        var bifurcatedBuffer = rmem.slice(0, splitOffset);
         // TODO maybe incrementing the existing ArcDrop is enough; maybe we don't need to wrap it in another ArcDrop.
         var bifurcatedBuf = new NioBuffer(base, bifurcatedBuffer, control, new ArcDrop<>(drop.increment()));
-        bifurcatedBuf.woff = woff;
-        bifurcatedBuf.roff = roff;
+        bifurcatedBuf.woff = Math.min(woff, splitOffset);
+        bifurcatedBuf.roff = Math.min(roff, splitOffset);
         bifurcatedBuf.order(order());
         boolean readOnly = readOnly();
         bifurcatedBuf.readOnly(readOnly);
-        rmem = rmem.slice(woff, rmem.capacity() - woff);
+        rmem = rmem.slice(splitOffset, rmem.capacity() - splitOffset);
         if (!readOnly) {
             wmem = rmem;
         }
-        woff = 0;
-        roff = 0;
+        woff = Math.max(woff, splitOffset) - splitOffset;
+        roff = Math.max(roff, splitOffset) - splitOffset;
         return bifurcatedBuf;
     }
 

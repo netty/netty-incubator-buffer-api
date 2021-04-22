@@ -53,8 +53,8 @@ public class BufferEnsureWritableTest extends BufferTestSupport {
     @MethodSource("allocators")
     public void ensureWritableMustThrowIfRequestedSizeWouldGrowBeyondMaxAllowed(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
-             Buffer buf = allocator.allocate(512)) {
-            assertThrows(IllegalArgumentException.class, () -> buf.ensureWritable(Integer.MAX_VALUE - 8));
+             Buffer buf = allocator.allocate(8)) {
+            assertThrows(IllegalArgumentException.class, () -> buf.ensureWritable(Integer.MAX_VALUE - 7));
         }
     }
 
@@ -130,15 +130,31 @@ public class BufferEnsureWritableTest extends BufferTestSupport {
             while (buf.readableBytes() > 0) {
                 buf.readByte();
             }
-            buf.ensureWritable(4, true);
+            buf.ensureWritable(4, 4, true);
             buf.writeInt(42);
             assertThat(buf.capacity()).isEqualTo(64);
 
             buf.writerOffset(60).readerOffset(60);
-            buf.ensureWritable(8, true);
+            buf.ensureWritable(8, 8, true);
             buf.writeLong(42);
             // Don't assert the capacity on this one, because single-component
             // composite buffers may choose to allocate rather than compact.
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    public void ensureWritableWithLargeMinimumGrowthMustGrowByAtLeastThatMuch(Fixture fixture) {
+        try (BufferAllocator allocator = fixture.createAllocator();
+             Buffer buf = allocator.allocate(16)) {
+            buf.writeLong(0).writeInt(0);
+            buf.readLong();
+            buf.readInt(); // Compaction is now possible as well.
+            buf.ensureWritable(8, 32, true); // We don't need to allocate.
+            assertThat(buf.capacity()).isEqualTo(16);
+            buf.writeByte((byte) 1);
+            buf.ensureWritable(16, 32, true); // Now we DO need to allocate, because we can't compact.
+            assertThat(buf.capacity()).isEqualTo(16 /* existing capacity */ + 32 /* minimum growth */);
         }
     }
 }

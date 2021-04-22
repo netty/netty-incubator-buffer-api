@@ -606,12 +606,15 @@ final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> implement
     }
 
     @Override
-    public void ensureWritable(int size, boolean allowCompaction) {
+    public void ensureWritable(int size, int minimumGrowth, boolean allowCompaction) {
         if (!isOwned()) {
             throw new IllegalStateException("Buffer is not owned. Only owned buffers can call ensureWritable.");
         }
         if (size < 0) {
             throw new IllegalArgumentException("Cannot ensure writable for a negative size: " + size + '.');
+        }
+        if (minimumGrowth < 0) {
+            throw new IllegalArgumentException("The minimum growth cannot be negative: " + minimumGrowth + '.');
         }
         if (readOnly) {
             throw bufferIsReadOnly();
@@ -649,13 +652,20 @@ final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> implement
                     // Now we have enough space.
                     return;
                 }
+            } else if (bufs.length == 1) {
+                // If we only have a single component buffer, then we can safely compact that in-place.
+                bufs[0].compact();
+                computeBufferOffsets();
+                if (writableBytes() >= size) {
+                    // Now we have enough space.
+                    return;
+                }
             }
         }
 
-        long newSize = capacity() + (long) size;
-        BufferAllocator.checkSize(newSize);
-        int growth = size - writableBytes();
-        Buffer extension = bufs.length == 0? allocator.allocate(growth) : allocator.allocate(growth, order());
+        int growth = Math.max(size - writableBytes(), minimumGrowth);
+        BufferAllocator.checkSize(capacity() + (long) growth);
+        Buffer extension = allocator.allocate(growth, order());
         unsafeExtendWith(extension);
     }
 
@@ -739,7 +749,14 @@ final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> implement
     }
 
     @Override
-    public Buffer bifurcate() {
+    public Buffer bifurcate(int splitOffset) {
+        if (splitOffset < 0) {
+            throw new IllegalArgumentException("The split offset cannot be negative: " + splitOffset + '.');
+        }
+        if (capacity() < splitOffset) {
+            throw new IllegalArgumentException("The split offset cannot be greater than the buffer capacity, " +
+                    "but the split offset was " + splitOffset + ", and capacity is " + capacity() + '.');
+        }
         if (!isOwned()) {
             throw new IllegalStateException("Cannot bifurcate a buffer that is not owned.");
         }
@@ -748,12 +765,12 @@ final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> implement
             return new CompositeBuffer(allocator, bufs, unsafeGetDrop(), true).order(order);
         }
 
-        int i = searchOffsets(woff);
-        int off = woff - offsets[i];
+        int i = searchOffsets(splitOffset);
+        int off = splitOffset - offsets[i];
         Buffer[] bifs = Arrays.copyOf(bufs, off == 0? i : 1 + i);
         bufs = Arrays.copyOfRange(bufs, off == bufs[i].capacity()? 1 + i : i, bufs.length);
         if (off > 0 && bifs.length > 0 && off < bifs[bifs.length - 1].capacity()) {
-            bifs[bifs.length - 1] = bufs[0].bifurcate();
+            bifs[bifs.length - 1] = bufs[0].bifurcate(off);
         }
         computeBufferOffsets();
         try {
