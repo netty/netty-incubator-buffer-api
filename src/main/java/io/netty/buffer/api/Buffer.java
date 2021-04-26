@@ -378,6 +378,23 @@ public interface Buffer extends Rc<Buffer>, BufferAccessors {
     void copyInto(int srcPos, Buffer dest, int destPos, int length);
 
     /**
+     * Write into this buffer, all the readable bytes from the given buffer.
+     * This updates the {@linkplain #writerOffset() write offset} of this buffer, and the
+     * {@linkplain #readerOffset() reader offset} of the given buffer.
+     *
+     * @param source The buffer to read from.
+     * @return This buffer.
+     */
+    default Buffer writeBytes(Buffer source) {
+        int size = source.readableBytes();
+        int woff = writerOffset();
+        writerOffset(woff + size);
+        source.copyInto(source.readerOffset(), this, woff, size);
+        source.readerOffset(source.readerOffset() + size);
+        return this;
+    }
+
+    /**
      * Resets the {@linkplain #readerOffset() read offset} and the {@linkplain #writerOffset() write offset} on this
      * buffer to their initial values.
      */

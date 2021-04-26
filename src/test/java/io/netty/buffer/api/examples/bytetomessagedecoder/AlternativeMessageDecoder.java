@@ -96,12 +96,10 @@ public abstract class AlternativeMessageDecoder extends ChannelHandlerAdapter {
             try (Buffer prev = collector) {
                 int requiredCapacity = input.capacity() + prev.readableBytes();
                 collector = allocator.allocate(Math.max(requiredCapacity, DEFAULT_CHUNK_SIZE), input.order());
-                prev.copyInto(prev.readerOffset(), collector, 0, prev.readableBytes());
-                collector.readerOffset(prev.readableBytes());
+                collector.writeBytes(prev);
             }
         }
-        input.copyInto(input.readerOffset(), collector, collector.writerOffset(), input.readableBytes());
-        collector.writerOffset(collector.writerOffset() + input.readableBytes());
+        collector.writeBytes(input);
         drainCollector(ctx);
     }
 

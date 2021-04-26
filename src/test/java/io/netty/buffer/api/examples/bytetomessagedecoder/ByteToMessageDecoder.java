@@ -110,9 +110,7 @@ public abstract class ByteToMessageDecoder extends ChannelHandlerAdapter {
                 //   assumed to be shared (e.g. refCnt() > 1) and the reallocation may not be safe.
                 return expandCumulation(alloc, cumulation, in);
             }
-            in.copyInto(in.readerOffset(), cumulation, cumulation.writerOffset(), required);
-            cumulation.writerOffset(cumulation.writerOffset() + required);
-            in.readerOffset(in.writerOffset());
+            cumulation.writeBytes(in);
             return cumulation;
         }
     };
@@ -480,9 +478,8 @@ public abstract class ByteToMessageDecoder extends ChannelHandlerAdapter {
         Buffer newCumulation = alloc.allocate(newSize, oldCumulation.order());
         Buffer toRelease = newCumulation;
         try {
-            oldCumulation.copyInto(oldCumulation.readerOffset(), newCumulation, 0, oldCumulation.readableBytes());
-            in.copyInto(in.readerOffset(), newCumulation, oldCumulation.readableBytes(), in.readableBytes());
-            newCumulation.writerOffset(oldCumulation.readableBytes() + in.readableBytes());
+            newCumulation.writeBytes(oldCumulation);
+            newCumulation.writeBytes(in);
             toRelease = oldCumulation;
             return newCumulation;
         } finally {
