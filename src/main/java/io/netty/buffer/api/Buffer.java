@@ -125,7 +125,7 @@ import java.nio.ByteOrder;
  * Examples of this include doing IO, or decoding a bounded part of a larger message.
  * On the other hand, bifurcate is suitable for when you want to hand over a region of a buffer to some other,
  * perhaps unknown, piece of code, and relinquish your ownership of that buffer region in the process.
- * Examples of include aggregating messages into an accumulator buffer, and sending messages down the pipeline for
+ * Examples include aggregating messages into an accumulator buffer, and sending messages down the pipeline for
  * further processing, as bifurcated buffer regions, once their data has been received in its entirety.
  */
 public interface Buffer extends Rc<Buffer>, BufferAccessors {
@@ -576,7 +576,7 @@ public interface Buffer extends Rc<Buffer>, BufferAccessors {
      * The buffer must be in {@linkplain #isOwned() an owned state}, or an exception will be thrown.
      * <p>
      * The region of this buffer that contain the read and readable bytes, will be captured and returned in a new
-     * buffer, that will hold its own ownership of that region. This allows the returned buffer to be indepentently
+     * buffer, that will hold its own ownership of that region. This allows the returned buffer to be independently
      * {@linkplain #send() sent} to other threads.
      * <p>
      * The returned buffer will adopt the {@link #readerOffset()} of this buffer, and have its {@link #writerOffset()}
@@ -627,7 +627,7 @@ public interface Buffer extends Rc<Buffer>, BufferAccessors {
      * The buffer must be in {@linkplain #isOwned() an owned state}, or an exception will be thrown.
      * <p>
      * The region of this buffer that precede the {@code splitOffset}, will be captured and returned in a new
-     * buffer, that will hold its own ownership of that region. This allows the returned buffer to be indepentently
+     * buffer, that will hold its own ownership of that region. This allows the returned buffer to be independently
      * {@linkplain #send() sent} to other threads.
      * <p>
      * The returned buffer will adopt the {@link #readerOffset()} and {@link #writerOffset()} of this buffer,
