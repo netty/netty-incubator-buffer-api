@@ -93,10 +93,12 @@ public abstract class AlternativeMessageDecoder extends ChannelHandlerAdapter {
         if (collector.isOwned()) {
             collector.ensureWritable(input.readableBytes(), DEFAULT_CHUNK_SIZE, true);
         } else {
-            try (Buffer prev = collector) {
-                int requiredCapacity = input.capacity() + prev.readableBytes();
-                collector = allocator.allocate(Math.max(requiredCapacity, DEFAULT_CHUNK_SIZE), input.order());
-                collector.writeBytes(prev);
+            int requiredCapacity = input.readableBytes() + collector.readableBytes();
+            int allocationSize = Math.max(requiredCapacity, DEFAULT_CHUNK_SIZE);
+            try (Buffer newBuffer = allocator.allocate(allocationSize, input.order())) {
+                newBuffer.writeBytes(collector);
+                collector.close();
+                collector = newBuffer.acquire();
             }
         }
         collector.writeBytes(input);

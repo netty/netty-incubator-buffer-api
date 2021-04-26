@@ -17,18 +17,18 @@ package io.netty.buffer.api.examples.bytetomessagedecoder;
 
 import io.netty.buffer.api.Buffer;
 import io.netty.buffer.api.BufferAllocator;
-import io.netty.buffer.api.adaptor.BufferAdaptor;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.channel.socket.ChannelInputShutdownEvent;
 import org.junit.Test;
+import org.mockito.stubbing.Answer;
 
-import java.nio.ByteOrder;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static io.netty.buffer.api.BufferAllocator.heap;
 import static io.netty.buffer.api.BufferTestSupport.assertEquals;
@@ -37,9 +37,12 @@ import static java.nio.ByteOrder.LITTLE_ENDIAN;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.withSettings;
 
 public class ByteToMessageDecoderTest {
 
@@ -334,41 +337,9 @@ public class ByteToMessageDecoderTest {
         assertFalse(channel.finish());
     }
 
-    static class WriteFailingByteBuf extends BufferAdaptor {
-        private final Error error = new Error();
-        private int untilFailure;
-
-        WriteFailingByteBuf(int untilFailure, int capacity) {
-            this(untilFailure, heap().allocate(capacity, BIG_ENDIAN));
-            this.untilFailure = untilFailure;
-        }
-
-        private WriteFailingByteBuf(int untilFailure, Buffer buffer) {
-            super(buffer);
-            this.untilFailure = untilFailure;
-        }
-
-        @Override
-        public Buffer order(ByteOrder order) {
-            if (order == LITTLE_ENDIAN && --untilFailure <= 0) {
-                throw error;
-            }
-            return super.order(order);
-        }
-
-        @Override
-        protected BufferAdaptor receive(Buffer buf) {
-            return new WriteFailingByteBuf(untilFailure, buf);
-        }
-
-        Error writeError() {
-            return error;
-        }
-    }
-
     @Test
     public void releaseWhenMergeCumulateThrows() {
-        WriteFailingByteBuf oldCumulation = new WriteFailingByteBuf(1, 64);
+        Buffer oldCumulation = writeFailingCumulation(1, 64);
         oldCumulation.writeByte((byte) 0);
         Buffer in = heap().allocate(12, BIG_ENDIAN).writerOffset(12);
 
@@ -379,10 +350,31 @@ public class ByteToMessageDecoderTest {
             thrown = t;
         }
 
-        assertSame(oldCumulation.writeError(), thrown);
+        assertThat(thrown).hasMessage("boom");
         assertFalse(in.isAccessible());
         assertTrue(oldCumulation.isOwned());
         oldCumulation.close();
+    }
+
+    private static Buffer writeFailingCumulation(int untilFailure, int capacity) {
+        Buffer realBuffer = heap().allocate(capacity, BIG_ENDIAN);
+        Answer<Object> callRealBuffer = inv -> {
+            Object result = inv.getMethod().invoke(realBuffer, inv.getArguments());
+            if (result == realBuffer) {
+                // Preserve mock wrapper for methods that returns the callee ('this') buffer instance.
+                return inv.getMock();
+            }
+            return result;
+        };
+        Buffer buffer = mock(Buffer.class, withSettings().defaultAnswer(callRealBuffer));
+        AtomicInteger countDown = new AtomicInteger(untilFailure);
+        doAnswer(inv -> {
+            if (countDown.decrementAndGet() <= 0) {
+                throw new Error("boom");
+            }
+            return callRealBuffer.answer(inv);
+        }).when(buffer).writeBytes(any(Buffer.class));
+        return buffer;
     }
 
     @Test
@@ -394,7 +386,7 @@ public class ByteToMessageDecoderTest {
 
     private static void releaseWhenMergeCumulateThrowsInExpand(int untilFailure, boolean shouldFail) {
         Buffer oldCumulation = heap().allocate(8, BIG_ENDIAN).writeByte((byte) 0);
-        final WriteFailingByteBuf newCumulation = new WriteFailingByteBuf(untilFailure, 16);
+        Buffer newCumulation = writeFailingCumulation(untilFailure, 16);
 
         BufferAllocator allocator = new BufferAllocator() {
             @Override
@@ -414,7 +406,7 @@ public class ByteToMessageDecoderTest {
         assertFalse(in.isAccessible());
 
         if (shouldFail) {
-            assertSame(newCumulation.writeError(), thrown);
+            assertThat(thrown).hasMessage("boom");
             assertTrue(oldCumulation.isOwned());
             oldCumulation.close();
             assertFalse(newCumulation.isAccessible());
