@@ -15,6 +15,7 @@
  */
 package io.netty.buffer.api;
 
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
@@ -129,6 +130,28 @@ public class BufferSendTest extends BufferTestSupport {
             assertEquals(32, buf.readInt());
             assertEquals(64, bifA.readInt());
             assertEquals(72, bifB.readInt());
+        }
+    }
+
+    @Test
+    public void isSendOfMustCheckObjectTypes() {
+        try (BufferAllocator allocator = BufferAllocator.heap()) {
+            Send<Buffer> bufferSend = allocator.allocate(8).send();
+            Send<BufferRef> bufferRefSend = new BufferRef(allocator.allocate(8).send()).send();
+            try {
+                assertTrue(Send.isSendOf(Buffer.class, bufferSend));
+                assertFalse(Send.isSendOf(BufferRef.class, bufferSend));
+                assertFalse(Send.isSendOf(Buffer.class, bufferRefSend));
+                assertTrue(Send.isSendOf(BufferRef.class, bufferRefSend));
+                assertFalse(Send.isSendOf(Buffer.class, new Object()));
+                assertFalse(Send.isSendOf(Object.class, new Object()));
+            } finally {
+                bufferSend.discard();
+                bufferRefSend.discard();
+            }
+            // Type checks must still pass after the sends have been received.
+            assertTrue(Send.isSendOf(Buffer.class, bufferSend));
+            assertTrue(Send.isSendOf(BufferRef.class, bufferRefSend));
         }
     }
 }

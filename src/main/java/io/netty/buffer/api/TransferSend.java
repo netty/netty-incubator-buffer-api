@@ -55,7 +55,7 @@ class TransferSend<I extends Rc<I>, T extends Rc<I>> implements Send<I> {
     }
 
     @Override
-    public boolean isInstanceOf(Class<?> cls) {
+    public boolean referentIsInstanceOf(Class<?> cls) {
         return cls.isAssignableFrom(concreteType);
     }
 

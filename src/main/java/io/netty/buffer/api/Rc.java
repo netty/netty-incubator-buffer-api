@@ -42,7 +42,7 @@ public interface Rc<I extends Rc<I>> extends AutoCloseable, Deref<I> {
     }
 
     @Override
-    default boolean isInstanceOf(Class<?> cls) {
+    default boolean referentIsInstanceOf(Class<?> cls) {
         return cls.isInstance(this);
     }
 
