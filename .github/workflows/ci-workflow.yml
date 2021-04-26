@@ -55,4 +55,4 @@ jobs:
         if: ${{ failure() }}
         with:
           name: artifacts
-          path: .
+          path: target/
