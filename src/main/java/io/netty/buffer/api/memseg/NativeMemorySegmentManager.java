@@ -60,7 +60,7 @@ public class NativeMemorySegmentManager extends AbstractMemorySegmentManager {
     @Override
     protected MemorySegment createSegment(long size, Cleaner cleaner) {
         final ResourceScope scope = cleaner == null ? newSharedScope() : newSharedScope(cleaner);
-        scope.addOnClose(getCleanupAction(size));
+        scope.addCloseAction(getCleanupAction(size));
         var segment = MemorySegment.allocateNative(size, scope);
         MEM_USAGE_NATIVE.add(size);
         return segment;
