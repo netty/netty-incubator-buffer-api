@@ -48,7 +48,7 @@ import java.util.stream.Stream;
  *     </li>
  * </ul>
  * Composite buffers can later be extended with internally allocated components, with {@link #ensureWritable(int)},
- * or with externally allocated buffers, using {@link #extendComposite(Buffer, Buffer)}.
+ * or with externally allocated buffers, using {@link #extendWith(Buffer)}.
  *
  * <h3>Constituent buffer requirements</h3>
  *
@@ -206,7 +206,7 @@ public final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> im
 
     /**
      * Create an empty composite buffer, that has no components. The buffer can be extended with components using either
-     * {@link #ensureWritable(int)} or {@link #extendComposite(Buffer, Buffer)}.
+     * {@link #ensureWritable(int)} or {@link #extendWith(Buffer)}.
      *
      * @param allocator The allocator for the composite buffer. This allocator will be used e.g. to service
      * {@link #ensureWritable(int)} calls.
@@ -214,28 +214,6 @@ public final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> im
      */
     public static Buffer compose(BufferAllocator allocator) {
         return new CompositeBuffer(allocator, EMPTY_BUFFER_ARRAY, COMPOSITE_DROP, false);
-    }
-
-    /**
-     * Extend the given composite buffer with the given extension buffer.
-     * This works as if the extension had originally been included at the end of the list of constituent buffers when
-     * the composite buffer was created.
-     * The composite buffer is modified in-place.
-     *
-     * @see #compose(BufferAllocator, Buffer...)
-     * @see #compose(BufferAllocator, Send...)
-     * @param composite The composite buffer (from a prior {@link #compose(BufferAllocator, Buffer...)} call) to extend
-     *                 with the given extension buffer.
-     * @param extension The buffer to extend the composite buffer with.
-     */
-    public static void extendComposite(Buffer composite, Buffer extension) {
-        if (!isComposite(composite)) {
-            throw new IllegalArgumentException(
-                    "Expected the first buffer to be a composite buffer, " +
-                            "but it is a " + composite.getClass() + " buffer: " + composite + '.');
-        }
-        CompositeBuffer compositeBuffer = (CompositeBuffer) composite;
-        compositeBuffer.extendWith(extension);
     }
 
     /**
@@ -854,7 +832,17 @@ public final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> im
         unsafeExtendWith(extension);
     }
 
-    void extendWith(Buffer extension) {
+    /**
+     * Extend this composite buffer with the given extension buffer.
+     * This works as if the extension had originally been included at the end of the list of constituent buffers when
+     * the composite buffer was created.
+     * The extension buffer is added to the end of this composite buffer, which is modified in-place.
+     *
+     * @see #compose(BufferAllocator, Buffer...)
+     * @see #compose(BufferAllocator, Send...)
+     * @param extension The buffer to extend the composite buffer with.
+     */
+    public void extendWith(Buffer extension) {
         Objects.requireNonNull(extension, "Extension buffer cannot be null.");
         if (!isOwned()) {
             throw new IllegalStateException("This buffer cannot be extended because it is not in an owned state.");

@@ -140,7 +140,7 @@ public abstract class ByteToMessageDecoder extends ChannelHandlerAdapter {
             } else {
                 composite = CompositeBuffer.compose(alloc, cumulation);
             }
-            CompositeBuffer.extendComposite(composite, in);
+            ((CompositeBuffer) composite).extendWith(in);
             return composite;
         }
     };

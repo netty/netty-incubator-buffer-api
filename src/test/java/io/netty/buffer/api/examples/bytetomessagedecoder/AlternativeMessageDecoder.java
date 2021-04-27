@@ -87,7 +87,7 @@ public abstract class AlternativeMessageDecoder extends ChannelHandlerAdapter {
                 && (collector.writableBytes() == 0 || input.writerOffset() == 0)
                 && (collector.readableBytes() == 0 || input.readerOffset() == 0)
                 && collector.order() == input.order()) {
-            CompositeBuffer.extendComposite(collector, input);
+            ((CompositeBuffer) collector).extendWith(input);
             drainCollector(ctx);
             return;
         }

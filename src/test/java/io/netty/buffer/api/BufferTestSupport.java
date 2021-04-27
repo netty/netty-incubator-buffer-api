@@ -365,7 +365,7 @@ public abstract class BufferTestSupport {
             assertThrows(IllegalStateException.class, () -> buf.copyInto(0, new byte[1], 0, 1));
             assertThrows(IllegalStateException.class, () -> buf.copyInto(0, ByteBuffer.allocate(1), 0, 1));
             if (CompositeBuffer.isComposite(buf)) {
-                assertThrows(IllegalStateException.class, () -> CompositeBuffer.extendComposite(buf, target));
+                assertThrows(IllegalStateException.class, () -> ((CompositeBuffer) buf).extendWith(target));
             }
         }
 
