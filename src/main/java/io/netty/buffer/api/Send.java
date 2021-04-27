@@ -56,7 +56,7 @@ public interface Send<T extends Rc<T>> extends Deref<T> {
             }
 
             @Override
-            public boolean isInstanceOf(Class<?> cls) {
+            public boolean referentIsInstanceOf(Class<?> cls) {
                 return cls.isAssignableFrom(concreteObjectType);
             }
 
@@ -67,6 +67,19 @@ public interface Send<T extends Rc<T>> extends Deref<T> {
                 }
             }
         };
+    }
+
+    /**
+     * Determine if the given candidate object is an instance of a {@link Send} from which an object of the given type
+     * can be received.
+     *
+     * @param type The type of object we wish to receive.
+     * @param candidate The candidate object that might be a {@link Send} of an object of the given type.
+     * @return {@code true} if the candidate object is a {@link Send} that would deliver an object of the given type,
+     * otherwise {@code false}.
+     */
+    static boolean isSendOf(Class<?> type, Object candidate) {
+        return candidate instanceof Send && ((Send<?>) candidate).referentIsInstanceOf(type);
     }
 
     /**

@@ -48,5 +48,5 @@ public interface Deref<T extends Rc<T>> extends Supplier<T> {
      * @param cls The type to check.
      * @return {@code true} if the object in this {@code Deref} can be assigned fields or variables of the given type.
      */
-    boolean isInstanceOf(Class<?> cls);
+    boolean referentIsInstanceOf(Class<?> cls);
 }
