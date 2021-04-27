@@ -36,4 +36,4 @@ COPY . .
 # Make sure Maven has enough memory to keep track of all the tests we run
 ENV MAVEN_OPTS="-Xmx4g -XX:+HeapDumpOnOutOfMemoryError"
 # Run tests
-CMD mvn verify -o -B -C -T1C -fae -nsu -npu
+CMD mvn verify -o -B -C -T1C -fae -nsu
