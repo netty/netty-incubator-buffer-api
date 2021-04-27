@@ -92,13 +92,15 @@ public abstract class BufferTestSupport {
         if ("nosample".equalsIgnoreCase(sampleSetting)) {
             return fixture -> true;
         }
+        // Filter out 95% of tests.
+        return filterOfTheDay(5);
+    }
+
+    protected static Predicate<Fixture> filterOfTheDay(int percentage) {
         Instant today = Instant.now().truncatedTo(ChronoUnit.DAYS); // New seed every day.
         SplittableRandom rng = new SplittableRandom(today.hashCode());
         AtomicInteger counter = new AtomicInteger();
-        return fixture -> {
-            // Filter out 95% of tests.
-            return counter.getAndIncrement() < 1 || rng.nextInt(0, 100) < 5;
-        };
+        return fixture -> counter.getAndIncrement() < 1 || rng.nextInt(0, 100) < percentage;
     }
 
     static Fixture[] allocators() {

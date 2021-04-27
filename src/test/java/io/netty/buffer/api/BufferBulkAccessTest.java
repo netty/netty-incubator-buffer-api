@@ -19,10 +19,10 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 
 import static java.nio.ByteOrder.BIG_ENDIAN;
 import static java.nio.ByteOrder.LITTLE_ENDIAN;
-import static org.assertj.core.api.Assertions.as;
 import static org.assertj.core.api.Assertions.assertThat;
 
 public class BufferBulkAccessTest extends BufferTestSupport {
@@ -303,11 +303,16 @@ public class BufferBulkAccessTest extends BufferTestSupport {
         }
     }
 
+    private static final Memoize<Fixture[]> OTHER_FIXTURES = new Memoize<Fixture[]>(
+            () -> Arrays.stream(allocators()).filter(filterOfTheDay(10)).toArray(Fixture[]::new));
+
     @ParameterizedTest
     @MethodSource("allocators")
     public void writeBytesMustTransferDataAndUpdateOffsets(Fixture fixture) {
         try (BufferAllocator alloc1 = fixture.createAllocator()) {
-            for (Fixture otherFixture : allocators()) {
+            // Only test 10% of available combinations. Otherwise, this takes too long.
+            Fixture[] allocators = OTHER_FIXTURES.get();
+            Arrays.stream(allocators).parallel().forEach(otherFixture -> {
                 try (BufferAllocator alloc2 = otherFixture.createAllocator();
                      Buffer target = alloc1.allocate(37);
                      Buffer source = alloc2.allocate(35)) {
@@ -330,8 +335,11 @@ public class BufferBulkAccessTest extends BufferTestSupport {
                     target.fill((byte) 0).reset().order(LITTLE_ENDIAN);
                     source.fill((byte) 0).reset().order(BIG_ENDIAN);
                     verifyWriteBytes(target, source);
+                } catch (Exception e) {
+                    e.addSuppressed(new RuntimeException("other fixture was: " + otherFixture));
+                    throw e;
                 }
-            }
+            });
         }
     }
 
