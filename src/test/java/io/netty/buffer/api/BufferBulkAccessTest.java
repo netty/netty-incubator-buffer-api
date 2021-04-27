@@ -115,7 +115,7 @@ public class BufferBulkAccessTest extends BufferTestSupport {
                 int second = size - first;
                 try (var bufFirst = a.allocate(first);
                      var bufSecond = b.allocate(second)) {
-                    return Buffer.compose(a, bufFirst, bufSecond);
+                    return CompositeBuffer.compose(a, bufFirst, bufSecond);
                 }
             });
         }
@@ -131,7 +131,7 @@ public class BufferBulkAccessTest extends BufferTestSupport {
                 int second = size - first;
                 try (var bufFirst = a.allocate(first);
                      var bufSecond = b.allocate(second)) {
-                    return Buffer.compose(a, bufFirst, bufSecond);
+                    return CompositeBuffer.compose(a, bufFirst, bufSecond);
                 }
             });
         }
@@ -147,7 +147,7 @@ public class BufferBulkAccessTest extends BufferTestSupport {
                 int second = size - first;
                 try (var bufFirst = a.allocate(first);
                      var bufSecond = b.allocate(second)) {
-                    return Buffer.compose(a, bufFirst, bufSecond);
+                    return CompositeBuffer.compose(a, bufFirst, bufSecond);
                 }
             });
         }
@@ -163,7 +163,7 @@ public class BufferBulkAccessTest extends BufferTestSupport {
                 int second = size - first;
                 try (var bufFirst = a.allocate(first);
                      var bufSecond = b.allocate(second)) {
-                    return Buffer.compose(a, bufFirst, bufSecond);
+                    return CompositeBuffer.compose(a, bufFirst, bufSecond);
                 }
             });
         }
@@ -180,7 +180,7 @@ public class BufferBulkAccessTest extends BufferTestSupport {
                 int second = size - first;
                 try (var bufFirst = a.allocate(first);
                      var bufSecond = b.allocate(second)) {
-                    return scope.add(Buffer.compose(a, bufFirst, bufSecond)).writerOffset(size).slice();
+                    return scope.add(CompositeBuffer.compose(a, bufFirst, bufSecond)).writerOffset(size).slice();
                 }
             });
         }
@@ -197,7 +197,7 @@ public class BufferBulkAccessTest extends BufferTestSupport {
                 int second = size - first;
                 try (var bufFirst = a.allocate(first);
                      var bufSecond = b.allocate(second)) {
-                    return scope.add(Buffer.compose(a, bufFirst, bufSecond)).writerOffset(size).slice();
+                    return scope.add(CompositeBuffer.compose(a, bufFirst, bufSecond)).writerOffset(size).slice();
                 }
             });
         }
@@ -214,7 +214,7 @@ public class BufferBulkAccessTest extends BufferTestSupport {
                 int second = size - first;
                 try (var bufFirst = a.allocate(first);
                      var bufSecond = b.allocate(second)) {
-                    return scope.add(Buffer.compose(a, bufFirst, bufSecond)).writerOffset(size).slice();
+                    return scope.add(CompositeBuffer.compose(a, bufFirst, bufSecond)).writerOffset(size).slice();
                 }
             });
         }
@@ -231,7 +231,7 @@ public class BufferBulkAccessTest extends BufferTestSupport {
                 int second = size - first;
                 try (var bufFirst = a.allocate(first);
                      var bufSecond = b.allocate(second)) {
-                    return scope.add(Buffer.compose(a, bufFirst, bufSecond)).writerOffset(size).slice();
+                    return scope.add(CompositeBuffer.compose(a, bufFirst, bufSecond)).writerOffset(size).slice();
                 }
             });
         }

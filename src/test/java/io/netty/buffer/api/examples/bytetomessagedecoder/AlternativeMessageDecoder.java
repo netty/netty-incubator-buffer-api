@@ -17,6 +17,7 @@ package io.netty.buffer.api.examples.bytetomessagedecoder;
 
 import io.netty.buffer.api.Buffer;
 import io.netty.buffer.api.BufferAllocator;
+import io.netty.buffer.api.CompositeBuffer;
 import io.netty.buffer.api.Send;
 import io.netty.channel.ChannelHandlerAdapter;
 import io.netty.channel.ChannelHandlerContext;
@@ -82,11 +83,11 @@ public abstract class AlternativeMessageDecoder extends ChannelHandlerAdapter {
     }
 
     private void processRead(ChannelHandlerContext ctx, Buffer input) {
-        if (collector.isOwned() && Buffer.isComposite(collector) && input.isOwned()
+        if (collector.isOwned() && CompositeBuffer.isComposite(collector) && input.isOwned()
                 && (collector.writableBytes() == 0 || input.writerOffset() == 0)
                 && (collector.readableBytes() == 0 || input.readerOffset() == 0)
                 && collector.order() == input.order()) {
-            Buffer.extendComposite(collector, input);
+            CompositeBuffer.extendComposite(collector, input);
             drainCollector(ctx);
             return;
         }

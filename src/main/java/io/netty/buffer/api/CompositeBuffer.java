@@ -24,7 +24,70 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Stream;
 
-final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> implements Buffer {
+/**
+ * The {@code CompositeBuffer} is a concrete {@link Buffer} implementation that make a number of other buffers appear
+ * as one. A composite buffer behaves the same as a normal, non-composite buffer in every way, so you normally don't
+ * need to handle them specially.
+ * <p>
+ * A composite buffer is constructed using one of the {@code compose} methods:
+ * <ul>
+ *     <li>
+ *         {@link #compose(BufferAllocator, Buffer...)} creates a composite buffer from the given set of buffers.
+ *         The reference count to the passed buffers will be increased, and the resulting composite buffer may or may
+ *         not have ownership.
+ *     </li>
+ *     <li>
+ *         {@link #compose(BufferAllocator, Send[])} creates a composite buffer from the buffers that are sent to it via
+ *         the passed in send objects. Since {@link Send#receive()} transfers ownership, the resulting composite buffer
+ *         will have ownership, because it is guaranteed that there are no other references to its constituent buffers.
+ *     </li>
+ *     <li>
+ *         {@link #compose(BufferAllocator)} creates and empty, zero capacity, composite buffer. Such empty buffers may
+ *         change their {@linkplain #order() byte order} or {@linkplain #readOnly() read-only} states when they gain
+ *         their first component.
+ *     </li>
+ * </ul>
+ * Composite buffers can later be extended with internally allocated components, with {@link #ensureWritable(int)},
+ * or with externally allocated buffers, using {@link #extendComposite(Buffer, Buffer)}.
+ *
+ * <h3>Constituent buffer requirements</h3>
+ *
+ * The buffers that a being composed to form the composite buffer, need to live up to a number of requirements.
+ * Basically, if we imagine that the constituent buffers have their memory regions concatenated together, then the
+ * result needs to make sense.
+ * <p>
+ * All the constituent buffers must have the same {@linkplain Buffer#order() byte order}.
+ * An exception will be thrown if you attempt to compose buffers that have different byte orders,
+ * and changing the byte order of the constituent buffers so that they become inconsistent after construction,
+ * will result in unspecified behaviour.
+ * <p>
+ * The read and write offsets of the constituent buffers must be arranged such that there are no "gaps" when viewed
+ * as a single connected chunk of memory.
+ * Specifically, there can be at most one buffer whose write offset is neither zero nor at capacity,
+ * and all buffers prior to it must have their write offsets at capacity, and all buffers after it must have a
+ * write-offset of zero.
+ * Likewise, there can be at most one buffer whose read offset is neither zero nor at capacity,
+ * and all buffers prior to it must have their read offsets at capacity, and all buffers after it must have a read
+ * offset of zero.
+ * Furthermore, the sum of the read offsets must be less than or equal to the sum of the write-offsets.
+ * <p>
+ * Reads and writes to the composite buffer that modifies the read or write offsets, will also modify the relevant
+ * offsets in the constituent buffers.
+ * <p>
+ * It is not a requirement that the buffers have the same size.
+ * <p>
+ * It is not a requirement that the buffers are allocated by this allocator, but if
+ * {@link Buffer#ensureWritable(int)} is called on the composed buffer, and the composed buffer needs to be
+ * expanded, then this allocator instance will be used for allocation the extra memory.
+ *
+ * <h3>Ownership and Send</h3>
+ *
+ * {@linkplain Buffer#send() Sending} a composite buffer implies sending all of its constituent buffers.
+ * For sending to be possible, both the composite buffer itself, and all of its constituent buffers, must be in an
+ * {@linkplain Rc#isOwned() owned state}.
+ * This means that the composite buffer must be the only reference to the constituent buffers.
+ */
+public final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> implements Buffer {
     /**
      * The max array size is JVM implementation dependant, but most seem to settle on {@code Integer.MAX_VALUE - 8}.
      * We set the max composite buffer capacity to the same, since it would otherwise be impossible to create a
@@ -45,6 +108,7 @@ final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> implement
             return "COMPOSITE_DROP";
         }
     };
+    private static final Buffer[] EMPTY_BUFFER_ARRAY = new Buffer[0];
 
     private final BufferAllocator allocator;
     private final TornBufferAccessors tornBufAccessors;
@@ -58,14 +122,130 @@ final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> implement
     private boolean closed;
     private boolean readOnly;
 
-    CompositeBuffer(BufferAllocator allocator, Buffer[] refs) {
-        this(allocator, filterExternalBufs(Arrays.stream(refs)
-                .map(buf -> buf.acquire() /* Increments reference counts. */)), COMPOSITE_DROP, false);
+    /**
+     * Compose the given sequence of buffers and present them as a single buffer.
+     * <p>
+     * <strong>Note:</strong> The composite buffer increments the reference count on all the constituent buffers,
+     * and holds a reference to them until the composite buffer is deallocated.
+     * This means the constituent buffers must still have their outside-reference count decremented as normal.
+     * If the buffers are allocated for the purpose of participating in the composite buffer,
+     * then they should be closed as soon as the composite buffer has been created, like in this example:
+     * <pre>{@code
+     *     try (Buffer a = allocator.allocate(size);
+     *          Buffer b = allocator.allocate(size)) {
+     *         return allocator.compose(a, b); // Reference counts for 'a' and 'b' incremented here.
+     *     } // Reference count for 'a' and 'b' decremented here; composite buffer now holds the last references.
+     * }</pre>
+     * <p>
+     * See the class documentation for more information on what is required of the given buffers for composition to be
+     * allowed.
+     *
+     * @param allocator The allocator for the composite buffer. This allocator will be used e.g. to service
+     * {@link #ensureWritable(int)} calls.
+     * @param bufs The buffers to compose into a single buffer view.
+     * @return A buffer composed of, and backed by, the given buffers.
+     * @throws IllegalArgumentException if the given buffers have an inconsistent
+     * {@linkplain Buffer#order() byte order}.
+     */
+    public static Buffer compose(BufferAllocator allocator, Buffer... bufs) {
+        Stream<Buffer> bufferStream = Arrays.stream(bufs)
+                .map(buf -> buf.acquire()); // Increments reference counts.
+        return new CompositeBuffer(allocator, filterExternalBufs(bufferStream), COMPOSITE_DROP, false);
     }
 
-    CompositeBuffer(BufferAllocator allocator, Send<Buffer>[] refs) {
-        this(allocator, filterExternalBufs(Arrays.stream(refs)
-                .map(buf -> buf.receive())), COMPOSITE_DROP, false);
+    /**
+     * Compose the given sequence of sends of buffers and present them as a single buffer.
+     * <p>
+     * <strong>Note:</strong> The composite buffer holds a reference to all the constituent buffers,
+     * until the composite buffer is deallocated.
+     * This means the constituent buffers must still have their outside-reference count decremented as normal.
+     * If the buffers are allocated for the purpose of participating in the composite buffer,
+     * then they should be closed as soon as the composite buffer has been created, like in this example:
+     * <pre>{@code
+     *     try (Buffer a = allocator.allocate(size);
+     *          Buffer b = allocator.allocate(size)) {
+     *         return allocator.compose(a, b); // Reference counts for 'a' and 'b' incremented here.
+     *     } // Reference count for 'a' and 'b' decremented here; composite buffer now holds the last references.
+     * }</pre>
+     * <p>
+     * See the class documentation for more information on what is required of the given buffers for composition to be
+     * allowed.
+     *
+     * @param allocator The allocator for the composite buffer. This allocator will be used e.g. to service
+     * {@link #ensureWritable(int)} calls.
+     * @param sends The sent buffers to compose into a single buffer view.
+     * @return A buffer composed of, and backed by, the given buffers.
+     * @throws IllegalArgumentException if the given buffers have an inconsistent
+     * {@linkplain Buffer#order() byte order}.
+     * @throws IllegalStateException if one of the sends have already been received. The remaining buffers and sends
+     * will be closed and descarded, respectively.
+     */
+    @SafeVarargs
+    public static Buffer compose(BufferAllocator allocator, Send<Buffer>... sends) {
+        Buffer[] bufs = new Buffer[sends.length];
+        IllegalStateException ise = null;
+        for (int i = 0; i < sends.length; i++) {
+            if (ise != null) {
+                sends[i].discard();
+            } else {
+                try {
+                    bufs[i] = sends[i].receive();
+                } catch (IllegalStateException e) {
+                    ise = e;
+                    for (int j = 0; j < i; j++) {
+                        bufs[j].close();
+                    }
+                }
+            }
+        }
+        if (ise != null) {
+            throw ise;
+        }
+        return compose(allocator, bufs);
+    }
+
+    /**
+     * Create an empty composite buffer, that has no components. The buffer can be extended with components using either
+     * {@link #ensureWritable(int)} or {@link #extendComposite(Buffer, Buffer)}.
+     *
+     * @param allocator The allocator for the composite buffer. This allocator will be used e.g. to service
+     * {@link #ensureWritable(int)} calls.
+     * @return A composite buffer that has no components, and has a capacity of zero.
+     */
+    public static Buffer compose(BufferAllocator allocator) {
+        return new CompositeBuffer(allocator, EMPTY_BUFFER_ARRAY, COMPOSITE_DROP, false);
+    }
+
+    /**
+     * Extend the given composite buffer with the given extension buffer.
+     * This works as if the extension had originally been included at the end of the list of constituent buffers when
+     * the composite buffer was created.
+     * The composite buffer is modified in-place.
+     *
+     * @see #compose(BufferAllocator, Buffer...)
+     * @see #compose(BufferAllocator, Send...)
+     * @param composite The composite buffer (from a prior {@link #compose(BufferAllocator, Buffer...)} call) to extend
+     *                 with the given extension buffer.
+     * @param extension The buffer to extend the composite buffer with.
+     */
+    public static void extendComposite(Buffer composite, Buffer extension) {
+        if (!isComposite(composite)) {
+            throw new IllegalArgumentException(
+                    "Expected the first buffer to be a composite buffer, " +
+                            "but it is a " + composite.getClass() + " buffer: " + composite + '.');
+        }
+        CompositeBuffer compositeBuffer = (CompositeBuffer) composite;
+        compositeBuffer.extendWith(extension);
+    }
+
+    /**
+     * Check if the given buffer is a {@linkplain #compose(BufferAllocator, Buffer...) composite} buffer or not.
+     * @param composite The buffer to check.
+     * @return {@code true} if the given buffer was created with {@link #compose(BufferAllocator, Buffer...)},
+     * {@code false} otherwise.
+     */
+    public static boolean isComposite(Buffer composite) {
+        return composite.getClass() == CompositeBuffer.class;
     }
 
     private static Buffer[] filterExternalBufs(Stream<Buffer> refs) {
@@ -706,7 +886,7 @@ final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> implement
         Buffer[] restoreTemp = bufs; // We need this to restore our buffer array, in case offset computations fail.
         try {
             if (extension instanceof CompositeBuffer) {
-                // If the extension is itself a composite buffer, then extend this one by all of the constituent
+                // If the extension is itself a composite buffer, then extend this one by all the constituent
                 // component buffers.
                 CompositeBuffer compositeExtension = (CompositeBuffer) extension;
                 Buffer[] addedBuffers = compositeExtension.bufs;

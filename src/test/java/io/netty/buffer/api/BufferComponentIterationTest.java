@@ -69,8 +69,8 @@ public class BufferComponentIterationTest extends BufferTestSupport {
             try (Buffer a = allocator.allocate(8);
                  Buffer b = allocator.allocate(8);
                  Buffer c = allocator.allocate(8);
-                 Buffer x = Buffer.compose(allocator, b, c)) {
-                buf = Buffer.compose(allocator, a, x);
+                 Buffer x = CompositeBuffer.compose(allocator, b, c)) {
+                buf = CompositeBuffer.compose(allocator, a, x);
             }
             assertThat(buf.countComponents()).isEqualTo(3);
             assertThat(buf.countReadableComponents()).isZero();
@@ -122,7 +122,7 @@ public class BufferComponentIterationTest extends BufferTestSupport {
                 a.writeInt(1);
                 b.writeInt(2);
                 c.writeInt(3);
-                composite = Buffer.compose(allocator, a, b, c);
+                composite = CompositeBuffer.compose(allocator, a, b, c);
             }
             var list = new LinkedList<Integer>(List.of(1, 2, 3));
             int count = composite.forEachReadable(0, (index, component) -> {
@@ -159,7 +159,7 @@ public class BufferComponentIterationTest extends BufferTestSupport {
                 a.writeInt(1);
                 b.writeInt(2);
                 c.writeInt(3);
-                composite = Buffer.compose(allocator, a, b, c);
+                composite = CompositeBuffer.compose(allocator, a, b, c);
             }
             int readPos = composite.readerOffset();
             int writePos = composite.writerOffset();
@@ -197,7 +197,7 @@ public class BufferComponentIterationTest extends BufferTestSupport {
             try (Buffer a = allocator.allocate(4);
                  Buffer b = allocator.allocate(4);
                  Buffer c = allocator.allocate(4)) {
-                buf = Buffer.compose(allocator, a, b, c);
+                buf = CompositeBuffer.compose(allocator, a, b, c);
             }
             int i = 1;
             while (buf.writableBytes() > 0) {
@@ -269,7 +269,7 @@ public class BufferComponentIterationTest extends BufferTestSupport {
             try (Buffer a = allocator.allocate(8);
                  Buffer b = allocator.allocate(8);
                  Buffer c = allocator.allocate(8)) {
-                buf = Buffer.compose(allocator, a, b, c);
+                buf = CompositeBuffer.compose(allocator, a, b, c);
             }
             buf.order(BIG_ENDIAN);
             buf.forEachWritable(0, (index, component) -> {

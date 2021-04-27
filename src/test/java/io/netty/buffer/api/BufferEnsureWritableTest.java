@@ -33,7 +33,7 @@ public class BufferEnsureWritableTest extends BufferTestSupport {
                 assertThrows(IllegalStateException.class, () -> slice.ensureWritable(1));
                 assertThrows(IllegalStateException.class, () -> buf.ensureWritable(1));
             }
-            try (Buffer compose = Buffer.compose(allocator, buf)) {
+            try (Buffer compose = CompositeBuffer.compose(allocator, buf)) {
                 assertThrows(IllegalStateException.class, () -> compose.ensureWritable(1));
                 assertThrows(IllegalStateException.class, () -> buf.ensureWritable(1));
             }
@@ -92,7 +92,7 @@ public class BufferEnsureWritableTest extends BufferTestSupport {
     @Test
     public void ensureWritableMustExpandCapacityOfEmptyCompositeBuffer() {
         try (BufferAllocator allocator = BufferAllocator.heap();
-             Buffer buf = Buffer.compose(allocator)) {
+             Buffer buf = CompositeBuffer.compose(allocator)) {
             assertThat(buf.writableBytes()).isEqualTo(0);
             buf.ensureWritable(8);
             assertThat(buf.writableBytes()).isGreaterThanOrEqualTo(8);

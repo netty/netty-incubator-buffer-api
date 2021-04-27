@@ -17,6 +17,7 @@ package io.netty.buffer.api.examples;
 
 import io.netty.buffer.api.BufferAllocator;
 import io.netty.buffer.api.Buffer;
+import io.netty.buffer.api.CompositeBuffer;
 import io.netty.buffer.api.Scope;
 
 import java.util.concurrent.ThreadLocalRandom;
@@ -44,7 +45,7 @@ public final class ComposingAndSlicingExample {
 
     private static Buffer createBigBuffer(BufferAllocator allocator) {
         try (Scope scope = new Scope()) {
-            return Buffer.compose(allocator,
+            return CompositeBuffer.compose(allocator,
                     scope.add(allocator.allocate(64)),
                     scope.add(allocator.allocate(64)),
                     scope.add(allocator.allocate(64)),
