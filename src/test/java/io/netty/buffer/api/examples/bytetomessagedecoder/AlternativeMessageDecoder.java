@@ -71,7 +71,7 @@ public abstract class AlternativeMessageDecoder extends ChannelHandlerAdapter {
             try (Buffer input = (Buffer) msg) {
                 processRead(ctx, input);
             }
-        } else if (msg instanceof Send && ((Send<?>) msg).isInstanceOf(Buffer.class)) {
+        } else if (Send.isSendOf(Buffer.class, msg)) {
             //noinspection unchecked
             try (Buffer input = ((Send<Buffer>) msg).receive()) {
                 processRead(ctx, input);
