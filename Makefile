@@ -16,6 +16,9 @@ clean:
 	docker rm -fv build-container-dbg
 	docker rm -fv build-container
 
+clean-layer-cache:
+	docker builder prune -f -a
+
 build: image
 	docker create --name build-container netty-incubator-buffer:build
 	mkdir -p target/container-output
@@ -23,3 +26,5 @@ build: image
 	docker wait build-container || (docker cp build-container:/home/build target/container-output && false)
 	docker cp build-container:/home/build/target .
 	docker rm build-container
+
+rebuild: clean clean-layer-cache build

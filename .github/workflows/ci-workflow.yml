@@ -44,7 +44,8 @@ jobs:
       - name: Make build
         run: make build
       - name: Publish Test Report
-        uses: scacap/action-surefire-report@v1.0.7
+        uses: scacap/action-surefire-report@v1.0.9
+        if: ${{ always() }}
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           report_paths: '**/target/surefire-reports/TEST-*.xml'
