@@ -490,13 +490,16 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
     }
 
     @Override
-    public void ensureWritable(int size, boolean allowCompaction) {
+    public void ensureWritable(int size, int minimumGrowth, boolean allowCompaction) {
         if (!isOwned()) {
             throw attachTrace(new IllegalStateException(
                     "Buffer is not owned. Only owned buffers can call ensureWritable."));
         }
         if (size < 0) {
             throw new IllegalArgumentException("Cannot ensure writable for a negative size: " + size + '.');
+        }
+        if (minimumGrowth < 0) {
+            throw new IllegalArgumentException("The minimum growth cannot be negative: " + minimumGrowth + '.');
         }
         if (seg != wseg) {
             throw bufferIsReadOnly();
@@ -513,7 +516,7 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
         }
 
         // Allocate a bigger buffer.
-        long newSize = capacity() + size - (long) writableBytes();
+        long newSize = capacity() + (long) Math.max(size - writableBytes(), minimumGrowth);
         BufferAllocator.checkSize(newSize);
         MemorySegment newSegment = (MemorySegment) alloc.allocateUntethered(this, (int) newSize);
 
@@ -545,25 +548,32 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
     }
 
     @Override
-    public Buffer bifurcate() {
+    public Buffer bifurcate(int splitOffset) {
+        if (splitOffset < 0) {
+            throw new IllegalArgumentException("The split offset cannot be negative: " + splitOffset + '.');
+        }
+        if (capacity() < splitOffset) {
+            throw new IllegalArgumentException("The split offset cannot be greater than the buffer capacity, " +
+                    "but the split offset was " + splitOffset + ", and capacity is " + capacity() + '.');
+        }
         if (!isOwned()) {
             throw attachTrace(new IllegalStateException("Cannot bifurcate a buffer that is not owned."));
         }
         var drop = (ArcDrop<MemSegBuffer>) unsafeGetDrop();
         unsafeSetDrop(new ArcDrop<>(drop));
-        var bifurcatedSeg = seg.asSlice(0, woff);
+        var bifurcatedSeg = seg.asSlice(0, splitOffset);
         var bifurcatedBuf = new MemSegBuffer(base, bifurcatedSeg, new ArcDrop<>(drop.increment()), alloc);
-        bifurcatedBuf.woff = woff;
-        bifurcatedBuf.roff = roff;
+        bifurcatedBuf.woff = Math.min(woff, splitOffset);
+        bifurcatedBuf.roff = Math.min(roff, splitOffset);
         bifurcatedBuf.order(order);
         boolean readOnly = readOnly();
         bifurcatedBuf.readOnly(readOnly);
-        seg = seg.asSlice(woff, seg.byteSize() - woff);
+        seg = seg.asSlice(splitOffset, seg.byteSize() - splitOffset);
         if (!readOnly) {
             wseg = seg;
         }
-        woff = 0;
-        roff = 0;
+        woff = Math.max(woff, splitOffset) - splitOffset;
+        roff = Math.max(roff, splitOffset) - splitOffset;
         return bifurcatedBuf;
     }
 

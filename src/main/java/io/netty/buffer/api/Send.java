@@ -101,7 +101,7 @@ public interface Send<T extends Rc<T>> extends Deref<T> {
      * @param <R> The result type of the mapping function.
      * @return A new {@link Send} instance that will deliver an object that is the result of the mapping.
      */
-    default <R extends Rc<R>> Send<R> map(Class<R> type, Function<T, ? extends R> mapper) {
+    default <R extends Rc<R>> Send<R> map(Class<R> type, Function<T, R> mapper) {
         return sending(type, () -> mapper.apply(receive()));
     }
 

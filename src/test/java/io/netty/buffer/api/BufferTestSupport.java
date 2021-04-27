@@ -92,13 +92,15 @@ public abstract class BufferTestSupport {
         if ("nosample".equalsIgnoreCase(sampleSetting)) {
             return fixture -> true;
         }
-        Instant today = Instant.now().truncatedTo(ChronoUnit.DAYS);
+        // Filter out 95% of tests.
+        return filterOfTheDay(5);
+    }
+
+    protected static Predicate<Fixture> filterOfTheDay(int percentage) {
+        Instant today = Instant.now().truncatedTo(ChronoUnit.DAYS); // New seed every day.
         SplittableRandom rng = new SplittableRandom(today.hashCode());
         AtomicInteger counter = new AtomicInteger();
-        return fixture -> {
-            boolean res = counter.getAndIncrement() < 1 || rng.nextInt(0, 100) <= 2;
-            return res;
-        }; // Filter out 97% of tests.
+        return fixture -> counter.getAndIncrement() < 1 || rng.nextInt(0, 100) < percentage;
     }
 
     static Fixture[] allocators() {
@@ -975,6 +977,10 @@ public abstract class BufferTestSupport {
         byte[] bs = new byte[buf.capacity()];
         buf.copyInto(0, bs, 0, bs.length);
         return bs;
+    }
+
+    public static void assertEquals(Buffer expected, Buffer actual) {
+        assertThat(toByteArray(actual)).containsExactly(toByteArray(expected));
     }
 
     public static void assertEquals(byte expected, byte actual) {

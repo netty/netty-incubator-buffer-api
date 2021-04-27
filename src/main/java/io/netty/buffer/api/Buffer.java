@@ -54,8 +54,6 @@ import java.nio.ByteOrder;
  * such as with the {@link #getByte(int)} method,
  * from multiple threads.
  * <p>
- * Confined buffers will initially be confined to the thread that allocates them.
- * <p>
  * If a buffer needs to be accessed by a different thread,
  * then the ownership of that buffer must be sent to that thread.
  * This can be done with the {@link #send()} method.
@@ -101,6 +99,34 @@ import java.nio.ByteOrder;
  *      0      <=     readerOffset  <=   writerOffset    <=    capacity
  * </pre>
  *
+ * <h3 name="slice-bifurcate">Slice vs. Bifurcate</h3>
+ *
+ * The {@link #slice()} and {@link #bifurcate()} methods both return new buffers on the memory of the buffer they're
+ * called on.
+ * However, there are also important differences between the two, as they are aimed at different use cases that were
+ * previously (in the {@code ByteBuf} API) covered by {@code slice()} alone.
+ *
+ * <ul>
+ *     <li>
+ *         Slices create a new view onto the memory, that is shared between the slice and the buffer.
+ *         As long as both the slice and the originating buffer are alive, neither will have ownership of the memory.
+ *         Since the memory is shared, changes to the data made through one will be visible through the other.
+ *     </li>
+ *     <li>
+ *         Bifurcation breaks the ownership of the memory in two.
+ *         Both resulting buffers retain ownership of their respective region of memory.
+ *         They can do this because the regions are guaranteed to not overlap; data changes through one buffer will not
+ *         be visible through the other.
+ *     </li>
+ * </ul>
+ *
+ * These differences means that slicing is mostly suitable for when you temporarily want to share a focused area of a
+ * buffer.
+ * Examples of this include doing IO, or decoding a bounded part of a larger message.
+ * On the other hand, bifurcate is suitable for when you want to hand over a region of a buffer to some other,
+ * perhaps unknown, piece of code, and relinquish your ownership of that buffer region in the process.
+ * Examples include aggregating messages into an accumulator buffer, and sending messages down the pipeline for
+ * further processing, as bifurcated buffer regions, once their data has been received in its entirety.
  */
 public interface Buffer extends Rc<Buffer>, BufferAccessors {
     /**
@@ -292,43 +318,6 @@ public interface Buffer extends Rc<Buffer>, BufferAccessors {
     boolean readOnly();
 
     /**
-     * Returns a slice of this buffer's readable bytes.
-     * Modifying the content of the returned buffer or this buffer affects each other's content,
-     * while they maintain separate offsets. This method is identical to
-     * {@code buf.slice(buf.readerOffset(), buf.readableBytes())}.
-     * This method does not modify {@link #readerOffset()} or {@link #writerOffset()} of this buffer.
-     * <p>
-     * This method increments the reference count of this buffer.
-     * The reference count is decremented again when the slice is deallocated.
-     * <p>
-     * The slice is created with a {@linkplain #writerOffset() write offset} equal to the length of the slice,
-     * so that the entire contents of the slice is ready to be read.
-     *
-     * @return A new buffer instance, with independent {@link #readerOffset()} and {@link #writerOffset()},
-     * that is a view of the readable region of this buffer.
-     */
-    default Buffer slice() {
-        return slice(readerOffset(), readableBytes());
-    }
-
-    /**
-     * Returns a slice of the given region of this buffer.
-     * Modifying the content of the returned buffer or this buffer affects each other's content,
-     * while they maintain separate offsets.
-     * This method does not modify {@link #readerOffset()} or {@link #writerOffset()} of this buffer.
-     * <p>
-     * This method increments the reference count of this buffer.
-     * The reference count is decremented again when the slice is deallocated.
-     * <p>
-     * The slice is created with a {@linkplain #writerOffset() write offset} equal to the length of the slice,
-     * so that the entire contents of the slice is ready to be read.
-     *
-     * @return A new buffer instance, with independent {@link #readerOffset()} and {@link #writerOffset()},
-     * that is a view of the given region of this buffer.
-     */
-    Buffer slice(int offset, int length);
-
-    /**
      * Copies the given length of data from this buffer into the given destination array, beginning at the given source
      * position in this buffer, and the given destination position in the destination array.
      * <p>
@@ -387,6 +376,23 @@ public interface Buffer extends Rc<Buffer>, BufferAccessors {
      * or if the resulting end positions reaches beyond the end of either this buffer or the destination array.
      */
     void copyInto(int srcPos, Buffer dest, int destPos, int length);
+
+    /**
+     * Write into this buffer, all the readable bytes from the given buffer.
+     * This updates the {@linkplain #writerOffset() write offset} of this buffer, and the
+     * {@linkplain #readerOffset() reader offset} of the given buffer.
+     *
+     * @param source The buffer to read from.
+     * @return This buffer.
+     */
+    default Buffer writeBytes(Buffer source) {
+        int size = source.readableBytes();
+        int woff = writerOffset();
+        writerOffset(woff + size);
+        source.copyInto(source.readerOffset(), this, woff, size);
+        source.readerOffset(source.readerOffset() + size);
+        return this;
+    }
 
     /**
      * Resets the {@linkplain #readerOffset() read offset} and the {@linkplain #writerOffset() write offset} on this
@@ -469,7 +475,7 @@ public interface Buffer extends Rc<Buffer>, BufferAccessors {
      * If this buffer already has the necessary space, then this method returns immediately.
      * If this buffer does not already have the necessary space, then it will be expanded using the
      * {@link BufferAllocator} the buffer was created with.
-     * This method is the same as calling {@link #ensureWritable(int, boolean)} where {@code allowCompaction} is
+     * This method is the same as calling {@link #ensureWritable(int, int, boolean)} where {@code allowCompaction} is
      * {@code false}.
      *
      * @param size The requested number of bytes of space that should be available for writing.
@@ -477,7 +483,7 @@ public interface Buffer extends Rc<Buffer>, BufferAccessors {
      * or is {@linkplain #readOnly() read-only}.
      */
     default void ensureWritable(int size) {
-        ensureWritable(size, true);
+        ensureWritable(size, 1, true);
     }
 
     /**
@@ -509,13 +515,60 @@ public interface Buffer extends Rc<Buffer>, BufferAccessors {
      * </ul>
      *
      * @param size The requested number of bytes of space that should be available for writing.
+     * @param minimumGrowth The minimum number of bytes to grow by. If it is determined that memory should be allocated
+     *                     and copied, make sure that the new memory allocation is bigger than the old one by at least
+     *                     this many bytes. This way, the buffer can grow by more than what is immediately necessary,
+     *                     thus amortising the costs of allocating and copying.
      * @param allowCompaction {@code true} if the method is allowed to modify the
      *                                   {@linkplain #readerOffset() reader offset} and
      *                                   {@linkplain #writerOffset() writer offset}, otherwise {@code false}.
      * @throws IllegalStateException if this buffer is not in an {@linkplain #isOwned() owned} state,
-     *      * or is {@linkplain #readOnly() read-only}.
+     * or is {@linkplain #readOnly() read-only}.
      */
-    void ensureWritable(int size, boolean allowCompaction);
+    void ensureWritable(int size, int minimumGrowth, boolean allowCompaction);
+
+    /**
+     * Returns a slice of this buffer's readable bytes.
+     * Modifying the content of the returned buffer or this buffer affects each other's content,
+     * while they maintain separate offsets. This method is identical to
+     * {@code buf.slice(buf.readerOffset(), buf.readableBytes())}.
+     * This method does not modify {@link #readerOffset()} or {@link #writerOffset()} of this buffer.
+     * <p>
+     * This method increments the reference count of this buffer.
+     * The reference count is decremented again when the slice is deallocated.
+     * <p>
+     * The slice is created with a {@linkplain #writerOffset() write offset} equal to the length of the slice,
+     * so that the entire contents of the slice is ready to be read.
+     * <p>
+     * See the <a href="#slice-bifurcate">Slice vs. Bifurcate</a> section for details on the difference between slice
+     * and bifurcate.
+     *
+     * @return A new buffer instance, with independent {@link #readerOffset()} and {@link #writerOffset()},
+     * that is a view of the readable region of this buffer.
+     */
+    default Buffer slice() {
+        return slice(readerOffset(), readableBytes());
+    }
+
+    /**
+     * Returns a slice of the given region of this buffer.
+     * Modifying the content of the returned buffer or this buffer affects each other's content,
+     * while they maintain separate offsets.
+     * This method does not modify {@link #readerOffset()} or {@link #writerOffset()} of this buffer.
+     * <p>
+     * This method increments the reference count of this buffer.
+     * The reference count is decremented again when the slice is deallocated.
+     * <p>
+     * The slice is created with a {@linkplain #writerOffset() write offset} equal to the length of the slice,
+     * so that the entire contents of the slice is ready to be read.
+     * <p>
+     * See the <a href="#slice-bifurcate">Slice vs. Bifurcate</a> section for details on the difference between slice
+     * and bifurcate.
+     *
+     * @return A new buffer instance, with independent {@link #readerOffset()} and {@link #writerOffset()},
+     * that is a view of the given region of this buffer.
+     */
+    Buffer slice(int offset, int length);
 
     /**
      * Split the buffer into two, at the {@linkplain #writerOffset() write offset} position.
@@ -523,7 +576,7 @@ public interface Buffer extends Rc<Buffer>, BufferAccessors {
      * The buffer must be in {@linkplain #isOwned() an owned state}, or an exception will be thrown.
      * <p>
      * The region of this buffer that contain the read and readable bytes, will be captured and returned in a new
-     * buffer, that will hold its own ownership of that region. This allows the returned buffer to be indepentently
+     * buffer, that will hold its own ownership of that region. This allows the returned buffer to be independently
      * {@linkplain #send() sent} to other threads.
      * <p>
      * The returned buffer will adopt the {@link #readerOffset()} of this buffer, and have its {@link #writerOffset()}
@@ -558,10 +611,64 @@ public interface Buffer extends Rc<Buffer>, BufferAccessors {
      * simply split its internal array in two.
      * <p>
      * Bifurcated buffers support all operations that normal buffers do, including {@link #ensureWritable(int)}.
+     * <p>
+     * See the <a href="#slice-bifurcate">Slice vs. Bifurcate</a> section for details on the difference between slice
+     * and bifurcate.
      *
      * @return A new buffer with independent and exclusive ownership over the read and readable bytes from this buffer.
      */
-    Buffer bifurcate();
+    default Buffer bifurcate() {
+        return bifurcate(writerOffset());
+    }
+
+    /**
+     * Split the buffer into two, at the given {@code splitOffset}.
+     * <p>
+     * The buffer must be in {@linkplain #isOwned() an owned state}, or an exception will be thrown.
+     * <p>
+     * The region of this buffer that precede the {@code splitOffset}, will be captured and returned in a new
+     * buffer, that will hold its own ownership of that region. This allows the returned buffer to be independently
+     * {@linkplain #send() sent} to other threads.
+     * <p>
+     * The returned buffer will adopt the {@link #readerOffset()} and {@link #writerOffset()} of this buffer,
+     * but truncated to fit within the capacity dictated by the {@code splitOffset}.
+     * <p>
+     * The memory region in the returned buffer will become inaccessible through this buffer. If the
+     * {@link #readerOffset()} or {@link #writerOffset()} of this buffer lie prior to the {@code splitOffset},
+     * then those offsets will be moved forward so they land on offset 0 after the bifurcation.
+     * <p>
+     * Effectively, the following transformation takes place:
+     * <pre>{@code
+     *         This buffer:
+     *          +--------------------------------+
+     *         0|               |splitOffset     |cap
+     *          +---------------+----------------+
+     *         /               / \               \
+     *        /               /   \               \
+     *       /               /     \               \
+     *      /               /       \               \
+     *     /               /         \               \
+     *    +---------------+           +---------------+
+     *    |               |cap        |               |cap
+     *    +---------------+           +---------------+
+     *    Returned buffer.            This buffer.
+     * }</pre>
+     * When the buffers are in this state, both of the bifurcated parts retain an atomic reference count on the
+     * underlying memory. This means that shared underlying memory will not be deallocated or returned to a pool, until
+     * all of the bifurcated parts have been closed.
+     * <p>
+     * Composite buffers have it a little easier, in that at most only one of the constituent buffers will actually be
+     * bifurcated. If the split point lands perfectly between two constituent buffers, then a composite buffer can
+     * simply split its internal array in two.
+     * <p>
+     * Bifurcated buffers support all operations that normal buffers do, including {@link #ensureWritable(int)}.
+     * <p>
+     * See the <a href="#slice-bifurcate">Slice vs. Bifurcate</a> section for details on the difference between slice
+     * and bifurcate.
+     *
+     * @return A new buffer with independent and exclusive ownership over the read and readable bytes from this buffer.
+     */
+    Buffer bifurcate(int splitOffset);
 
     /**
      * Discards the read bytes, and moves the buffer contents to the beginning of the buffer.

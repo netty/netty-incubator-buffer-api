@@ -18,7 +18,7 @@ module netty.incubator.buffer {
     requires io.netty.common;
     requires io.netty.buffer;
 
-    // Optional dependencies, needed for some of the examples.
+    // Optional dependencies, needed for some examples.
     requires static java.logging;
 
     exports io.netty.buffer.api;
