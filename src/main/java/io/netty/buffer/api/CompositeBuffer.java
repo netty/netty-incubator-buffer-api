@@ -58,11 +58,17 @@ final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> implement
     private boolean closed;
     private boolean readOnly;
 
-    CompositeBuffer(BufferAllocator allocator, Deref<Buffer>[] refs) {
-        this(allocator, filterExternalBufs(refs), COMPOSITE_DROP, false);
+    CompositeBuffer(BufferAllocator allocator, Buffer[] refs) {
+        this(allocator, filterExternalBufs(Arrays.stream(refs)
+                .map(buf -> buf.acquire() /* Increments reference counts. */)), COMPOSITE_DROP, false);
     }
 
-    private static Buffer[] filterExternalBufs(Deref<Buffer>[] refs) {
+    CompositeBuffer(BufferAllocator allocator, Send<Buffer>[] refs) {
+        this(allocator, filterExternalBufs(Arrays.stream(refs)
+                .map(buf -> buf.receive())), COMPOSITE_DROP, false);
+    }
+
+    private static Buffer[] filterExternalBufs(Stream<Buffer> refs) {
         // We filter out all zero-capacity buffers because they wouldn't contribute to the composite buffer anyway,
         // and also, by ensuring that all constituent buffers contribute to the size of the composite buffer,
         // we make sure that the number of composite buffers will never become greater than the number of bytes in
@@ -70,11 +76,10 @@ final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> implement
         // This restriction guarantees that methods like countComponents, forEachReadable and forEachWritable,
         // will never overflow their component counts.
         // Allocating a new array unconditionally also prevents external modification of the array.
-        Buffer[] bufs = Arrays.stream(refs)
-                              .map(r -> r.get()) // Increments reference counts.
-                              .filter(CompositeBuffer::discardEmpty)
-                              .flatMap(CompositeBuffer::flattenBuffer)
-                              .toArray(Buffer[]::new);
+        Buffer[] bufs = refs
+                .filter(CompositeBuffer::discardEmpty)
+                .flatMap(CompositeBuffer::flattenBuffer)
+                .toArray(Buffer[]::new);
         // Make sure there are no duplicates among the buffers.
         Set<Buffer> duplicatesCheck = Collections.newSetFromMap(new IdentityHashMap<>());
         duplicatesCheck.addAll(Arrays.asList(bufs));
