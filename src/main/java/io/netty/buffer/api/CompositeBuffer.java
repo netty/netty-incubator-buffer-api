@@ -376,7 +376,7 @@ public final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> im
     }
 
     @Override
-    public Buffer order(ByteOrder order) {
+    public CompositeBuffer order(ByteOrder order) {
         if (this.order != order) {
             this.order = order;
             for (Buffer buf : bufs) {
@@ -402,7 +402,7 @@ public final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> im
     }
 
     @Override
-    public Buffer readerOffset(int index) {
+    public CompositeBuffer readerOffset(int index) {
         prepRead(index, 0);
         int indexLeft = index;
         for (Buffer buf : bufs) {
@@ -419,7 +419,7 @@ public final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> im
     }
 
     @Override
-    public Buffer writerOffset(int index) {
+    public CompositeBuffer writerOffset(int index) {
         checkWriteBounds(index, 0);
         int indexLeft = index;
         for (Buffer buf : bufs) {
@@ -431,7 +431,7 @@ public final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> im
     }
 
     @Override
-    public Buffer fill(byte value) {
+    public CompositeBuffer fill(byte value) {
         for (Buffer buf : bufs) {
             buf.fill(value);
         }
@@ -444,7 +444,7 @@ public final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> im
     }
 
     @Override
-    public Buffer readOnly(boolean readOnly) {
+    public CompositeBuffer readOnly(boolean readOnly) {
         for (Buffer buf : bufs) {
             buf.readOnly(readOnly);
         }
@@ -458,7 +458,7 @@ public final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> im
     }
 
     @Override
-    public Buffer slice(int offset, int length) {
+    public CompositeBuffer slice(int offset, int length) {
         checkWriteBounds(offset, length);
         if (offset < 0 || length < 0) {
             throw new IllegalArgumentException(
@@ -922,7 +922,7 @@ public final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> im
     }
 
     @Override
-    public Buffer bifurcate(int splitOffset) {
+    public CompositeBuffer bifurcate(int splitOffset) {
         if (splitOffset < 0) {
             throw new IllegalArgumentException("The split offset cannot be negative: " + splitOffset + '.');
         }
@@ -1077,25 +1077,25 @@ public final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> im
     }
 
     @Override
-    public Buffer writeByte(byte value) {
+    public CompositeBuffer writeByte(byte value) {
         prepWrite(Byte.BYTES).writeByte(value);
         return this;
     }
 
     @Override
-    public Buffer setByte(int woff, byte value) {
+    public CompositeBuffer setByte(int woff, byte value) {
         prepWrite(woff, Byte.BYTES).setByte(subOffset, value);
         return this;
     }
 
     @Override
-    public Buffer writeUnsignedByte(int value) {
+    public CompositeBuffer writeUnsignedByte(int value) {
         prepWrite(Byte.BYTES).writeUnsignedByte(value);
         return this;
     }
 
     @Override
-    public Buffer setUnsignedByte(int woff, int value) {
+    public CompositeBuffer setUnsignedByte(int woff, int value) {
         prepWrite(woff, Byte.BYTES).setUnsignedByte(subOffset, value);
         return this;
     }
@@ -1111,13 +1111,13 @@ public final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> im
     }
 
     @Override
-    public Buffer writeChar(char value) {
+    public CompositeBuffer writeChar(char value) {
         prepWrite(2).writeChar(value);
         return this;
     }
 
     @Override
-    public Buffer setChar(int woff, char value) {
+    public CompositeBuffer setChar(int woff, char value) {
         prepWrite(woff, 2).setChar(subOffset, value);
         return this;
     }
@@ -1143,25 +1143,25 @@ public final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> im
     }
 
     @Override
-    public Buffer writeShort(short value) {
+    public CompositeBuffer writeShort(short value) {
         prepWrite(Short.BYTES).writeShort(value);
         return this;
     }
 
     @Override
-    public Buffer setShort(int woff, short value) {
+    public CompositeBuffer setShort(int woff, short value) {
         prepWrite(woff, Short.BYTES).setShort(subOffset, value);
         return this;
     }
 
     @Override
-    public Buffer writeUnsignedShort(int value) {
+    public CompositeBuffer writeUnsignedShort(int value) {
         prepWrite(Short.BYTES).writeUnsignedShort(value);
         return this;
     }
 
     @Override
-    public Buffer setUnsignedShort(int woff, int value) {
+    public CompositeBuffer setUnsignedShort(int woff, int value) {
         prepWrite(woff, Short.BYTES).setUnsignedShort(subOffset, value);
         return this;
     }
@@ -1187,25 +1187,25 @@ public final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> im
     }
 
     @Override
-    public Buffer writeMedium(int value) {
+    public CompositeBuffer writeMedium(int value) {
         prepWrite(3).writeMedium(value);
         return this;
     }
 
     @Override
-    public Buffer setMedium(int woff, int value) {
+    public CompositeBuffer setMedium(int woff, int value) {
         prepWrite(woff, 3).setMedium(subOffset, value);
         return this;
     }
 
     @Override
-    public Buffer writeUnsignedMedium(int value) {
+    public CompositeBuffer writeUnsignedMedium(int value) {
         prepWrite(3).writeUnsignedMedium(value);
         return this;
     }
 
     @Override
-    public Buffer setUnsignedMedium(int woff, int value) {
+    public CompositeBuffer setUnsignedMedium(int woff, int value) {
         prepWrite(woff, 3).setUnsignedMedium(subOffset, value);
         return this;
     }
@@ -1231,25 +1231,25 @@ public final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> im
     }
 
     @Override
-    public Buffer writeInt(int value) {
+    public CompositeBuffer writeInt(int value) {
         prepWrite(Integer.BYTES).writeInt(value);
         return this;
     }
 
     @Override
-    public Buffer setInt(int woff, int value) {
+    public CompositeBuffer setInt(int woff, int value) {
         prepWrite(woff, Integer.BYTES).setInt(subOffset, value);
         return this;
     }
 
     @Override
-    public Buffer writeUnsignedInt(long value) {
+    public CompositeBuffer writeUnsignedInt(long value) {
         prepWrite(Integer.BYTES).writeUnsignedInt(value);
         return this;
     }
 
     @Override
-    public Buffer setUnsignedInt(int woff, long value) {
+    public CompositeBuffer setUnsignedInt(int woff, long value) {
         prepWrite(woff, Integer.BYTES).setUnsignedInt(subOffset, value);
         return this;
     }
@@ -1265,13 +1265,13 @@ public final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> im
     }
 
     @Override
-    public Buffer writeFloat(float value) {
+    public CompositeBuffer writeFloat(float value) {
         prepWrite(Float.BYTES).writeFloat(value);
         return this;
     }
 
     @Override
-    public Buffer setFloat(int woff, float value) {
+    public CompositeBuffer setFloat(int woff, float value) {
         prepWrite(woff, Float.BYTES).setFloat(subOffset, value);
         return this;
     }
@@ -1287,13 +1287,13 @@ public final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> im
     }
 
     @Override
-    public Buffer writeLong(long value) {
+    public CompositeBuffer writeLong(long value) {
         prepWrite(Long.BYTES).writeLong(value);
         return this;
     }
 
     @Override
-    public Buffer setLong(int woff, long value) {
+    public CompositeBuffer setLong(int woff, long value) {
         prepWrite(woff, Long.BYTES).setLong(subOffset, value);
         return this;
     }
@@ -1309,13 +1309,13 @@ public final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> im
     }
 
     @Override
-    public Buffer writeDouble(double value) {
+    public CompositeBuffer writeDouble(double value) {
         prepWrite(Double.BYTES).writeDouble(value);
         return this;
     }
 
     @Override
-    public Buffer setDouble(int woff, double value) {
+    public CompositeBuffer setDouble(int woff, double value) {
         prepWrite(woff, Double.BYTES).setDouble(subOffset, value);
         return this;
     }
