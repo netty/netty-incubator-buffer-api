@@ -201,7 +201,7 @@ public final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> im
         if (ise != null) {
             throw ise;
         }
-        return compose(allocator, bufs);
+        return new CompositeBuffer(allocator, filterExternalBufs(Arrays.stream(bufs)), COMPOSITE_DROP, false);
     }
 
     /**
