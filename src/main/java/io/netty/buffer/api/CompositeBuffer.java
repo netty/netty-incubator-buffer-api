@@ -147,7 +147,7 @@ public final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> im
      * @throws IllegalArgumentException if the given buffers have an inconsistent
      * {@linkplain Buffer#order() byte order}.
      */
-    public static Buffer compose(BufferAllocator allocator, Buffer... bufs) {
+    public static CompositeBuffer compose(BufferAllocator allocator, Buffer... bufs) {
         Stream<Buffer> bufferStream = Arrays.stream(bufs)
                 .map(buf -> buf.acquire()); // Increments reference counts.
         return new CompositeBuffer(allocator, filterExternalBufs(bufferStream), COMPOSITE_DROP, false);
@@ -181,7 +181,7 @@ public final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> im
      * will be closed and descarded, respectively.
      */
     @SafeVarargs
-    public static Buffer compose(BufferAllocator allocator, Send<Buffer>... sends) {
+    public static CompositeBuffer compose(BufferAllocator allocator, Send<Buffer>... sends) {
         Buffer[] bufs = new Buffer[sends.length];
         IllegalStateException ise = null;
         for (int i = 0; i < sends.length; i++) {
@@ -212,7 +212,7 @@ public final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> im
      * {@link #ensureWritable(int)} calls.
      * @return A composite buffer that has no components, and has a capacity of zero.
      */
-    public static Buffer compose(BufferAllocator allocator) {
+    public static CompositeBuffer compose(BufferAllocator allocator) {
         return new CompositeBuffer(allocator, EMPTY_BUFFER_ARRAY, COMPOSITE_DROP, false);
     }
 
