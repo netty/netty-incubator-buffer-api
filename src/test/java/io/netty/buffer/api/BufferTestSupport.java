@@ -130,9 +130,21 @@ public abstract class BufferTestSupport {
     static List<Fixture> initialAllocators() {
         return List.of(
                 new Fixture("heap", BufferAllocator::heap, HEAP),
+                new Fixture("constHeap", () -> constantBufferBasedAllocator(BufferAllocator.heap()), HEAP),
+                new Fixture("constDirect", () -> constantBufferBasedAllocator(BufferAllocator.direct()),
+                        DIRECT, CLEANER),
                 new Fixture("direct", BufferAllocator::direct, DIRECT, CLEANER),
                 new Fixture("pooledHeap", BufferAllocator::pooledHeap, POOLED, HEAP),
                 new Fixture("pooledDirect", BufferAllocator::pooledDirect, POOLED, DIRECT, CLEANER));
+    }
+
+    private static BufferAllocator constantBufferBasedAllocator(BufferAllocator allocator) {
+        return size -> {
+            if (size < 0) {
+                throw new IllegalArgumentException();
+            }
+            return allocator.constBufferSupplier(new byte[size]).get().readOnly(false).reset();
+        };
     }
 
     private static Stream<Fixture> fixtureCombinations() {
@@ -240,12 +252,42 @@ public abstract class BufferTestSupport {
                     }
                 };
             }, COMPOSITE));
+            builder.add(new Fixture(fixture + ".readOnly(true/false)", () -> {
+                var allocator = fixture.get();
+                return new BufferAllocator() {
+                    @Override
+                    public Buffer allocate(int size) {
+                        return allocator.allocate(size).readOnly(true).readOnly(false);
+                    }
+
+                    @Override
+                    public void close() {
+                        allocator.close();
+                    }
+                };
+            }, fixture.getProperties()));
+            builder.add(new Fixture(fixture + ".compose.readOnly(true/false)", () -> {
+                var allocator = fixture.get();
+                return new BufferAllocator() {
+                    @Override
+                    public Buffer allocate(int size) {
+                        try (Buffer buf = allocator.allocate(size)) {
+                            CompositeBuffer composite = CompositeBuffer.compose(allocator, buf);
+                            return composite.readOnly(true).readOnly(false);
+                        }
+                    }
+
+                    @Override
+                    public void close() {
+                        allocator.close();
+                    }
+                };
+            }, COMPOSITE));
         }
 
         var stream = builder.build();
         return stream.flatMap(BufferTestSupport::injectSplits)
-                     .flatMap(BufferTestSupport::injectSlices)
-                     .flatMap(BufferTestSupport::injectReadOnlyToggling);
+                     .flatMap(BufferTestSupport::injectSlices);
     }
 
     private static Stream<Fixture> injectSplits(Fixture f) {
@@ -307,26 +349,6 @@ public abstract class BufferTestSupport {
                 }
             };
         }, props));
-        return builder.build();
-    }
-
-    private static Stream<Fixture> injectReadOnlyToggling(Fixture f) {
-        Builder<Fixture> builder = Stream.builder();
-        builder.add(f);
-        builder.add(new Fixture(f + ".readOnly(true/false)", () -> {
-            var allocatorBase = f.get();
-            return new BufferAllocator() {
-                @Override
-                public Buffer allocate(int size) {
-                    return allocatorBase.allocate(size).readOnly(true).readOnly(false);
-                }
-
-                @Override
-                public void close() {
-                    allocatorBase.close();
-                }
-            };
-        }, f.getProperties()));
         return builder.build();
     }
 

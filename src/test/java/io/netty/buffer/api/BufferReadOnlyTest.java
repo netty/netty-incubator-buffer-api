@@ -19,6 +19,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
+import java.util.function.Supplier;
+
+import static java.nio.ByteOrder.BIG_ENDIAN;
+import static java.nio.ByteOrder.LITTLE_ENDIAN;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -136,5 +140,29 @@ public class BufferReadOnlyTest extends BufferTestSupport {
             }
         }
     }
-    // todo read only buffer must have zero writable bytes
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    public void readOnlyBuffersCannotChangeWriteOffset(Fixture fixture) {
+        try (BufferAllocator allocator = fixture.createAllocator();
+             Buffer buf = allocator.allocate(8).readOnly(true)) {
+            assertThrows(IllegalStateException.class, () -> buf.writerOffset(4));
+        }
+    }
+
+    @Test
+    public void modifyingConstBufferDoesNotImpactSiblings() {
+        Supplier<Buffer> supplier = BufferAllocator.heap().constBufferSupplier(new byte[] {1, 2, 3, 4});
+        try (Buffer a = supplier.get();
+             Buffer b = supplier.get().order(LITTLE_ENDIAN)) {
+            a.order(BIG_ENDIAN).readOnly(false).setInt(0, 0xA1A2A3A4);
+            a.readerOffset(2);
+            assertThat(toByteArray(a)).containsExactly(0xA1, 0xA2, 0xA3, 0xA4);
+            assertThat(toByteArray(b)).containsExactly(1, 2, 3, 4);
+            assertThat(b.readerOffset()).isZero();
+            assertThat(b.order()).isEqualTo(LITTLE_ENDIAN);
+            assertThat(a.writerOffset()).isEqualTo(4);
+            assertThat(b.writerOffset()).isEqualTo(4);
+        }
+    }
 }

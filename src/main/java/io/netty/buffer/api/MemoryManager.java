@@ -15,9 +15,6 @@
  */
 package io.netty.buffer.api;
 
-import io.netty.buffer.api.memseg.HeapMemorySegmentManager;
-import io.netty.buffer.api.memseg.NativeMemorySegmentManager;
-
 import java.lang.ref.Cleaner;
 
 public interface MemoryManager {

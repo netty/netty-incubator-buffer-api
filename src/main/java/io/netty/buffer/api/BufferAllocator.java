@@ -18,6 +18,7 @@ package io.netty.buffer.api;
 import io.netty.buffer.api.internal.Statics;
 
 import java.nio.ByteOrder;
+import java.util.function.Supplier;
 
 /**
  * Interface for {@link Buffer} allocators.
@@ -66,6 +67,38 @@ public interface BufferAllocator extends AutoCloseable {
      */
     default Buffer allocate(int size, ByteOrder order) {
         return allocate(size).order(order);
+    }
+
+    /**
+     * Create a supplier of "constant" {@linkplain Buffer Buffers} from this allocator, that all have the given
+     * byte contents. The buffer has the same capacity as the byte array length, and its write offset is placed at the
+     * end, and its read offset is at the beginning, such that the entire buffer contents are readable.
+     * <p>
+     * The buffers produced by the supplier will have {@linkplain Buffer#isOwned() ownership}, and closing them will
+     * make them {@linkplain Buffer#isAccessible() inaccessible}, just like a normally allocated buffer.
+     * <p>
+     * The buffers produced are only "constants" in so far as they are {@linkplain Buffer#readOnly() read-only}.
+     * However, since all buffers are meant to behave the same, it is possible to make the returned buffers writeable
+     * again. Doing so will only impact the particular buffer instance, such that changing its contents will not impact
+     * any other buffer produced by the supplier.
+     * <p>
+     * It can generally be expected, but is not guaranteed, that the returned supplier is more resource efficient than
+     * allocating and copying memory with other available APIs.
+     * <p>
+     * The primary use case for this API, is when you need to repeatedly produce buffers with the same contents, and
+     * you perhaps wish to keep a {@code static final} field with these contents. This use case has previously been
+     * solved by allocating a read-only buffer with the given contents, and then slicing or duplicating it on every use.
+     * This approach had several problems. For instance, if you forget to slice, the offsets of the buffer can change
+     * in unexpected ways, since the same buffer instance is shared and accessed from many places. The buffer could also
+     * be deallocated, making the data inaccessible. Lastly, the read-only state could be changed, allowing the
+     * supposedly constant buffer to change its contents. The supplier-based API solves all of these problems, by
+     * enforcing that each usage get their own distinct buffer instance.
+     *
+     * @param bytes The byte contents of the buffers produced by the returned supplier.
+     * @return A supplier of read-only buffers with the given contents.
+     */
+    default Supplier<Buffer> constBufferSupplier(byte[] bytes) {
+        return () -> allocate(bytes.length).writeBytes(bytes).readOnly(true);
     }
 
     /**
