@@ -26,7 +26,7 @@ package io.netty.buffer.api;
  *
  * @param <I> The concrete subtype.
  */
-public interface Rc<I extends Rc<I>> extends AutoCloseable, Deref<I> {
+public interface Rc<I extends Rc<I>> extends AutoCloseable {
     /**
      * Increment the reference count.
      * <p>
@@ -35,16 +35,6 @@ public interface Rc<I extends Rc<I>> extends AutoCloseable, Deref<I> {
      * @return This Rc instance.
      */
     I acquire();
-
-    @Override
-    default I get() {
-        return acquire();
-    }
-
-    @Override
-    default boolean referentIsInstanceOf(Class<?> cls) {
-        return cls.isInstance(this);
-    }
 
     /**
      * Decrement the reference count, and despose of the resource if the last reference is closed.

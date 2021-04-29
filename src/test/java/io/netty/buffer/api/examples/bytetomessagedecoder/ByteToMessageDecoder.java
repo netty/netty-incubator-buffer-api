@@ -18,6 +18,7 @@ package io.netty.buffer.api.examples.bytetomessagedecoder;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.api.Buffer;
 import io.netty.buffer.api.BufferAllocator;
+import io.netty.buffer.api.CompositeBuffer;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelConfig;
 import io.netty.channel.ChannelFuture;
@@ -94,7 +95,7 @@ public abstract class ByteToMessageDecoder extends ChannelHandlerAdapter {
      * Cumulate {@link Buffer}s by merge them into one {@link Buffer}'s, using memory copies.
      */
     public static final Cumulator MERGE_CUMULATOR = (alloc, cumulation, in) -> {
-        if (cumulation.readableBytes() == 0 && !Buffer.isComposite(cumulation)) {
+        if (cumulation.readableBytes() == 0 && !CompositeBuffer.isComposite(cumulation)) {
             // If cumulation is empty and input buffer is contiguous, use it directly
             cumulation.close();
             return in;
@@ -128,7 +129,7 @@ public abstract class ByteToMessageDecoder extends ChannelHandlerAdapter {
         }
         Buffer composite;
         try (in) {
-            if (Buffer.isComposite(cumulation) && cumulation.isOwned()) {
+            if (CompositeBuffer.isComposite(cumulation) && cumulation.isOwned()) {
                 composite = cumulation;
                 if (composite.writerOffset() != composite.capacity()) {
                     // Writer index must equal capacity if we are going to "write"
@@ -137,9 +138,9 @@ public abstract class ByteToMessageDecoder extends ChannelHandlerAdapter {
                     cumulation.close();
                 }
             } else {
-                composite = Buffer.compose(alloc, cumulation);
+                composite = CompositeBuffer.compose(alloc, cumulation);
             }
-            Buffer.extendComposite(composite, in);
+            ((CompositeBuffer) composite).extendWith(in);
             return composite;
         }
     };
@@ -224,7 +225,7 @@ public abstract class ByteToMessageDecoder extends ChannelHandlerAdapter {
     }
 
     private static Buffer newEmptyBuffer() {
-        return Buffer.compose(BufferAllocator.heap());
+        return CompositeBuffer.compose(BufferAllocator.heap());
     }
 
     @Override

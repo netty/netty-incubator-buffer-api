@@ -32,7 +32,7 @@ import java.util.function.Supplier;
  *
  * @param <T>
  */
-public interface Send<T extends Rc<T>> extends Deref<T> {
+public interface Send<T extends Rc<T>> {
     /**
      * Construct a {@link Send} based on the given {@link Supplier}.
      * The supplier will be called only once, in the receiving thread.
@@ -117,8 +117,12 @@ public interface Send<T extends Rc<T>> extends Deref<T> {
         }
     }
 
-    @Override
-    default T get() {
-        return receive();
-    }
+    /**
+     * Determine if the object received from this {@code Send} is an instance of the given class.
+     *
+     * @param cls The type to check.
+     * @return {@code true} if the object received from this {@code Send} can be assigned fields or variables of the
+     * given type, otherwise false.
+     */
+    boolean referentIsInstanceOf(Class<?> cls);
 }

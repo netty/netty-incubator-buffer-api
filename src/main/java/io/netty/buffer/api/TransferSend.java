@@ -43,11 +43,6 @@ class TransferSend<I extends Rc<I>, T extends Rc<I>> implements Send<I> {
         return (I) copy;
     }
 
-    Owned<T> unsafeUnwrapOwned() {
-        gateReception();
-        return outgoing;
-    }
-
     private void gateReception() {
         if ((boolean) RECEIVED.getAndSet(this, true)) {
             throw new IllegalStateException("This object has already been received.");

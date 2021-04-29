@@ -37,7 +37,7 @@ import java.nio.ByteOrder;
  * When the buffer is initially allocated, a pairing {@link #close()} call will deallocate it.
  * In this state, the buffer {@linkplain #isOwned() is "owned"}.
  * <p>
- * The buffer can also be {@linkplain #acquire() acquired} when it's about to be involved in a complicated life time.
+ * The buffer can also be {@linkplain #acquire() acquired} when it's about to be involved in a complicated lifetime.
  * The {@link #acquire()} call increments the reference count of the buffer,
  * and a pairing {@link #close()} call will decrement the reference count.
  * Each acquire lends out the buffer, and the buffer is said to be in a "borrowed" state.
@@ -58,14 +58,15 @@ import java.nio.ByteOrder;
  * then the ownership of that buffer must be sent to that thread.
  * This can be done with the {@link #send()} method.
  * The send method consumes the buffer, if it is in an owned state, and produces a {@link Send} object.
- * The {@link Send} object can then be shared in a thread-safe way (so called "safe publication"),
+ * The {@link Send} object can then be shared in a thread-safe way (so-called "safe publication"),
  * with the intended recipient thread.
  * <p>
  * To send a buffer to another thread, the buffer must not have any outstanding borrows.
  * That is to say, all {@linkplain #acquire() acquires} must have been paired with a {@link #close()};
  * all {@linkplain #slice() slices} must have been closed.
- * And if this buffer is a constituent of a {@linkplain Buffer#compose(BufferAllocator, Deref...) composite buffer},
- * then that composite buffer must be closed.
+ * And if this buffer is a constituent of a
+ * {@linkplain CompositeBuffer#compose(BufferAllocator, Buffer...) composite buffer}, then that composite buffer must
+ * be closed.
  * And if this buffer is itself a composite buffer, then it must own all of its constituent buffers.
  * The {@link #isOwned()} method can be used on any buffer to check if it can be sent or not.
  *
@@ -79,7 +80,7 @@ import java.nio.ByteOrder;
  *     <ul><li>These accessor methods are typically called {@code getX} or {@code setX}.</li></ul>
  * </ol>
  *
- * A buffer contain two mutable offset positions: one for reading and one for writing.
+ * A buffer contains two mutable offset positions: one for reading and one for writing.
  * These positions use <a href="https://en.wikipedia.org/wiki/Zero-based_numbering">zero-based indexing</a>,
  * such that the first byte of data in the buffer is placed at offset {@code 0},
  * and the last byte in the buffer is at offset {@link #capacity() capacity - 1}.
@@ -109,7 +110,7 @@ import java.nio.ByteOrder;
  * <ul>
  *     <li>
  *         Slices create a new view onto the memory, that is shared between the slice and the buffer.
- *         As long as both the slice and the originating buffer are alive, neither will have ownership of the memory.
+ *         As long as both the slice, and the originating buffer are alive, neither will have ownership of the memory.
  *         Since the memory is shared, changes to the data made through one will be visible through the other.
  *     </li>
  *     <li>
@@ -120,7 +121,7 @@ import java.nio.ByteOrder;
  *     </li>
  * </ul>
  *
- * These differences means that slicing is mostly suitable for when you temporarily want to share a focused area of a
+ * These differences mean that slicing is mostly suitable for when you temporarily want to share a focused area of a
  * buffer.
  * Examples of this include doing IO, or decoding a bounded part of a larger message.
  * On the other hand, bifurcate is suitable for when you want to hand over a region of a buffer to some other,
@@ -129,93 +130,6 @@ import java.nio.ByteOrder;
  * further processing, as bifurcated buffer regions, once their data has been received in its entirety.
  */
 public interface Buffer extends Rc<Buffer>, BufferAccessors {
-    /**
-     * Compose the given sequence of buffers and present them as a single buffer.
-     * <p>
-     * <strong>Note:</strong> The composite buffer increments the reference count on all the constituent buffers,
-     * and holds a reference to them until the composite buffer is deallocated.
-     * This means the constituent buffers must still have their outside-reference count decremented as normal.
-     * If the buffers are allocated for the purpose of participating in the composite buffer,
-     * then they should be closed as soon as the composite buffer has been created, like in this example:
-     * <pre>{@code
-     *     try (Buffer a = allocator.allocate(size);
-     *          Buffer b = allocator.allocate(size)) {
-     *         return allocator.compose(a, b); // Reference counts for 'a' and 'b' incremented here.
-     *     } // Reference count for 'a' and 'b' decremented here; composite buffer now holds the last references.
-     * }</pre>
-     * <p>
-     * {@linkplain Buffer#send() Sending} a composite buffer implies sending all of its constituent buffers.
-     * For sending to be possible, both the composite buffer itself, and all of its constituent buffers, must be in an
-     * {@linkplain Rc#isOwned() owned state}.
-     * This means that the composite buffer must be the only reference to the constituent buffers.
-     * <p>
-     * All of the constituent buffers must have the same {@linkplain Buffer#order() byte order}.
-     * An exception will be thrown if you attempt to compose buffers that have different byte orders,
-     * and changing the byte order of the constituent buffers so they become inconsistent after construction,
-     * will result in unspecified behaviour.
-     * <p>
-     * The read and write offsets of the constituent buffers must be arranged such that there are no "gaps" when viewed
-     * as a single connected chunk of memory.
-     * Specifically, there can be at most one buffer whose write offset is neither zero nor at capacity,
-     * and all buffers prior to it must have their write offsets at capacity, and all buffers after it must have a write
-     * offset of zero.
-     * Likewise, there can be at most one buffer whose read offset is neither zero nor at capacity,
-     * and all buffers prior to it must have their read offsets at capacity, and all buffers after it must have a read
-     * offset of zero.
-     * Furthermore, the sum of the read offsets must be less than or equal to the sum of the write offsets.
-     * <p>
-     * Reads and writes to the composite buffer that modifies the read or write offsets, will also modify the relevant
-     * offsets in the constituent buffers.
-     * <p>
-     * It is not a requirement that the buffers have the same size.
-     * <p>
-     * It is not a requirement that the buffers are allocated by this allocator, but if
-     * {@link Buffer#ensureWritable(int)} is called on the composed buffer, and the composed buffer needs to be
-     * expanded, then this allocator instance will be used for allocation the extra memory.
-     *
-     * @param allocator The allocator for the composite buffer. This allocator will be used e.g. to service
-     * {@link #ensureWritable(int)} calls.
-     * @param bufs The buffers to compose into a single buffer view.
-     * @return A buffer composed of, and backed by, the given buffers.
-     * @throws IllegalArgumentException if the given buffers have an inconsistent
-     * {@linkplain Buffer#order() byte order}.
-     */
-    @SafeVarargs
-    static Buffer compose(BufferAllocator allocator, Deref<Buffer>... bufs) {
-        return new CompositeBuffer(allocator, bufs);
-    }
-
-    /**
-     * Extend the given composite buffer with the given extension buffer.
-     * This works as if the extension had originally been included at the end of the list of constituent buffers when
-     * the composite buffer was created.
-     * The composite buffer is modified in-place.
-     *
-     * @see #compose(BufferAllocator, Deref...)
-     * @param composite The composite buffer (from a prior {@link #compose(BufferAllocator, Deref...)} call) to extend
-     *                 with the given extension buffer.
-     * @param extension The buffer to extend the composite buffer with.
-     */
-    static void extendComposite(Buffer composite, Buffer extension) {
-        if (!isComposite(composite)) {
-            throw new IllegalArgumentException(
-                    "Expected the first buffer to be a composite buffer, " +
-                    "but it is a " + composite.getClass() + " buffer: " + composite + '.');
-        }
-        CompositeBuffer compositeBuffer = (CompositeBuffer) composite;
-        compositeBuffer.extendWith(extension);
-    }
-
-    /**
-     * Check if the given buffer is a {@linkplain #compose(BufferAllocator, Deref...) composite} buffer or not.
-     * @param composite The buffer to check.
-     * @return {@code true} if the given buffer was created with {@link #compose(BufferAllocator, Deref...)},
-     * {@code false} otherwise.
-     */
-    static boolean isComposite(Buffer composite) {
-        return composite.getClass() == CompositeBuffer.class;
-    }
-
     /**
      * Change the default byte order of this buffer, and return this buffer.
      *
@@ -331,7 +245,7 @@ public interface Buffer extends Rc<Buffer>, BufferAccessors {
      * @param length The number of bytes to copy.
      * @throws NullPointerException if the destination array is null.
      * @throws IndexOutOfBoundsException if the source or destination positions, or the length, are negative,
-     * or if the resulting end positions reaches beyond the end of either this buffer or the destination array.
+     * or if the resulting end positions reaches beyond the end of either this buffer, or the destination array.
      */
     void copyInto(int srcPos, byte[] dest, int destPos, int length);
 
@@ -352,7 +266,7 @@ public interface Buffer extends Rc<Buffer>, BufferAccessors {
      * @param length The number of bytes to copy.
      * @throws NullPointerException if the destination array is null.
      * @throws IndexOutOfBoundsException if the source or destination positions, or the length, are negative,
-     * or if the resulting end positions reaches beyond the end of either this buffer or the destination array.
+     * or if the resulting end positions reaches beyond the end of either this buffer, or the destination array.
      */
     void copyInto(int srcPos, ByteBuffer dest, int destPos, int length);
 
@@ -373,7 +287,7 @@ public interface Buffer extends Rc<Buffer>, BufferAccessors {
      * @param length The number of bytes to copy.
      * @throws NullPointerException if the destination array is null.
      * @throws IndexOutOfBoundsException if the source or destination positions, or the length, are negative,
-     * or if the resulting end positions reaches beyond the end of either this buffer or the destination array.
+     * or if the resulting end positions reaches beyond the end of either this buffer, or the destination array.
      */
     void copyInto(int srcPos, Buffer dest, int destPos, int length);
 
@@ -408,9 +322,9 @@ public interface Buffer extends Rc<Buffer>, BufferAccessors {
      * Open a cursor to iterate the readable bytes of this buffer. The {@linkplain #readerOffset() reader offset} and
      * {@linkplain #writerOffset() witer offset} are not modified by the cursor.
      * <p>
-     * Care should be taken to ensure that the buffers lifetime extends beyond the cursor and the iteration, and that
+     * Care should be taken to ensure that the buffer's lifetime extends beyond the cursor and the iteration, and that
      * the {@linkplain #readerOffset() reader offset} and {@linkplain #writerOffset() writer offset} are not modified
-     * while the iteration takes place. Otherwise unpredictable behaviour might result.
+     * while the iteration takes place. Otherwise, unpredictable behaviour might result.
      *
      * @return A {@link ByteCursor} for iterating the readable bytes of this buffer.
      */
@@ -421,16 +335,16 @@ public interface Buffer extends Rc<Buffer>, BufferAccessors {
      * The {@linkplain #readerOffset() reader offset} and {@linkplain #writerOffset() witer offset} are not modified by
      * the cursor.
      * <p>
-     * Care should be taken to ensure that the buffers lifetime extends beyond the cursor and the iteration, and that
+     * Care should be taken to ensure that the buffer's lifetime extends beyond the cursor and the iteration, and that
      * the {@linkplain #readerOffset() reader offset} and {@linkplain #writerOffset() writer offset} are not modified
-     * while the iteration takes place. Otherwise unpredictable behaviour might result.
+     * while the iteration takes place. Otherwise, unpredictable behaviour might result.
      *
      * @param fromOffset The offset into the buffer where iteration should start.
      *                  The first byte read from the iterator will be the byte at this offset.
      * @param length The number of bytes to iterate.
      * @return A {@link ByteCursor} for the given stretch of bytes of this buffer.
      * @throws IllegalArgumentException if the length is negative, or if the region given by the {@code fromOffset} and
-     * the {@code length} reaches outside of the bounds of this buffer.
+     * the {@code length} reaches outside the bounds of this buffer.
      */
     ByteCursor openCursor(int fromOffset, int length);
 
@@ -439,9 +353,9 @@ public interface Buffer extends Rc<Buffer>, BufferAccessors {
      * The {@linkplain #readerOffset() reader offset} and {@linkplain #writerOffset() witer offset} are not modified by
      * the cursor.
      * <p>
-     * Care should be taken to ensure that the buffers lifetime extends beyond the cursor and the iteration, and that
+     * Care should be taken to ensure that the buffer's lifetime extends beyond the cursor and the iteration, and that
      * the {@linkplain #readerOffset() reader offset} and {@linkplain #writerOffset() writer offset} are not modified
-     * while the iteration takes place. Otherwise unpredictable behaviour might result.
+     * while the iteration takes place. Otherwise, unpredictable behaviour might result.
      *
      * @return A {@link ByteCursor} for the readable bytes of this buffer.
      */
@@ -455,16 +369,16 @@ public interface Buffer extends Rc<Buffer>, BufferAccessors {
      * The {@linkplain #readerOffset() reader offset} and {@linkplain #writerOffset() witer offset} are not modified by
      * the cursor.
      * <p>
-     * Care should be taken to ensure that the buffers lifetime extends beyond the cursor and the iteration, and that
+     * Care should be taken to ensure that the buffer's lifetime extends beyond the cursor and the iteration, and that
      * the {@linkplain #readerOffset() reader offset} and {@linkplain #writerOffset() writer offset} are not modified
-     * while the iteration takes place. Otherwise unpredictable behaviour might result.
+     * while the iteration takes place. Otherwise, unpredictable behaviour might result.
      *
      * @param fromOffset The offset into the buffer where iteration should start.
      *                  The first byte read from the iterator will be the byte at this offset.
      * @param length The number of bytes to iterate.
      * @return A {@link ByteCursor} for the given stretch of bytes of this buffer.
      * @throws IllegalArgumentException if the length is negative, or if the region given by the {@code fromOffset} and
-     * the {@code length} reaches outside of the bounds of this buffer.
+     * the {@code length} reaches outside the bounds of this buffer.
      */
     ByteCursor openReverseCursor(int fromOffset, int length);
 
@@ -580,7 +494,7 @@ public interface Buffer extends Rc<Buffer>, BufferAccessors {
      * {@linkplain #send() sent} to other threads.
      * <p>
      * The returned buffer will adopt the {@link #readerOffset()} of this buffer, and have its {@link #writerOffset()}
-     * and {@link #capacity()} both set to the equal to the write offset of this buffer.
+     * and {@link #capacity()} both set to the equal to the write-offset of this buffer.
      * <p>
      * The memory region in the returned buffer will become inaccessible through this buffer. This buffer will have its
      * capacity reduced by the capacity of the returned buffer, and the read and write offsets of this buffer will both
@@ -604,7 +518,7 @@ public interface Buffer extends Rc<Buffer>, BufferAccessors {
      * }</pre>
      * When the buffers are in this state, both of the bifurcated parts retain an atomic reference count on the
      * underlying memory. This means that shared underlying memory will not be deallocated or returned to a pool, until
-     * all of the bifurcated parts have been closed.
+     * all the bifurcated parts have been closed.
      * <p>
      * Composite buffers have it a little easier, in that at most only one of the constituent buffers will actually be
      * bifurcated. If the split point lands perfectly between two constituent buffers, then a composite buffer can
@@ -635,7 +549,7 @@ public interface Buffer extends Rc<Buffer>, BufferAccessors {
      * <p>
      * The memory region in the returned buffer will become inaccessible through this buffer. If the
      * {@link #readerOffset()} or {@link #writerOffset()} of this buffer lie prior to the {@code splitOffset},
-     * then those offsets will be moved forward so they land on offset 0 after the bifurcation.
+     * then those offsets will be moved forward, so they land on offset 0 after the bifurcation.
      * <p>
      * Effectively, the following transformation takes place:
      * <pre>{@code
@@ -655,7 +569,7 @@ public interface Buffer extends Rc<Buffer>, BufferAccessors {
      * }</pre>
      * When the buffers are in this state, both of the bifurcated parts retain an atomic reference count on the
      * underlying memory. This means that shared underlying memory will not be deallocated or returned to a pool, until
-     * all of the bifurcated parts have been closed.
+     * all the bifurcated parts have been closed.
      * <p>
      * Composite buffers have it a little easier, in that at most only one of the constituent buffers will actually be
      * bifurcated. If the split point lands perfectly between two constituent buffers, then a composite buffer can
@@ -731,7 +645,7 @@ public interface Buffer extends Rc<Buffer>, BufferAccessors {
      * <strong>Note</strong> that the {@link ReadableComponent} instance passed to the consumer could be reused for
      * multiple calls, so the data must be extracted from the component in the context of the iteration.
      * <p>
-     * The {@link ByteBuffer} instances obtained from the component, share life time with that internal component.
+     * The {@link ByteBuffer} instances obtained from the component, share lifetime with that internal component.
      * This means they can be accessed as long as the internal memory store remain unchanged. Methods that may cause
      * such changes, are any method that requires the buffer to be {@linkplain #isOwned() owned}.
      * <p>
@@ -773,7 +687,7 @@ public interface Buffer extends Rc<Buffer>, BufferAccessors {
      * <strong>Note</strong> that the {@link WritableComponent} instance passed to the consumer could be reused for
      * multiple calls, so the data must be extracted from the component in the context of the iteration.
      * <p>
-     * The {@link ByteBuffer} instances obtained from the component, share life time with that internal component.
+     * The {@link ByteBuffer} instances obtained from the component, share lifetime with that internal component.
      * This means they can be accessed as long as the internal memory store remain unchanged. Methods that may cause
      * such changes, are any method that requires the buffer to be {@linkplain #isOwned() owned}.
      * <p>

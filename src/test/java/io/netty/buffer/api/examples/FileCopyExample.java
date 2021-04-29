@@ -17,6 +17,7 @@ package io.netty.buffer.api.examples;
 
 import io.netty.buffer.api.BufferAllocator;
 import io.netty.buffer.api.Buffer;
+import io.netty.buffer.api.CompositeBuffer;
 import io.netty.buffer.api.Send;
 
 import java.nio.channels.FileChannel;
@@ -37,7 +38,7 @@ public final class FileCopyExample {
         try (BufferAllocator allocator = BufferAllocator.pooledDirect();
              var input = FileChannel.open(Path.of("/dev/urandom"), READ);
              var output = FileChannel.open(Path.of("random.bin"), CREATE, TRUNCATE_EXISTING, WRITE)) {
-            Send<Buffer> done = Buffer.compose(allocator).send();
+            Send<Buffer> done = CompositeBuffer.compose(allocator).send();
 
             var reader = executor.submit(() -> {
                 for (int i = 0; i < 1024; i++) {

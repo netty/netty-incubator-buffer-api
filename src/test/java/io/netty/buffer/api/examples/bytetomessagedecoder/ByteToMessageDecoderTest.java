@@ -17,6 +17,7 @@ package io.netty.buffer.api.examples.bytetomessagedecoder;
 
 import io.netty.buffer.api.Buffer;
 import io.netty.buffer.api.BufferAllocator;
+import io.netty.buffer.api.CompositeBuffer;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.embedded.EmbeddedChannel;
@@ -32,6 +33,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static io.netty.buffer.api.BufferAllocator.heap;
 import static io.netty.buffer.api.BufferTestSupport.assertEquals;
+import static io.netty.buffer.api.CompositeBuffer.compose;
 import static java.nio.ByteOrder.BIG_ENDIAN;
 import static java.nio.ByteOrder.LITTLE_ENDIAN;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -421,7 +423,7 @@ public class ByteToMessageDecoderTest {
     @Test
     public void releaseWhenCompositeCumulateThrows() {
         Buffer in = heap().allocate(12, LITTLE_ENDIAN).writerOffset(12);
-        try (Buffer cumulation = Buffer.compose(heap(), heap().allocate(1, BIG_ENDIAN).writeByte((byte) 0).send())) {
+        try (Buffer cumulation = compose(heap(), heap().allocate(1, BIG_ENDIAN).writeByte((byte) 0).send())) {
             ByteToMessageDecoder.COMPOSITE_CUMULATOR.cumulate(heap(), cumulation, in);
             fail();
         } catch (IllegalArgumentException expected) {

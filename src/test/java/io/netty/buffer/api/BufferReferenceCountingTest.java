@@ -310,7 +310,7 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
                     assertEquals(0, slice.capacity()); // We haven't written anything, so the slice is empty.
                     int sliceBorrows = slice.countBorrows();
                     assertEquals(borrows + 2, buf.countBorrows());
-                    try (Buffer ignored1 = Buffer.compose(allocator, buf, slice)) {
+                    try (Buffer ignored1 = CompositeBuffer.compose(allocator, buf, slice)) {
                         assertEquals(borrows + 3, buf.countBorrows());
                         // Note: Slice is empty; not acquired by the composite buffer.
                         assertEquals(sliceBorrows, slice.countBorrows());
@@ -337,7 +337,7 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
                     assertEquals(1, slice.capacity());
                     int sliceBorrows = slice.countBorrows();
                     assertEquals(borrows + 2, buf.countBorrows());
-                    try (Buffer ignored1 = Buffer.compose(allocator, buf, slice)) {
+                    try (Buffer ignored1 = CompositeBuffer.compose(allocator, buf, slice)) {
                         assertEquals(borrows + 3, buf.countBorrows());
                         assertEquals(sliceBorrows + 1, slice.countBorrows());
                     }
@@ -656,7 +656,7 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
     @Test
     public void bifurcateOnEmptyBigEndianCompositeBuffer() {
         try (BufferAllocator allocator = BufferAllocator.heap();
-             Buffer buf = Buffer.compose(allocator).order(BIG_ENDIAN)) {
+             Buffer buf = CompositeBuffer.compose(allocator).order(BIG_ENDIAN)) {
             verifyBifurcateEmptyCompositeBuffer(buf);
         }
     }
@@ -664,7 +664,7 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
     @Test
     public void bifurcateOnEmptyLittleEndianCompositeBuffer() {
         try (BufferAllocator allocator = BufferAllocator.heap();
-             Buffer buf = Buffer.compose(allocator).order(LITTLE_ENDIAN)) {
+             Buffer buf = CompositeBuffer.compose(allocator).order(LITTLE_ENDIAN)) {
             verifyBifurcateEmptyCompositeBuffer(buf);
         }
     }

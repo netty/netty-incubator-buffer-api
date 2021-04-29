@@ -166,7 +166,7 @@ public abstract class BufferTestSupport {
                             int half = size / 2;
                             try (Buffer firstHalf = a.allocate(half);
                                  Buffer secondHalf = b.allocate(size - half)) {
-                                return Buffer.compose(a, firstHalf, secondHalf);
+                                return CompositeBuffer.compose(a, firstHalf, secondHalf);
                             }
                         }
 
@@ -190,7 +190,7 @@ public abstract class BufferTestSupport {
                     try (Buffer a = alloc.allocate(part);
                          Buffer b = alloc.allocate(part);
                          Buffer c = alloc.allocate(size - part * 2)) {
-                        return Buffer.compose(alloc, a, b, c);
+                        return CompositeBuffer.compose(alloc, a, b, c);
                     }
                 }
 
@@ -229,7 +229,7 @@ public abstract class BufferTestSupport {
                         if (size < 2) {
                             return allocator.allocate(size);
                         }
-                        var buf = Buffer.compose(allocator);
+                        var buf = CompositeBuffer.compose(allocator);
                         buf.ensureWritable(size);
                         return buf;
                     }
@@ -364,8 +364,8 @@ public abstract class BufferTestSupport {
             assertThrows(IllegalStateException.class, () -> buf.copyInto(0, target, 0, 1));
             assertThrows(IllegalStateException.class, () -> buf.copyInto(0, new byte[1], 0, 1));
             assertThrows(IllegalStateException.class, () -> buf.copyInto(0, ByteBuffer.allocate(1), 0, 1));
-            if (Buffer.isComposite(buf)) {
-                assertThrows(IllegalStateException.class, () -> Buffer.extendComposite(buf, target));
+            if (CompositeBuffer.isComposite(buf)) {
+                assertThrows(IllegalStateException.class, () -> ((CompositeBuffer) buf).extendWith(target));
             }
         }
 

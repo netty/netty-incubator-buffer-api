@@ -17,6 +17,7 @@ package io.netty.buffer.api.benchmarks;
 
 import io.netty.buffer.api.BufferAllocator;
 import io.netty.buffer.api.Buffer;
+import io.netty.buffer.api.CompositeBuffer;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
@@ -62,14 +63,14 @@ public class ByteIterationBenchmark {
             allocator = BufferAllocator.heap();
             try (var a = allocator.allocate(SIZE / 2);
                  var b = allocator.allocate(SIZE / 2)) {
-                buf = Buffer.compose(allocator, a, b);
+                buf = CompositeBuffer.compose(allocator, a, b);
             }
             break;
         case "composite-direct":
             allocator = BufferAllocator.direct();
             try (var a = allocator.allocate(SIZE / 2);
                  var b = allocator.allocate(SIZE / 2)) {
-                buf = Buffer.compose(allocator, a, b);
+                buf = CompositeBuffer.compose(allocator, a, b);
             }
             break;
         default:
