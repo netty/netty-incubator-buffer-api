@@ -100,9 +100,9 @@ import java.nio.ByteOrder;
  *      0      <=     readerOffset  <=   writerOffset    <=    capacity
  * </pre>
  *
- * <h3 name="slice-bifurcate">Slice vs. Bifurcate</h3>
+ * <h3 name="slice-split">Slice vs. Split</h3>
  *
- * The {@link #slice()} and {@link #bifurcate()} methods both return new buffers on the memory of the buffer they're
+ * The {@link #slice()} and {@link #split()} methods both return new buffers on the memory of the buffer they're
  * called on.
  * However, there are also important differences between the two, as they are aimed at different use cases that were
  * previously (in the {@code ByteBuf} API) covered by {@code slice()} alone.
@@ -114,7 +114,7 @@ import java.nio.ByteOrder;
  *         Since the memory is shared, changes to the data made through one will be visible through the other.
  *     </li>
  *     <li>
- *         Bifurcation breaks the ownership of the memory in two.
+ *         Split breaks the ownership of the memory in two.
  *         Both resulting buffers retain ownership of their respective region of memory.
  *         They can do this because the regions are guaranteed to not overlap; data changes through one buffer will not
  *         be visible through the other.
@@ -124,10 +124,10 @@ import java.nio.ByteOrder;
  * These differences mean that slicing is mostly suitable for when you temporarily want to share a focused area of a
  * buffer.
  * Examples of this include doing IO, or decoding a bounded part of a larger message.
- * On the other hand, bifurcate is suitable for when you want to hand over a region of a buffer to some other,
+ * On the other hand, split is suitable for when you want to hand over a region of a buffer to some other,
  * perhaps unknown, piece of code, and relinquish your ownership of that buffer region in the process.
  * Examples include aggregating messages into an accumulator buffer, and sending messages down the pipeline for
- * further processing, as bifurcated buffer regions, once their data has been received in its entirety.
+ * further processing, as split buffer regions, once their data has been received in its entirety.
  */
 public interface Buffer extends Rc<Buffer>, BufferAccessors {
     /**
@@ -454,8 +454,8 @@ public interface Buffer extends Rc<Buffer>, BufferAccessors {
      * The slice is created with a {@linkplain #writerOffset() write offset} equal to the length of the slice,
      * so that the entire contents of the slice is ready to be read.
      * <p>
-     * See the <a href="#slice-bifurcate">Slice vs. Bifurcate</a> section for details on the difference between slice
-     * and bifurcate.
+     * See the <a href="#slice-split">Slice vs. Split</a> section for details on the difference between slice
+     * and split.
      *
      * @return A new buffer instance, with independent {@link #readerOffset()} and {@link #writerOffset()},
      * that is a view of the readable region of this buffer.
@@ -476,8 +476,8 @@ public interface Buffer extends Rc<Buffer>, BufferAccessors {
      * The slice is created with a {@linkplain #writerOffset() write offset} equal to the length of the slice,
      * so that the entire contents of the slice is ready to be read.
      * <p>
-     * See the <a href="#slice-bifurcate">Slice vs. Bifurcate</a> section for details on the difference between slice
-     * and bifurcate.
+     * See the <a href="#slice-split">Slice vs. Split</a> section for details on the difference between slice
+     * and split.
      *
      * @return A new buffer instance, with independent {@link #readerOffset()} and {@link #writerOffset()},
      * that is a view of the given region of this buffer.
@@ -516,23 +516,23 @@ public interface Buffer extends Rc<Buffer>, BufferAccessors {
      *    +---+---------------------+           +---------------+
      *    Returned buffer.                      This buffer.
      * }</pre>
-     * When the buffers are in this state, both of the bifurcated parts retain an atomic reference count on the
+     * When the buffers are in this state, both of the split parts retain an atomic reference count on the
      * underlying memory. This means that shared underlying memory will not be deallocated or returned to a pool, until
-     * all the bifurcated parts have been closed.
+     * all the split parts have been closed.
      * <p>
      * Composite buffers have it a little easier, in that at most only one of the constituent buffers will actually be
-     * bifurcated. If the split point lands perfectly between two constituent buffers, then a composite buffer can
+     * split. If the split point lands perfectly between two constituent buffers, then a composite buffer can
      * simply split its internal array in two.
      * <p>
-     * Bifurcated buffers support all operations that normal buffers do, including {@link #ensureWritable(int)}.
+     * Split buffers support all operations that normal buffers do, including {@link #ensureWritable(int)}.
      * <p>
-     * See the <a href="#slice-bifurcate">Slice vs. Bifurcate</a> section for details on the difference between slice
-     * and bifurcate.
+     * See the <a href="#slice-split">Slice vs. Split</a> section for details on the difference between slice
+     * and split.
      *
      * @return A new buffer with independent and exclusive ownership over the read and readable bytes from this buffer.
      */
-    default Buffer bifurcate() {
-        return bifurcate(writerOffset());
+    default Buffer split() {
+        return split(writerOffset());
     }
 
     /**
@@ -549,7 +549,7 @@ public interface Buffer extends Rc<Buffer>, BufferAccessors {
      * <p>
      * The memory region in the returned buffer will become inaccessible through this buffer. If the
      * {@link #readerOffset()} or {@link #writerOffset()} of this buffer lie prior to the {@code splitOffset},
-     * then those offsets will be moved forward, so they land on offset 0 after the bifurcation.
+     * then those offsets will be moved forward, so they land on offset 0 after the split.
      * <p>
      * Effectively, the following transformation takes place:
      * <pre>{@code
@@ -567,22 +567,22 @@ public interface Buffer extends Rc<Buffer>, BufferAccessors {
      *    +---------------+           +---------------+
      *    Returned buffer.            This buffer.
      * }</pre>
-     * When the buffers are in this state, both of the bifurcated parts retain an atomic reference count on the
+     * When the buffers are in this state, both of the split parts retain an atomic reference count on the
      * underlying memory. This means that shared underlying memory will not be deallocated or returned to a pool, until
-     * all the bifurcated parts have been closed.
+     * all the split parts have been closed.
      * <p>
      * Composite buffers have it a little easier, in that at most only one of the constituent buffers will actually be
-     * bifurcated. If the split point lands perfectly between two constituent buffers, then a composite buffer can
+     * split. If the split point lands perfectly between two constituent buffers, then a composite buffer can
      * simply split its internal array in two.
      * <p>
-     * Bifurcated buffers support all operations that normal buffers do, including {@link #ensureWritable(int)}.
+     * Split buffers support all operations that normal buffers do, including {@link #ensureWritable(int)}.
      * <p>
-     * See the <a href="#slice-bifurcate">Slice vs. Bifurcate</a> section for details on the difference between slice
-     * and bifurcate.
+     * See the <a href="#slice-split">Slice vs. Split</a> section for details on the difference between slice
+     * and split.
      *
      * @return A new buffer with independent and exclusive ownership over the read and readable bytes from this buffer.
      */
-    Buffer bifurcate(int splitOffset);
+    Buffer split(int splitOffset);
 
     /**
      * Discards the read bytes, and moves the buffer contents to the beginning of the buffer.

@@ -243,22 +243,22 @@ public abstract class BufferTestSupport {
         }
 
         var stream = builder.build();
-        return stream.flatMap(BufferTestSupport::injectBifurcations)
+        return stream.flatMap(BufferTestSupport::injectSplits)
                      .flatMap(BufferTestSupport::injectSlices)
                      .flatMap(BufferTestSupport::injectReadOnlyToggling);
     }
 
-    private static Stream<Fixture> injectBifurcations(Fixture f) {
+    private static Stream<Fixture> injectSplits(Fixture f) {
         Builder<Fixture> builder = Stream.builder();
         builder.add(f);
-        builder.add(new Fixture(f + ".bifurcate", () -> {
+        builder.add(new Fixture(f + ".split", () -> {
             var allocatorBase = f.get();
             return new BufferAllocator() {
                 @Override
                 public Buffer allocate(int size) {
                     try (Buffer buf = allocatorBase.allocate(size + 1)) {
                         buf.writerOffset(size);
-                        return buf.bifurcate().writerOffset(0);
+                        return buf.split().writerOffset(0);
                     }
                 }
 
@@ -369,7 +369,7 @@ public abstract class BufferTestSupport {
             }
         }
 
-        assertThrows(IllegalStateException.class, () -> buf.bifurcate());
+        assertThrows(IllegalStateException.class, () -> buf.split());
         assertThrows(IllegalStateException.class, () -> buf.send());
         assertThrows(IllegalStateException.class, () -> buf.acquire());
         assertThrows(IllegalStateException.class, () -> buf.slice());
@@ -832,8 +832,8 @@ public abstract class BufferTestSupport {
         assertEquals(woff, buf.writerOffset());
     }
 
-    public static void verifyBifurcateEmptyCompositeBuffer(Buffer buf) {
-        try (Buffer a = buf.bifurcate()) {
+    public static void verifySplitEmptyCompositeBuffer(Buffer buf) {
+        try (Buffer a = buf.split()) {
             a.ensureWritable(4);
             buf.ensureWritable(4);
             a.writeInt(1);

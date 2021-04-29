@@ -58,7 +58,7 @@ import static java.util.Objects.requireNonNull;
  *         {@code @Override}
  *         public void decode({@link ChannelHandlerContext} ctx, {@link Buffer} in)
  *                 throws {@link Exception} {
- *             ctx.fireChannelRead(in.bifurcate());
+ *             ctx.fireChannelRead(in.split());
  *         }
  *     }
  * </pre>
@@ -85,7 +85,7 @@ import static java.util.Objects.requireNonNull;
  * Be aware that sub-classes of {@link ByteToMessageDecoder} <strong>MUST NOT</strong>
  * annotated with {@link @Sharable}.
  * <p>
- * Some methods such as {@link Buffer#bifurcate(int)} will cause a memory leak if the returned buffer
+ * Some methods such as {@link Buffer#split(int)} will cause a memory leak if the returned buffer
  * is not released or fired through the {@link ChannelPipeline} via
  * {@link ChannelHandlerContext#fireChannelRead(Object)}.
  */
@@ -276,7 +276,7 @@ public abstract class ByteToMessageDecoder extends ChannelHandlerAdapter {
                 }
                 assert context.ctx == ctx || ctx == context;
 
-                callDecode(context, cumulation); // TODO we'll want to bifurcate here, and simplify lifetime handling
+                callDecode(context, cumulation); // TODO we'll want to split here, and simplify lifetime handling
             } catch (DecoderException e) {
                 throw e;
             } catch (Exception e) {

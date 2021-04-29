@@ -417,7 +417,7 @@ class NioBuffer extends RcSupport<Buffer, NioBuffer> implements Buffer, Readable
     }
 
     @Override
-    public Buffer bifurcate(int splitOffset) {
+    public Buffer split(int splitOffset) {
         if (splitOffset < 0) {
             throw new IllegalArgumentException("The split offset cannot be negative: " + splitOffset + '.');
         }
@@ -426,25 +426,25 @@ class NioBuffer extends RcSupport<Buffer, NioBuffer> implements Buffer, Readable
                     "but the split offset was " + splitOffset + ", and capacity is " + capacity() + '.');
         }
         if (!isOwned()) {
-            throw attachTrace(new IllegalStateException("Cannot bifurcate a buffer that is not owned."));
+            throw attachTrace(new IllegalStateException("Cannot split a buffer that is not owned."));
         }
         var drop = (ArcDrop<NioBuffer>) unsafeGetDrop();
         unsafeSetDrop(new ArcDrop<>(drop));
-        var bifurcatedBuffer = rmem.slice(0, splitOffset);
+        var splitByteBuffer = rmem.slice(0, splitOffset);
         // TODO maybe incrementing the existing ArcDrop is enough; maybe we don't need to wrap it in another ArcDrop.
-        var bifurcatedBuf = new NioBuffer(base, bifurcatedBuffer, control, new ArcDrop<>(drop.increment()));
-        bifurcatedBuf.woff = Math.min(woff, splitOffset);
-        bifurcatedBuf.roff = Math.min(roff, splitOffset);
-        bifurcatedBuf.order(order());
+        var splitBuffer = new NioBuffer(base, splitByteBuffer, control, new ArcDrop<>(drop.increment()));
+        splitBuffer.woff = Math.min(woff, splitOffset);
+        splitBuffer.roff = Math.min(roff, splitOffset);
+        splitBuffer.order(order());
         boolean readOnly = readOnly();
-        bifurcatedBuf.readOnly(readOnly);
+        splitBuffer.readOnly(readOnly);
         rmem = rmem.slice(splitOffset, rmem.capacity() - splitOffset);
         if (!readOnly) {
             wmem = rmem;
         }
         woff = Math.max(woff, splitOffset) - splitOffset;
         roff = Math.max(roff, splitOffset) - splitOffset;
-        return bifurcatedBuf;
+        return splitBuffer;
     }
 
     @Override
