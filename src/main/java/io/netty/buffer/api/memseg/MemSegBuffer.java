@@ -548,7 +548,7 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
     }
 
     @Override
-    public Buffer bifurcate(int splitOffset) {
+    public Buffer split(int splitOffset) {
         if (splitOffset < 0) {
             throw new IllegalArgumentException("The split offset cannot be negative: " + splitOffset + '.');
         }
@@ -557,24 +557,24 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
                     "but the split offset was " + splitOffset + ", and capacity is " + capacity() + '.');
         }
         if (!isOwned()) {
-            throw attachTrace(new IllegalStateException("Cannot bifurcate a buffer that is not owned."));
+            throw attachTrace(new IllegalStateException("Cannot split a buffer that is not owned."));
         }
         var drop = (ArcDrop<MemSegBuffer>) unsafeGetDrop();
         unsafeSetDrop(new ArcDrop<>(drop));
-        var bifurcatedSeg = seg.asSlice(0, splitOffset);
-        var bifurcatedBuf = new MemSegBuffer(base, bifurcatedSeg, new ArcDrop<>(drop.increment()), alloc);
-        bifurcatedBuf.woff = Math.min(woff, splitOffset);
-        bifurcatedBuf.roff = Math.min(roff, splitOffset);
-        bifurcatedBuf.order(order);
+        var splitSegment = seg.asSlice(0, splitOffset);
+        var splitBuffer = new MemSegBuffer(base, splitSegment, new ArcDrop<>(drop.increment()), alloc);
+        splitBuffer.woff = Math.min(woff, splitOffset);
+        splitBuffer.roff = Math.min(roff, splitOffset);
+        splitBuffer.order(order);
         boolean readOnly = readOnly();
-        bifurcatedBuf.readOnly(readOnly);
+        splitBuffer.readOnly(readOnly);
         seg = seg.asSlice(splitOffset, seg.byteSize() - splitOffset);
         if (!readOnly) {
             wseg = seg;
         }
         woff = Math.max(woff, splitOffset) - splitOffset;
         roff = Math.max(roff, splitOffset) - splitOffset;
-        return bifurcatedBuf;
+        return splitBuffer;
     }
 
     @Override

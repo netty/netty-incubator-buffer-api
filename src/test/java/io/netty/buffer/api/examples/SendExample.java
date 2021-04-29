@@ -226,9 +226,9 @@ public class SendExample {
             BufferAllocator allocator = BufferAllocator.heap();
 
             try (Buffer buf = allocator.allocate(4096)) {
-                var futA = executor.submit(new Task(buf.writerOffset(1024).bifurcate().send()));
-                var futB = executor.submit(new Task(buf.writerOffset(1024).bifurcate().send()));
-                var futC = executor.submit(new Task(buf.writerOffset(1024).bifurcate().send()));
+                var futA = executor.submit(new Task(buf.writerOffset(1024).split().send()));
+                var futB = executor.submit(new Task(buf.writerOffset(1024).split().send()));
+                var futC = executor.submit(new Task(buf.writerOffset(1024).split().send()));
                 var futD = executor.submit(new Task(buf.send()));
                 futA.get();
                 futB.get();

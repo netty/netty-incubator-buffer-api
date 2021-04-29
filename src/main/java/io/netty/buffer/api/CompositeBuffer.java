@@ -922,7 +922,7 @@ public final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> im
     }
 
     @Override
-    public CompositeBuffer bifurcate(int splitOffset) {
+    public CompositeBuffer split(int splitOffset) {
         if (splitOffset < 0) {
             throw new IllegalArgumentException("The split offset cannot be negative: " + splitOffset + '.');
         }
@@ -931,29 +931,29 @@ public final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> im
                     "but the split offset was " + splitOffset + ", and capacity is " + capacity() + '.');
         }
         if (!isOwned()) {
-            throw new IllegalStateException("Cannot bifurcate a buffer that is not owned.");
+            throw new IllegalStateException("Cannot split a buffer that is not owned.");
         }
         if (bufs.length == 0) {
-            // Bifurcating a zero-length buffer is trivial.
+            // Splitting a zero-length buffer is trivial.
             return new CompositeBuffer(allocator, bufs, unsafeGetDrop(), true).order(order);
         }
 
         int i = searchOffsets(splitOffset);
         int off = splitOffset - offsets[i];
-        Buffer[] bifs = Arrays.copyOf(bufs, off == 0? i : 1 + i);
+        Buffer[] splits = Arrays.copyOf(bufs, off == 0? i : 1 + i);
         bufs = Arrays.copyOfRange(bufs, off == bufs[i].capacity()? 1 + i : i, bufs.length);
-        if (off > 0 && bifs.length > 0 && off < bifs[bifs.length - 1].capacity()) {
-            bifs[bifs.length - 1] = bufs[0].bifurcate(off);
+        if (off > 0 && splits.length > 0 && off < splits[splits.length - 1].capacity()) {
+            splits[splits.length - 1] = bufs[0].split(off);
         }
         computeBufferOffsets();
         try {
-            var compositeBuf = new CompositeBuffer(allocator, bifs, unsafeGetDrop(), true);
-            compositeBuf.order = order; // Preserve byte order even if bifs array is empty.
+            var compositeBuf = new CompositeBuffer(allocator, splits, unsafeGetDrop(), true);
+            compositeBuf.order = order; // Preserve byte order even if splits array is empty.
             return compositeBuf;
         } finally {
-            // Drop our references to the buffers in the bifs array. They belong to the new composite buffer now.
-            for (Buffer bif : bifs) {
-                bif.close();
+            // Drop our references to the buffers in the splits array. They belong to the new composite buffer now.
+            for (Buffer split : splits) {
+                split.close();
             }
         }
     }

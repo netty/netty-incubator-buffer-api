@@ -51,7 +51,7 @@ public class AlternativeMessageDecoderTest {
                 }
 
                 // We can read our message in full.
-                Buffer messageBuffer = input.bifurcate(input.readerOffset() + length);
+                Buffer messageBuffer = input.split(input.readerOffset() + length);
                 ctx.fireChannelRead(messageBuffer);
                 return true;
             }
@@ -80,7 +80,7 @@ public class AlternativeMessageDecoderTest {
             if (length == messagesBuffer.readableBytes()) {
                 channel.writeInbound(messagesBuffer);
             } else {
-                channel.writeInbound(messagesBuffer.bifurcate(length));
+                channel.writeInbound(messagesBuffer.split(length));
             }
         }
 

@@ -111,15 +111,15 @@ public class BufferSendTest extends BufferTestSupport {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    public void sendMustNotMakeBifurcatedBuffersInaccessible(Fixture fixture) throws Exception {
+    public void sendMustNotMakeSplitBuffersInaccessible(Fixture fixture) throws Exception {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(16)) {
             buf.writeInt(64);
-            var bifA = buf.bifurcate();
+            var splitA = buf.split();
             buf.writeInt(42);
-            var send = buf.bifurcate().send();
+            var send = buf.split().send();
             buf.writeInt(72);
-            var bifB = buf.bifurcate();
+            var splitB = buf.split();
             var fut = executor.submit(() -> {
                 try (Buffer receive = send.receive()) {
                     assertEquals(42, receive.readInt());
@@ -128,8 +128,8 @@ public class BufferSendTest extends BufferTestSupport {
             fut.get();
             buf.writeInt(32);
             assertEquals(32, buf.readInt());
-            assertEquals(64, bifA.readInt());
-            assertEquals(72, bifB.readInt());
+            assertEquals(64, splitA.readInt());
+            assertEquals(72, splitB.readInt());
         }
     }
 

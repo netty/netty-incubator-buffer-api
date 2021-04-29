@@ -403,32 +403,32 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    public void bifurcateWithNegativeOffsetMustThrow(Fixture fixture) {
+    public void splitWithNegativeOffsetMustThrow(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            buf.bifurcate(0).close();
-            assertThrows(IllegalArgumentException.class, () -> buf.bifurcate(-1));
+            buf.split(0).close();
+            assertThrows(IllegalArgumentException.class, () -> buf.split(-1));
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    public void bifurcateWithOversizedOffsetMustThrow(Fixture fixture) {
+    public void splitWithOversizedOffsetMustThrow(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            assertThrows(IllegalArgumentException.class, () -> buf.bifurcate(9));
-            buf.bifurcate(8).close();
+            assertThrows(IllegalArgumentException.class, () -> buf.split(9));
+            buf.split(8).close();
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    public void bifurcateOfNonOwnedBufferMustThrow(Fixture fixture) {
+    public void splitOfNonOwnedBufferMustThrow(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
             buf.writeInt(1);
             try (Buffer acquired = buf.acquire()) {
-                var exc = assertThrows(IllegalStateException.class, () -> acquired.bifurcate());
+                var exc = assertThrows(IllegalStateException.class, () -> acquired.split());
                 assertThat(exc).hasMessageContaining("owned");
             }
         }
@@ -436,11 +436,11 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    public void bifurcateOnOffsetOfNonOwnedBufferMustThrow(Fixture fixture) {
+    public void splitOnOffsetOfNonOwnedBufferMustThrow(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
             try (Buffer acquired = buf.acquire()) {
-                var exc = assertThrows(IllegalStateException.class, () -> acquired.bifurcate(4));
+                var exc = assertThrows(IllegalStateException.class, () -> acquired.split(4));
                 assertThat(exc).hasMessageContaining("owned");
             }
         }
@@ -448,47 +448,47 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    public void bifurcateOnOffsetMustTruncateGreaterOffsets(Fixture fixture) {
+    public void splitOnOffsetMustTruncateGreaterOffsets(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
             buf.writeInt(0x01020304);
             buf.writeByte((byte) 0x05);
             buf.readInt();
-            try (Buffer bif = buf.bifurcate(2)) {
+            try (Buffer split = buf.split(2)) {
                 assertThat(buf.readerOffset()).isEqualTo(2);
                 assertThat(buf.writerOffset()).isEqualTo(3);
 
-                assertThat(bif.readerOffset()).isEqualTo(2);
-                assertThat(bif.writerOffset()).isEqualTo(2);
+                assertThat(split.readerOffset()).isEqualTo(2);
+                assertThat(split.writerOffset()).isEqualTo(2);
             }
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    public void bifurcateOnOffsetMustExtendLesserOffsets(Fixture fixture) {
+    public void splitOnOffsetMustExtendLesserOffsets(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
             buf.writeInt(0x01020304);
             buf.readInt();
-            try (Buffer bif = buf.bifurcate(6)) {
+            try (Buffer split = buf.split(6)) {
                 assertThat(buf.readerOffset()).isEqualTo(0);
                 assertThat(buf.writerOffset()).isEqualTo(0);
 
-                assertThat(bif.readerOffset()).isEqualTo(4);
-                assertThat(bif.writerOffset()).isEqualTo(4);
+                assertThat(split.readerOffset()).isEqualTo(4);
+                assertThat(split.writerOffset()).isEqualTo(4);
             }
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    public void bifurcatedPartMustContainFirstHalfOfBuffer(Fixture fixture) {
+    public void splitPartMustContainFirstHalfOfBuffer(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(16).order(BIG_ENDIAN)) {
             buf.writeLong(0x0102030405060708L);
             assertThat(buf.readByte()).isEqualTo((byte) 0x01);
-            try (Buffer bif = buf.bifurcate()) {
+            try (Buffer split = buf.split()) {
                 // Original buffer:
                 assertThat(buf.capacity()).isEqualTo(8);
                 assertThat(buf.readerOffset()).isZero();
@@ -496,19 +496,19 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
                 assertThat(buf.readableBytes()).isZero();
                 assertThrows(IndexOutOfBoundsException.class, () -> buf.readByte());
 
-                // Bifurcated part:
-                assertThat(bif.capacity()).isEqualTo(8);
-                assertThat(bif.readerOffset()).isOne();
-                assertThat(bif.writerOffset()).isEqualTo(8);
-                assertThat(bif.readableBytes()).isEqualTo(7);
-                assertThat(bif.readByte()).isEqualTo((byte) 0x02);
-                assertThat(bif.readInt()).isEqualTo(0x03040506);
-                assertThat(bif.readByte()).isEqualTo((byte) 0x07);
-                assertThat(bif.readByte()).isEqualTo((byte) 0x08);
-                assertThrows(IndexOutOfBoundsException.class, () -> bif.readByte());
+                // Split part:
+                assertThat(split.capacity()).isEqualTo(8);
+                assertThat(split.readerOffset()).isOne();
+                assertThat(split.writerOffset()).isEqualTo(8);
+                assertThat(split.readableBytes()).isEqualTo(7);
+                assertThat(split.readByte()).isEqualTo((byte) 0x02);
+                assertThat(split.readInt()).isEqualTo(0x03040506);
+                assertThat(split.readByte()).isEqualTo((byte) 0x07);
+                assertThat(split.readByte()).isEqualTo((byte) 0x08);
+                assertThrows(IndexOutOfBoundsException.class, () -> split.readByte());
             }
 
-            // Bifurcated part does NOT return when closed:
+            // Split part does NOT return when closed:
             assertThat(buf.capacity()).isEqualTo(8);
             assertThat(buf.readerOffset()).isZero();
             assertThat(buf.writerOffset()).isZero();
@@ -519,12 +519,12 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    public void bifurcatedPartsMustBeIndividuallySendable(Fixture fixture) {
+    public void splitPartsMustBeIndividuallySendable(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(16).order(BIG_ENDIAN)) {
             buf.writeLong(0x0102030405060708L);
             assertThat(buf.readByte()).isEqualTo((byte) 0x01);
-            try (Buffer sentBif = buf.bifurcate().send().receive()) {
+            try (Buffer sentSplit = buf.split().send().receive()) {
                 try (Buffer sentBuf = buf.send().receive()) {
                     assertThat(sentBuf.capacity()).isEqualTo(8);
                     assertThat(sentBuf.readerOffset()).isZero();
@@ -533,28 +533,28 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
                     assertThrows(IndexOutOfBoundsException.class, () -> sentBuf.readByte());
                 }
 
-                assertThat(sentBif.capacity()).isEqualTo(8);
-                assertThat(sentBif.readerOffset()).isOne();
-                assertThat(sentBif.writerOffset()).isEqualTo(8);
-                assertThat(sentBif.readableBytes()).isEqualTo(7);
-                assertThat(sentBif.readByte()).isEqualTo((byte) 0x02);
-                assertThat(sentBif.readInt()).isEqualTo(0x03040506);
-                assertThat(sentBif.readByte()).isEqualTo((byte) 0x07);
-                assertThat(sentBif.readByte()).isEqualTo((byte) 0x08);
-                assertThrows(IndexOutOfBoundsException.class, () -> sentBif.readByte());
+                assertThat(sentSplit.capacity()).isEqualTo(8);
+                assertThat(sentSplit.readerOffset()).isOne();
+                assertThat(sentSplit.writerOffset()).isEqualTo(8);
+                assertThat(sentSplit.readableBytes()).isEqualTo(7);
+                assertThat(sentSplit.readByte()).isEqualTo((byte) 0x02);
+                assertThat(sentSplit.readInt()).isEqualTo(0x03040506);
+                assertThat(sentSplit.readByte()).isEqualTo((byte) 0x07);
+                assertThat(sentSplit.readByte()).isEqualTo((byte) 0x08);
+                assertThrows(IndexOutOfBoundsException.class, () -> sentSplit.readByte());
             }
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    public void mustBePossibleToBifurcateMoreThanOnce(Fixture fixture) {
+    public void mustBePossibleToSplitMoreThanOnce(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(16).order(BIG_ENDIAN)) {
             buf.writeLong(0x0102030405060708L);
-            try (Buffer a = buf.bifurcate()) {
+            try (Buffer a = buf.split()) {
                 a.writerOffset(4);
-                try (Buffer b = a.bifurcate()) {
+                try (Buffer b = a.split()) {
                     assertEquals(0x01020304, b.readInt());
                     a.writerOffset(4);
                     assertEquals(0x05060708, a.readInt());
@@ -562,7 +562,7 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
                     assertThrows(IndexOutOfBoundsException.class, () -> a.readByte());
                     buf.writeLong(0xA1A2A3A4A5A6A7A8L);
                     buf.writerOffset(4);
-                    try (Buffer c = buf.bifurcate()) {
+                    try (Buffer c = buf.split()) {
                         assertEquals(0xA1A2A3A4, c.readInt());
                         buf.writerOffset(4);
                         assertEquals(0xA5A6A7A8, buf.readInt());
@@ -576,19 +576,19 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    public void mustBePossibleToBifurcateOwnedSlices(Fixture fixture) {
+    public void mustBePossibleToSplitOwnedSlices(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator()) {
             Buffer buf = allocator.allocate(16).order(BIG_ENDIAN);
             buf.writeLong(0x0102030405060708L);
             try (Buffer slice = buf.slice()) {
                 buf.close();
                 assertTrue(slice.isOwned());
-                try (Buffer bifurcate = slice.bifurcate(4)) {
-                    bifurcate.reset().ensureWritable(Long.BYTES);
+                try (Buffer split = slice.split(4)) {
+                    split.reset().ensureWritable(Long.BYTES);
                     slice.reset().ensureWritable(Long.BYTES);
-                    assertThat(bifurcate.capacity()).isEqualTo(Long.BYTES);
+                    assertThat(split.capacity()).isEqualTo(Long.BYTES);
                     assertThat(slice.capacity()).isEqualTo(Long.BYTES);
-                    assertThat(bifurcate.getLong(0)).isEqualTo(0x01020304_00000000L);
+                    assertThat(split.getLong(0)).isEqualTo(0x01020304_00000000L);
                     assertThat(slice.getLong(0)).isEqualTo(0x05060708_00000000L);
                 }
             }
@@ -597,15 +597,15 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    public void bifurcatedBufferMustHaveSameByteOrderAsParent(Fixture fixture) {
+    public void splitBufferMustHaveSameByteOrderAsParent(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8).order(BIG_ENDIAN)) {
             buf.writeLong(0x0102030405060708L);
-            try (Buffer a = buf.bifurcate()) {
+            try (Buffer a = buf.split()) {
                 assertThat(a.order()).isEqualTo(BIG_ENDIAN);
                 a.order(LITTLE_ENDIAN);
                 a.writerOffset(4);
-                try (Buffer b = a.bifurcate()) {
+                try (Buffer b = a.split()) {
                     assertThat(b.order()).isEqualTo(LITTLE_ENDIAN);
                     assertThat(buf.order()).isEqualTo(BIG_ENDIAN);
                 }
@@ -615,11 +615,11 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    public void ensureWritableOnBifurcatedBuffers(Fixture fixture) {
+    public void ensureWritableOnSplitBuffers(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
             buf.writeLong(0x0102030405060708L);
-            try (Buffer a = buf.bifurcate()) {
+            try (Buffer a = buf.split()) {
                 assertEquals(0x0102030405060708L, a.readLong());
                 a.ensureWritable(8);
                 a.writeLong(0xA1A2A3A4A5A6A7A8L);
@@ -634,13 +634,13 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    public void ensureWritableOnBifurcatedBuffersWithOddOffsets(Fixture fixture) {
+    public void ensureWritableOnSplitBuffersWithOddOffsets(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(10).order(BIG_ENDIAN)) {
             buf.writeLong(0x0102030405060708L);
             buf.writeByte((byte) 0x09);
             buf.readByte();
-            try (Buffer a = buf.bifurcate()) {
+            try (Buffer a = buf.split()) {
                 assertEquals(0x0203040506070809L, a.readLong());
                 a.ensureWritable(8);
                 a.writeLong(0xA1A2A3A4A5A6A7A8L);
@@ -654,28 +654,28 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
     }
 
     @Test
-    public void bifurcateOnEmptyBigEndianCompositeBuffer() {
+    public void splitOnEmptyBigEndianCompositeBuffer() {
         try (BufferAllocator allocator = BufferAllocator.heap();
              Buffer buf = CompositeBuffer.compose(allocator).order(BIG_ENDIAN)) {
-            verifyBifurcateEmptyCompositeBuffer(buf);
+            verifySplitEmptyCompositeBuffer(buf);
         }
     }
 
     @Test
-    public void bifurcateOnEmptyLittleEndianCompositeBuffer() {
+    public void splitOnEmptyLittleEndianCompositeBuffer() {
         try (BufferAllocator allocator = BufferAllocator.heap();
              Buffer buf = CompositeBuffer.compose(allocator).order(LITTLE_ENDIAN)) {
-            verifyBifurcateEmptyCompositeBuffer(buf);
+            verifySplitEmptyCompositeBuffer(buf);
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    public void bifurcatedBuffersMustBeAccessibleInOtherThreads(Fixture fixture) throws Exception {
+    public void splitBuffersMustBeAccessibleInOtherThreads(Fixture fixture) throws Exception {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
             buf.writeInt(42);
-            var send = buf.bifurcate().send();
+            var send = buf.split().send();
             var fut = executor.submit(() -> {
                 try (Buffer receive = send.receive()) {
                     assertEquals(42, receive.readInt());
@@ -716,13 +716,13 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    public void bifurcateOfReadOnlyBufferMustBeReadOnly(Fixture fixture) {
+    public void splitOfReadOnlyBufferMustBeReadOnly(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(16)) {
             buf.writeLong(0x0102030405060708L);
             buf.readOnly(true);
-            try (Buffer bifurcate = buf.bifurcate()) {
-                assertTrue(bifurcate.readOnly());
+            try (Buffer split = buf.split()) {
+                assertTrue(split.readOnly());
                 assertTrue(buf.readOnly());
             }
         }
