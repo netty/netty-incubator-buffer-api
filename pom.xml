@@ -176,6 +176,7 @@
           <forkedProcessExitTimeoutInSeconds>600</forkedProcessExitTimeoutInSeconds>
           <!-- Not reusing forks lets us be more frugal with memory. We have a lot of tests, and they need a lot of metadata -->
           <reuseForks>false</reuseForks>
+          <forkCount>1C</forkCount>
           <systemProperties>
             <sample>nosample</sample>
           </systemProperties>
