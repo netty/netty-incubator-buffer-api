@@ -16,53 +16,33 @@
 package io.netty.buffer.api;
 
 import io.netty.buffer.api.memseg.NativeMemorySegmentManager;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 public class BufferCleanerTest extends BufferTestSupport {
-    @Disabled("Too slow, for now")
     @ParameterizedTest
     @MethodSource("directAllocators")
     public void bufferMustBeClosedByCleaner(Fixture fixture) throws InterruptedException {
         var initial = NativeMemorySegmentManager.MEM_USAGE_NATIVE.sum();
+        int allocationSize = 1024;
+        allocateAndForget(fixture, allocationSize);
+        long sum = 0;
+        for (int i = 0; i < 15; i++) {
+            System.gc();
+            System.runFinalization();
+            sum = NativeMemorySegmentManager.MEM_USAGE_NATIVE.sum() - initial;
+            if (sum < allocationSize) {
+                return;
+            }
+        }
+        assertThat(sum).isLessThan(allocationSize);
+    }
+
+    private static void allocateAndForget(Fixture fixture, int size) {
         var allocator = fixture.createAllocator();
         allocator.close();
-        int iterations = 15;
-        int allocationSize = 1024;
-        for (int i = 0; i < iterations; i++) {
-            allocateAndForget(allocator, allocationSize);
-            System.gc();
-        }
-        System.runFinalization();
-        var sum = NativeMemorySegmentManager.MEM_USAGE_NATIVE.sum() - initial;
-        var totalAllocated = (long) allocationSize * iterations;
-        assertThat(sum).isLessThan(totalAllocated);
-    }
-
-    private static void allocateAndForget(BufferAllocator allocator, int size) {
         allocator.allocate(size);
-    }
-
-    @Disabled("Too slow, for now")
-    @ParameterizedTest
-    @MethodSource("pooledDirectAllocators")
-    public void buffersMustBeReusedByPoolingAllocatorEvenWhenDroppedByCleanerInsteadOfExplicitly(Fixture fixture)
-            throws InterruptedException {
-        var initial = NativeMemorySegmentManager.MEM_USAGE_NATIVE.sum();
-        try (var allocator = fixture.createAllocator()) {
-            int iterations = 15;
-            int allocationSize = 1024;
-            for (int i = 0; i < iterations; i++) {
-                allocateAndForget(allocator, allocationSize);
-                System.gc();
-            }
-            System.runFinalization();
-            var sum = NativeMemorySegmentManager.MEM_USAGE_NATIVE.sum() - initial;
-            var totalAllocated = (long) allocationSize * iterations;
-            assertThat(sum).isLessThan(totalAllocated);
-        }
     }
 }
