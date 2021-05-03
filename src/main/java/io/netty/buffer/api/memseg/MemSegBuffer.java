@@ -84,21 +84,38 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
         };
     }
 
-    private final AllocatorControl alloc;
+    private final AllocatorControl control;
     private MemorySegment base;
     private MemorySegment seg;
     private MemorySegment wseg;
     private ByteOrder order;
     private int roff;
     private int woff;
+    private boolean constBuffer;
 
-    MemSegBuffer(MemorySegment base, MemorySegment view, Drop<MemSegBuffer> drop, AllocatorControl alloc) {
+    MemSegBuffer(MemorySegment base, MemorySegment view, Drop<MemSegBuffer> drop, AllocatorControl control) {
         super(new MakeInaccisbleOnDrop(ArcDrop.wrap(drop)));
-        this.alloc = alloc;
+        this.control = control;
         this.base = base;
         seg = view;
         wseg = view;
         order = ByteOrder.nativeOrder();
+    }
+
+    /**
+     * Constructor for {@linkplain BufferAllocator#constBufferSupplier(byte[]) const buffers}.
+     */
+    MemSegBuffer(MemSegBuffer parent) {
+        super(new MakeInaccisbleOnDrop(new ArcDrop<>(((ArcDrop<MemSegBuffer>) parent.unsafeGetDrop()).unwrap())));
+        control = parent.control;
+        base = parent.base;
+        seg = parent.seg;
+        wseg = parent.wseg;
+        order = parent.order;
+        roff = parent.roff;
+        woff = parent.woff;
+        adaptor = null; // The adaptor must be independent, because we can de-constify.
+        constBuffer = true;
     }
 
     private static final class MakeInaccisbleOnDrop implements Drop<MemSegBuffer> {
@@ -282,6 +299,9 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
 
     @Override
     public Buffer readOnly(boolean readOnly) {
+        if (!readOnly) {
+            deconstify();
+        }
         wseg = readOnly? CLOSED_SEGMENT : seg;
         return this;
     }
@@ -299,9 +319,10 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
         if (!isAccessible()) {
             throw new IllegalStateException("This buffer is closed: " + this + '.');
         }
+        deconstify(); // Slice or parent could later be made writable, and if so, changes must be visible in both.
         var slice = seg.asSlice(offset, length);
         Drop<MemSegBuffer> drop = ArcDrop.acquire(unsafeGetDrop());
-        return new MemSegBuffer(base, slice, drop, alloc)
+        return new MemSegBuffer(base, slice, drop, control)
                 .writerOffset(length)
                 .order(order())
                 .readOnly(readOnly());
@@ -518,32 +539,39 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
         // Allocate a bigger buffer.
         long newSize = capacity() + (long) Math.max(size - writableBytes(), minimumGrowth);
         BufferAllocator.checkSize(newSize);
-        MemorySegment newSegment = (MemorySegment) alloc.allocateUntethered(this, (int) newSize);
+        MemorySegment newSegment = (MemorySegment) control.allocateUntethered(this, (int) newSize);
 
         // Copy contents.
         newSegment.copyFrom(seg);
 
-        // Release old memory segment:
+        // Release the old memory segment and install the new one:
+        Drop<MemSegBuffer> drop = disconnectDrop();
+        attachNewMemorySegment(newSegment, drop);
+    }
+
+    private Drop<MemSegBuffer> disconnectDrop() {
         var drop = unsafeGetDrop();
         if (drop instanceof ArcDrop) {
             // Disconnect from the current arc drop, since we'll get our own fresh memory segment.
             int roff = this.roff;
             int woff = this.woff;
             drop.drop(this);
-            while (drop instanceof ArcDrop) {
-                drop = ((ArcDrop<MemSegBuffer>) drop).unwrap();
-            }
+            drop = ArcDrop.unwrapAllArcs(drop);
             unsafeSetDrop(new ArcDrop<>(drop));
             this.roff = roff;
             this.woff = woff;
         } else {
             // TODO would we ever get here?
-            alloc.recoverMemory(recoverableMemory());
+            control.recoverMemory(recoverableMemory());
         }
+        return drop;
+    }
 
+    private void attachNewMemorySegment(MemorySegment newSegment, Drop<MemSegBuffer> drop) {
         base = newSegment;
         seg = newSegment;
         wseg = newSegment;
+        constBuffer = false;
         drop.attach(this);
     }
 
@@ -562,12 +590,15 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
         var drop = (ArcDrop<MemSegBuffer>) unsafeGetDrop();
         unsafeSetDrop(new ArcDrop<>(drop));
         var splitSegment = seg.asSlice(0, splitOffset);
-        var splitBuffer = new MemSegBuffer(base, splitSegment, new ArcDrop<>(drop.increment()), alloc);
+        var splitBuffer = new MemSegBuffer(base, splitSegment, new ArcDrop<>(drop.increment()), control);
         splitBuffer.woff = Math.min(woff, splitOffset);
         splitBuffer.roff = Math.min(roff, splitOffset);
         splitBuffer.order(order);
         boolean readOnly = readOnly();
         splitBuffer.readOnly(readOnly);
+        // Note that split, unlike slice, does not deconstify, because data changes in either buffer are not visible
+        // in the other. The split buffers can later deconstify independently if needed.
+        splitBuffer.constBuffer = constBuffer;
         seg = seg.asSlice(splitOffset, seg.byteSize() - splitOffset);
         if (!readOnly) {
             wseg = seg;
@@ -1095,17 +1126,19 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
         var roff = this.roff;
         var woff = this.woff;
         var readOnly = readOnly();
+        var isConst = constBuffer;
         MemorySegment transferSegment = seg;
         MemorySegment base = this.base;
         makeInaccessible();
         return new Owned<MemSegBuffer>() {
             @Override
             public MemSegBuffer transferOwnership(Drop<MemSegBuffer> drop) {
-                MemSegBuffer copy = new MemSegBuffer(base, transferSegment, drop, alloc);
+                MemSegBuffer copy = new MemSegBuffer(base, transferSegment, drop, control);
                 copy.order = order;
                 copy.roff = roff;
                 copy.woff = woff;
                 copy.readOnly(readOnly);
+                copy.constBuffer = isConst;
                 return copy;
             }
         };
@@ -1117,6 +1150,23 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
         wseg = CLOSED_SEGMENT;
         roff = 0;
         woff = 0;
+    }
+
+    /**
+     * If this buffer is a {@linkplain BufferAllocator#constBufferSupplier(byte[]) const buffer}, turn it into a normal
+     * buffer, in order to protect the const parent.
+     * A const buffer is sharing its memory with some parent, whose contents cannot be allowed to change.
+     * To ensure this, we must allocate our own memory and copy the contents, because we will soon not be able to
+     * guarantee that the contents of <em>this</em> buffer won't change.
+     */
+    private void deconstify() {
+        if (constBuffer) {
+            MemorySegment newSegment = (MemorySegment) control.allocateUntethered(this, capacity());
+            newSegment.copyFrom(seg);
+            Drop<MemSegBuffer> drop = ArcDrop.wrap(ArcDrop.unwrapAllArcs(unsafeGetDrop()));
+            unsafeSetDrop(drop);
+            attachNewMemorySegment(newSegment, drop);
+        }
     }
 
     @Override

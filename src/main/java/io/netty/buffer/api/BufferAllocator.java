@@ -83,7 +83,10 @@ public interface BufferAllocator extends AutoCloseable {
      * any other buffer produced by the supplier.
      * <p>
      * It can generally be expected, but is not guaranteed, that the returned supplier is more resource efficient than
-     * allocating and copying memory with other available APIs.
+     * allocating and copying memory with other available APIs. In such optimised implementations, the underlying memory
+     * baking the buffers will be shared among all the buffers produced by the supplier. Each buffer will then allocate
+     * their own independent copy of the data only when needed, such as when making the buffer writable, or when slicing
+     * the buffer.
      * <p>
      * The primary use case for this API, is when you need to repeatedly produce buffers with the same contents, and
      * you perhaps wish to keep a {@code static final} field with these contents. This use case has previously been
@@ -110,11 +113,11 @@ public interface BufferAllocator extends AutoCloseable {
     }
 
     static BufferAllocator heap() {
-        return new ManagedBufferAllocator(MemoryManagers.getManagers().getHeapMemoryManager(), Statics.CLEANER);
+        return new ManagedBufferAllocator(MemoryManagers.getManagers().getHeapMemoryManager());
     }
 
     static BufferAllocator direct() {
-        return new ManagedBufferAllocator(MemoryManagers.getManagers().getNativeMemoryManager(), Statics.CLEANER);
+        return new ManagedBufferAllocator(MemoryManagers.getManagers().getNativeMemoryManager());
     }
 
     static BufferAllocator pooledHeap() {

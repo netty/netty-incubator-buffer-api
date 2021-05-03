@@ -22,6 +22,7 @@ import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.function.Supplier;
 
 import static io.netty.buffer.api.internal.Statics.NO_OP_DROP;
 import static java.lang.invoke.MethodHandles.lookup;
@@ -52,6 +53,13 @@ class SizeClassedMemoryPool implements BufferAllocator, AllocatorControl, Drop<B
                        .order(ByteOrder.nativeOrder());
         }
         return createBuf(size, getDrop());
+    }
+
+    @Override
+    public Supplier<Buffer> constBufferSupplier(byte[] bytes) {
+        Buffer constantBuffer = manager.allocateShared(this, bytes.length, manager.drop(), Statics.CLEANER);
+        constantBuffer.writeBytes(bytes).readOnly(true);
+        return () -> manager.allocateCopyOnWritable(constantBuffer);
     }
 
     protected MemoryManager getMemoryManager() {

@@ -72,9 +72,14 @@ public final class Fixture implements Supplier<BufferAllocator> {
         return properties.contains(Properties.SLICE);
     }
 
+    public boolean isConst() {
+        return properties.contains(Properties.CONST);
+    }
+
     public enum Properties {
         HEAP,
         DIRECT,
+        CONST,
         COMPOSITE,
         CLEANER,
         POOLED,

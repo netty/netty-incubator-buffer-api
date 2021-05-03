@@ -21,11 +21,6 @@ import java.lang.ref.Cleaner;
 
 public class HeapMemorySegmentManager extends AbstractMemorySegmentManager {
     @Override
-    public boolean isNative() {
-        return false;
-    }
-
-    @Override
     protected MemorySegment createSegment(long size, Cleaner cleaner) {
         return MemorySegment.ofArray(new byte[Math.toIntExact(size)]);
     }

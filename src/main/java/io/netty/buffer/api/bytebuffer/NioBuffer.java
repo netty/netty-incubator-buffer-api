@@ -47,6 +47,7 @@ class NioBuffer extends RcSupport<Buffer, NioBuffer> implements Buffer, Readable
 
     private int roff;
     private int woff;
+    private boolean constBuffer;
 
     NioBuffer(ByteBuffer base, ByteBuffer memory, AllocatorControl control, Drop<NioBuffer> drop) {
         super(new MakeInaccisbleOnDrop(ArcDrop.wrap(drop)));
@@ -54,6 +55,22 @@ class NioBuffer extends RcSupport<Buffer, NioBuffer> implements Buffer, Readable
         rmem = memory;
         wmem = memory;
         this.control = control;
+    }
+
+    /**
+     * Constructor for {@linkplain BufferAllocator#constBufferSupplier(byte[]) const buffers}.
+     */
+    NioBuffer(NioBuffer parent) {
+        super(new MakeInaccisbleOnDrop(new ArcDrop<>(((ArcDrop<NioBuffer>) parent.unsafeGetDrop()).unwrap())));
+        control = parent.control;
+        base = parent.base;
+        rmem = parent.rmem.slice(0, parent.rmem.capacity()); // Need to slice to get independent byte orders.
+        assert parent.wmem == CLOSED_BUFFER;
+        wmem = CLOSED_BUFFER;
+        roff = parent.roff;
+        woff = parent.woff;
+        order(parent.order());
+        constBuffer = true;
     }
 
     private static final class MakeInaccisbleOnDrop implements Drop<NioBuffer> {
@@ -159,6 +176,9 @@ class NioBuffer extends RcSupport<Buffer, NioBuffer> implements Buffer, Readable
 
     @Override
     public Buffer readOnly(boolean readOnly) {
+        if (!readOnly) {
+            deconstify();
+        }
         if (readOnly && wmem == rmem) {
             wmem = CLOSED_BUFFER;
         } else if (!readOnly && wmem != rmem) {
@@ -180,6 +200,7 @@ class NioBuffer extends RcSupport<Buffer, NioBuffer> implements Buffer, Readable
         if (!isAccessible()) {
             throw new IllegalStateException("This buffer is closed: " + this + '.');
         }
+        deconstify(); // Slice or parent could later be made writable, and if so, changes must be visible in both.
         ByteBuffer slice = rmem.slice(offset, length);
         ArcDrop<NioBuffer> drop = (ArcDrop<NioBuffer>) unsafeGetDrop();
         drop.increment();
@@ -398,21 +419,28 @@ class NioBuffer extends RcSupport<Buffer, NioBuffer> implements Buffer, Readable
         // Copy contents.
         copyInto(0, buffer, 0, capacity());
 
-        // Release old memory:
+        // Release the old memory and install the new:
+        Drop<NioBuffer> drop = disconnectDrop();
+        attachNewBuffer(buffer, drop);
+    }
+
+    private Drop<NioBuffer> disconnectDrop() {
         var drop = (Drop<NioBuffer>) unsafeGetDrop();
         int roff = this.roff;
         int woff = this.woff;
         drop.drop(this);
-        while (drop instanceof ArcDrop) {
-            drop = ((ArcDrop<NioBuffer>) drop).unwrap();
-        }
+        drop = ArcDrop.unwrapAllArcs(drop);
         unsafeSetDrop(new ArcDrop<>(drop));
         this.roff = roff;
         this.woff = woff;
+        return drop;
+    }
 
+    private void attachNewBuffer(ByteBuffer buffer, Drop<NioBuffer> drop) {
         base = buffer;
         rmem = buffer;
         wmem = buffer;
+        constBuffer = false;
         drop.attach(this);
     }
 
@@ -438,6 +466,9 @@ class NioBuffer extends RcSupport<Buffer, NioBuffer> implements Buffer, Readable
         splitBuffer.order(order());
         boolean readOnly = readOnly();
         splitBuffer.readOnly(readOnly);
+        // Note that split, unlike slice, does not deconstify, because data changes in either buffer are not visible
+        // in the other. The split buffers can later deconstify independently if needed.
+        splitBuffer.constBuffer = constBuffer;
         rmem = rmem.slice(splitOffset, rmem.capacity() - splitOffset);
         if (!readOnly) {
             wmem = rmem;
@@ -554,6 +585,7 @@ class NioBuffer extends RcSupport<Buffer, NioBuffer> implements Buffer, Readable
         return processor.process(initialIndex, this)? 1 : -1;
     }
 
+    // <editor-fold defaultstate="collapsed" desc="Primitive accessors implementation.">
     @Override
     public byte readByte() {
         checkRead(roff, Byte.BYTES);
@@ -1053,6 +1085,7 @@ class NioBuffer extends RcSupport<Buffer, NioBuffer> implements Buffer, Readable
             throw bufferIsReadOnly();
         }
     }
+    // </editor-fold>
 
     @Override
     protected Owned<NioBuffer> prepareSend() {
@@ -1060,6 +1093,7 @@ class NioBuffer extends RcSupport<Buffer, NioBuffer> implements Buffer, Readable
         var roff = this.roff;
         var woff = this.woff;
         var readOnly = readOnly();
+        var isConst = constBuffer;
         ByteBuffer base = this.base;
         ByteBuffer rmem = this.rmem;
         makeInaccessible();
@@ -1071,6 +1105,7 @@ class NioBuffer extends RcSupport<Buffer, NioBuffer> implements Buffer, Readable
                 copy.roff = roff;
                 copy.woff = woff;
                 copy.readOnly(readOnly);
+                copy.constBuffer = isConst;
                 return copy;
             }
         };
@@ -1082,6 +1117,24 @@ class NioBuffer extends RcSupport<Buffer, NioBuffer> implements Buffer, Readable
         wmem = CLOSED_BUFFER;
         roff = 0;
         woff = 0;
+    }
+
+    /**
+     * If this buffer is a {@linkplain BufferAllocator#constBufferSupplier(byte[]) const buffer}, turn it into a normal
+     * buffer, in order to protect the const parent.
+     * A const buffer is sharing its memory with some parent, whose contents cannot be allowed to change.
+     * To ensure this, we must allocate our own memory and copy the contents, because we will soon not be able to
+     * guarantee that the contents of <em>this</em> buffer won't change.
+     */
+    private void deconstify() {
+        if (constBuffer) {
+            ByteBuffer byteBuffer = (ByteBuffer) control.allocateUntethered(this, capacity());
+            byteBuffer.put(rmem);
+            byteBuffer.order(rmem.order());
+            Drop<NioBuffer> drop = ArcDrop.wrap(ArcDrop.unwrapAllArcs(unsafeGetDrop()));
+            unsafeSetDrop(drop);
+            attachNewBuffer(byteBuffer, drop);
+        }
     }
 
     @Override

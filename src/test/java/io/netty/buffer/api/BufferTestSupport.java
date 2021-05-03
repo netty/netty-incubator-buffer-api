@@ -40,6 +40,7 @@ import java.util.stream.Stream.Builder;
 
 import static io.netty.buffer.api.Fixture.Properties.CLEANER;
 import static io.netty.buffer.api.Fixture.Properties.COMPOSITE;
+import static io.netty.buffer.api.Fixture.Properties.CONST;
 import static io.netty.buffer.api.Fixture.Properties.DIRECT;
 import static io.netty.buffer.api.Fixture.Properties.HEAP;
 import static io.netty.buffer.api.Fixture.Properties.POOLED;
@@ -55,6 +56,8 @@ import static org.junit.jupiter.api.Assertions.fail;
 public abstract class BufferTestSupport {
     public static ExecutorService executor;
 
+    private static final Memoize<Fixture[]> INITIAL_NO_CONST = new Memoize<>(
+            () -> initialFixturesForEachImplementation().stream().filter(f -> !f.isConst()).toArray(Fixture[]::new));
     private static final Memoize<Fixture[]> ALL_COMBINATIONS = new Memoize<>(
             () -> fixtureCombinations().toArray(Fixture[]::new));
     private static final Memoize<Fixture[]> ALL_ALLOCATORS = new Memoize<>(
@@ -127,12 +130,16 @@ public abstract class BufferTestSupport {
         return POOLED_DIRECT_ALLOCS.get();
     }
 
+    static Fixture[] initialNoConstAllocators() {
+        return INITIAL_NO_CONST.get();
+    }
+
     static List<Fixture> initialAllocators() {
         return List.of(
                 new Fixture("heap", BufferAllocator::heap, HEAP),
-                new Fixture("constHeap", () -> constantBufferBasedAllocator(BufferAllocator.heap()), HEAP),
+                new Fixture("constHeap", () -> constantBufferBasedAllocator(BufferAllocator.heap()), HEAP, CONST),
                 new Fixture("constDirect", () -> constantBufferBasedAllocator(BufferAllocator.direct()),
-                        DIRECT, CLEANER),
+                        DIRECT, CONST, CLEANER),
                 new Fixture("direct", BufferAllocator::direct, DIRECT, CLEANER),
                 new Fixture("pooledHeap", BufferAllocator::pooledHeap, POOLED, HEAP),
                 new Fixture("pooledDirect", BufferAllocator::pooledDirect, POOLED, DIRECT, CLEANER));
@@ -147,7 +154,7 @@ public abstract class BufferTestSupport {
         };
     }
 
-    private static Stream<Fixture> fixtureCombinations() {
+    static List<Fixture> initialFixturesForEachImplementation() {
         List<Fixture> initFixtures = initialAllocators();
 
         // Multiply by all MemoryManagers.
@@ -156,12 +163,17 @@ public abstract class BufferTestSupport {
             loadableManagers.add(provider.get());
         });
         initFixtures = initFixtures.stream().flatMap(f -> {
-            Stream.Builder<Fixture> builder = Stream.builder();
+            Builder<Fixture> builder = Stream.builder();
             for (MemoryManagers managers : loadableManagers) {
                 builder.add(new Fixture(f + "/" + managers, () -> using(managers, f), f.getProperties()));
             }
             return builder.build();
         }).toList();
+        return initFixtures;
+    }
+
+    private static Stream<Fixture> fixtureCombinations() {
+        List<Fixture> initFixtures = initialFixturesForEachImplementation();
 
         Builder<Fixture> builder = Stream.builder();
         initFixtures.forEach(builder);

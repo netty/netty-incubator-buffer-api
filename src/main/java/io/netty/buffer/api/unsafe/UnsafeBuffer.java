@@ -38,7 +38,7 @@ import static io.netty.buffer.api.internal.Statics.bufferIsClosed;
 import static io.netty.buffer.api.internal.Statics.bufferIsReadOnly;
 import static io.netty.util.internal.PlatformDependent.BIG_ENDIAN_NATIVE_ORDER;
 
-public class UnsafeBuffer extends RcSupport<Buffer, UnsafeBuffer> implements Buffer, ReadableComponent,
+class UnsafeBuffer extends RcSupport<Buffer, UnsafeBuffer> implements Buffer, ReadableComponent,
         WritableComponent {
     private static final int CLOSED_SIZE = -1;
     private static final boolean ACCESS_UNALIGNED = PlatformDependent.isUnaligned();
@@ -54,8 +54,9 @@ public class UnsafeBuffer extends RcSupport<Buffer, UnsafeBuffer> implements Buf
     private boolean readOnly;
     private int roff;
     private int woff;
+    private boolean constBuffer;
 
-    public UnsafeBuffer(UnsafeMemory memory, long offset, int size, AllocatorControl allocatorControl,
+    UnsafeBuffer(UnsafeMemory memory, long offset, int size, AllocatorControl allocatorControl,
                         Drop<UnsafeBuffer> drop) {
         super(new MakeInaccisbleOnDrop(ArcDrop.wrap(drop)));
         this.memory = memory;
@@ -66,6 +67,23 @@ public class UnsafeBuffer extends RcSupport<Buffer, UnsafeBuffer> implements Buf
         wsize = size;
         control = allocatorControl;
         order = ByteOrder.nativeOrder();
+    }
+
+    UnsafeBuffer(UnsafeBuffer parent) {
+        super(new MakeInaccisbleOnDrop(new ArcDrop<>(((ArcDrop<UnsafeBuffer>) parent.unsafeGetDrop()).unwrap())));
+        control = parent.control;
+        memory = parent.memory;
+        base = parent.base;
+        baseOffset = parent.baseOffset;
+        address = parent.address;
+        rsize = parent.rsize;
+        wsize = parent.wsize;
+        order = parent.order;
+        flipBytes = parent.flipBytes;
+        readOnly = parent.readOnly;
+        roff = parent.roff;
+        woff = parent.woff;
+        constBuffer = true;
     }
 
     @Override
@@ -135,6 +153,9 @@ public class UnsafeBuffer extends RcSupport<Buffer, UnsafeBuffer> implements Buf
 
     @Override
     public Buffer readOnly(boolean readOnly) {
+        if (!readOnly) {
+            deconstify();
+        }
         this.readOnly = readOnly;
         wsize = readOnly? CLOSED_SIZE : rsize;
         return this;
@@ -151,6 +172,7 @@ public class UnsafeBuffer extends RcSupport<Buffer, UnsafeBuffer> implements Buf
             throw new IllegalArgumentException("Length cannot be negative: " + length + '.');
         }
         checkGet(offset, length);
+        deconstify(); // Slice or parent could later be made writable, and if so, changes must be visible in both.
         ArcDrop<UnsafeBuffer> drop = (ArcDrop<UnsafeBuffer>) unsafeGetDrop();
         drop.increment();
         return new UnsafeBuffer(memory, baseOffset + offset, length, control, drop)
@@ -436,24 +458,31 @@ public class UnsafeBuffer extends RcSupport<Buffer, UnsafeBuffer> implements Buf
             Reference.reachabilityFence(memory);
         }
 
-        // Release old memory:
+        // Release the old memory, and install the new memory:
+        Drop<UnsafeBuffer> drop = disconnectDrop();
+        attachNewMemory(memory, drop);
+    }
+
+    private Drop<UnsafeBuffer> disconnectDrop() {
         var drop = (Drop<UnsafeBuffer>) unsafeGetDrop();
         int roff = this.roff;
         int woff = this.woff;
         drop.drop(this);
-        while (drop instanceof ArcDrop) {
-            drop = ((ArcDrop<UnsafeBuffer>) drop).unwrap();
-        }
+        drop = ArcDrop.unwrapAllArcs(drop);
         unsafeSetDrop(new ArcDrop<>(drop));
         this.roff = roff;
         this.woff = woff;
+        return drop;
+    }
 
+    private void attachNewMemory(UnsafeMemory memory, Drop<UnsafeBuffer> drop) {
         this.memory = memory;
         base = memory.base;
         baseOffset = 0;
         address = memory.address;
         rsize = memory.size;
         wsize = memory.size;
+        constBuffer = false;
         drop.attach(this);
     }
 
@@ -478,6 +507,9 @@ public class UnsafeBuffer extends RcSupport<Buffer, UnsafeBuffer> implements Buf
         splitBuffer.order(order());
         boolean readOnly = readOnly();
         splitBuffer.readOnly(readOnly);
+        // Note that split, unlike slice, does not deconstify, because data changes in either buffer are not visible
+        // in the other. The split buffers can later deconstify independently if needed.
+        splitBuffer.constBuffer = constBuffer;
         rsize -= splitOffset;
         baseOffset += splitOffset;
         address += splitOffset;
@@ -628,6 +660,7 @@ public class UnsafeBuffer extends RcSupport<Buffer, UnsafeBuffer> implements Buf
         return processor.process(initialIndex, this)? 1 : -1;
     }
 
+    // <editor-fold defaultstate="collapsed" desc="Primitive accessors implementation.">
     @Override
     public byte readByte() {
         checkRead(roff, Byte.BYTES);
@@ -1189,6 +1222,7 @@ public class UnsafeBuffer extends RcSupport<Buffer, UnsafeBuffer> implements Buf
         }
         return this;
     }
+    // </editor-fold>
 
     @Override
     protected Owned<UnsafeBuffer> prepareSend() {
@@ -1196,6 +1230,7 @@ public class UnsafeBuffer extends RcSupport<Buffer, UnsafeBuffer> implements Buf
         var roff = this.roff;
         var woff = this.woff;
         var readOnly = readOnly();
+        var isConst = constBuffer;
         UnsafeMemory memory = this.memory;
         AllocatorControl control = this.control;
         long baseOffset = this.baseOffset;
@@ -1209,6 +1244,7 @@ public class UnsafeBuffer extends RcSupport<Buffer, UnsafeBuffer> implements Buf
                 copy.roff = roff;
                 copy.woff = woff;
                 copy.readOnly(readOnly);
+                copy.constBuffer = isConst;
                 return copy;
             }
         };
@@ -1258,6 +1294,29 @@ public class UnsafeBuffer extends RcSupport<Buffer, UnsafeBuffer> implements Buf
         rsize = CLOSED_SIZE;
         wsize = CLOSED_SIZE;
         readOnly = false;
+    }
+
+    /**
+     * If this buffer is a {@linkplain BufferAllocator#constBufferSupplier(byte[]) const buffer}, turn it into a normal
+     * buffer, in order to protect the const parent.
+     * A const buffer is sharing its memory with some parent, whose contents cannot be allowed to change.
+     * To ensure this, we must allocate our own memory and copy the contents, because we will soon not be able to
+     * guarantee that the contents of <em>this</em> buffer won't change.
+     */
+    private void deconstify() {
+        if (constBuffer) {
+            UnsafeMemory newMemory = (UnsafeMemory) control.allocateUntethered(this, capacity());
+            UnsafeMemory oldMemory = memory;
+            try {
+                PlatformDependent.copyMemory(base, address, newMemory.base, newMemory.address, newMemory.size);
+                Drop<UnsafeBuffer> drop = ArcDrop.wrap(ArcDrop.unwrapAllArcs(unsafeGetDrop()));
+                unsafeSetDrop(drop);
+                attachNewMemory(newMemory, drop);
+            } finally {
+                Reference.reachabilityFence(newMemory);
+                Reference.reachabilityFence(oldMemory);
+            }
+        }
     }
 
     @Override

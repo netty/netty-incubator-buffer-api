@@ -15,29 +15,37 @@
  */
 package io.netty.buffer.api;
 
+import io.netty.buffer.api.internal.Statics;
+
 import java.lang.ref.Cleaner;
+import java.util.function.Supplier;
 
 import static io.netty.buffer.api.internal.Statics.NO_OP_DROP;
 
 class ManagedBufferAllocator implements BufferAllocator, AllocatorControl {
     private final MemoryManager manager;
-    private final Cleaner cleaner;
 
-    ManagedBufferAllocator(MemoryManager manager, Cleaner cleaner) {
+    ManagedBufferAllocator(MemoryManager manager) {
         this.manager = manager;
-        this.cleaner = cleaner;
     }
 
     @Override
     public Buffer allocate(int size) {
         BufferAllocator.checkSize(size);
-        return manager.allocateShared(this, size, manager.drop(), cleaner);
+        return manager.allocateShared(this, size, manager.drop(), Statics.CLEANER);
+    }
+
+    @Override
+    public Supplier<Buffer> constBufferSupplier(byte[] bytes) {
+        Buffer constantBuffer = manager.allocateShared(this, bytes.length, manager.drop(), Statics.CLEANER);
+        constantBuffer.writeBytes(bytes).readOnly(true);
+        return () -> manager.allocateCopyOnWritable(constantBuffer);
     }
 
     @Override
     public Object allocateUntethered(Buffer originator, int size) {
         BufferAllocator.checkSize(size);
-        var buf = manager.allocateShared(this, size, NO_OP_DROP, cleaner);
+        var buf = manager.allocateShared(this, size, NO_OP_DROP, Statics.CLEANER);
         return manager.unwrapRecoverableMemory(buf);
     }
 

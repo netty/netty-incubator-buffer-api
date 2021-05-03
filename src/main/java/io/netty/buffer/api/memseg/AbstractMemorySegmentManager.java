@@ -28,12 +28,16 @@ import static io.netty.buffer.api.internal.Statics.convert;
 
 public abstract class AbstractMemorySegmentManager implements MemoryManager {
     @Override
-    public abstract boolean isNative();
-
-    @Override
     public Buffer allocateShared(AllocatorControl allocatorControl, long size, Drop<Buffer> drop, Cleaner cleaner) {
         var segment = createSegment(size, cleaner);
         return new MemSegBuffer(segment, segment, convert(drop), allocatorControl);
+    }
+
+    @Override
+    public Buffer allocateCopyOnWritable(Buffer ownedReadOnlyBuffer) {
+        assert ownedReadOnlyBuffer.isOwned() && ownedReadOnlyBuffer.readOnly();
+        MemSegBuffer buf = (MemSegBuffer) ownedReadOnlyBuffer;
+        return new MemSegBuffer(buf);
     }
 
     protected abstract MemorySegment createSegment(long size, Cleaner cleaner);

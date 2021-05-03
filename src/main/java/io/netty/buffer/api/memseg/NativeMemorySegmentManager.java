@@ -53,11 +53,6 @@ public class NativeMemorySegmentManager extends AbstractMemorySegmentManager {
     }
 
     @Override
-    public boolean isNative() {
-        return true;
-    }
-
-    @Override
     protected MemorySegment createSegment(long size, Cleaner cleaner) {
         final ResourceScope scope = cleaner == null ? newSharedScope() : newSharedScope(cleaner);
         scope.addCloseAction(getCleanupAction(size));
