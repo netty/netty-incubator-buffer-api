@@ -98,8 +98,17 @@ public interface BufferAllocator extends AutoCloseable {
     }
 
     /**
-     * Close this allocator, freeing all of its internal resources. It is not specified if the allocator can still be
-     * used after this method has been called on it.
+     * Close this allocator, freeing all of its internal resources.
+     * <p>
+     * Existing (currently in-use) allocated buffers will not be impacted by calling this method.
+     * If this is a pooling or caching allocator, then existing buffers will be immediately freed when they are closed,
+     * instead of being pooled or cached.
+     * <p>
+     * The allocator can still be used to allocate more buffers after calling this method.
+     * However, if this is a pooling or caching allocator, then the pooling and caching functionality will be
+     * effectively disabled after calling this method.
+     * <p>
+     * If this allocator does not perform any pooling or caching, then calling this method likely has no effect.
      */
     @Override
     default void close() {
