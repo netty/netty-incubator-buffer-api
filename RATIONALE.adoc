@@ -80,7 +80,7 @@ This is important because certain operations can only be called when the buffer 
 All of these operations will call this out in their javadocs.
 These operations either change the ownership of the buffer, or they change the internal memory allocation of the buffer, in some way.
 For instance, `ensureWritable()` requires ownership because it may replace the internal memory allocation with a new larger one.
-The `bifurcate()` method requires ownership because it changes how the buffer ownership itself is set up.
+The `split()` method requires ownership because it changes how the buffer ownership itself is set up.
 The `send()` method is used for transferring ownership between threads, which obviously requires ownership to begin with.
 
 [source,java]
@@ -169,7 +169,7 @@ In the `ByteBufAllocator` API, the implementation of the allocator made decision
 This API surface is much reduced in the new `BufferAllocator` API.
 The `BufferAllocator` implementation decision is making a choice on the on-/off-heap, and pooled/unpooled axis.
 These choices are made available as a family of static factory methods on the `BufferAllocator` interface, so they’re easy to find.
-Once you got an `BufferAllocator` instance, you can only allocate buffers, compose buffers (to make a composite buffer), and extend an existing composite buffer.
+Once you got an `BufferAllocator` instance, you can only allocate buffers.
 
 [source,java]
 ----
@@ -214,9 +214,13 @@ The above is just for illustration purpose.
 === Composite buffers
 
 In our existing API, `CompositeByteBuf` is a publicly exposed class, part of the API surface.
-In our new API, composite buffers hide behind the `Buffer` interface, and all methods on `Buffer` have been designed such that they work equally well on both composite and non-composite buffers.
+In our new API, composite buffers mostly hide behind the `Buffer` interface, and all methods on `Buffer` have been designed such that they work equally well on both composite and non-composite buffers.
 This is to avoid the pains currently observed where we code that branches on whether a buffer is composite or not, and do one thing or another based on this information.
 Being able to unify these code paths will help with maintainability.
+
+There are, however, some methods of composite buffers that don't make sense on non-composite buffers.
+One such method is extending a composite buffer with more components.
+For this reason, the `CompositeBuffer` class is still public, such that these composite buffer specific methods have a natural home.
 
 Buffers need to know their allocators, in order to implement `ensureWritable()`, and the same is true for composite buffers.
 That’s why the method to compose buffers takes a `BufferAllocator` as a first argument:
@@ -225,11 +229,11 @@ That’s why the method to compose buffers takes a `BufferAllocator` as a first 
 ----
 try (Buffer x = allocator.allocate(128);
      Buffer y = allocator.allocate(128)) {
-    return Buffer.compose(allocator, x, y);
+    return CompositeBuffer.compose(allocator, x, y);
 }
 ----
 
-The static `compose()` method will create a composite buffer, even when only given a single buffer.
+The static `compose()` method will create a composite buffer, even when only given a single buffer, or no buffers.
 
 The composite buffer acquires a reference on each of its constituent component buffers.
 This means that, for instance, newly allocated buffers will not be owned by the composite buffer unless the reference outside of the composite buffer is closed.
@@ -247,12 +251,12 @@ This ensures the composite buffer gets an exclusive reference to the sent compon
 Although there is in principle is no need for integrating code to know whether a buffer is composite, it is still possible to query, in case it is helpful for some optimisations.
 This is done with the `countComponents()`, `countReadableComponents()`, and `countWritableComponents()` family of methods.
 These methods exist on the `Buffer` interface, so non-composite buffers have them too, and will pretend to have a single component, namely themselves.
-If it is important to know with certainly, if a buffer is composite or not, then the static `Buffer.isComposite()` method can be used.
+If it is important to know with certainly, if a buffer is composite or not, then the static `CompositeBuffer.isComposite()` method can be used.
 
-If you know that a buffer is composite, and the composite buffer is owned, then it’s possible to extend the composite buffer with more components, using the static `Buffer.extendComposite()` method.
+If you know that a buffer is composite, and the composite buffer is owned, then it’s possible to extend the composite buffer with more components, using the `CompositeBuffer.extendWith()` method.
 
 Composite buffers can be nested, but they will flatten themselves internally.
-That is, you can pass composite buffers to the `Buffer.compose()` method, and the resulting composite buffer will appear to contain all their data just as if the components had been non-composite.
+That is, you can pass composite buffers to the `CompositeBuffer.compose()` method, and the resulting composite buffer will appear to contain all their data just as if the components had been non-composite.
 However, the new composite buffer will end up with the flattened concatenation of all constituent components.
 This means the number of indirections will not increase in the new buffer.
 
@@ -286,7 +290,7 @@ In the new API we are making things a little more strict.
 The concept of a buffer having loosely defined capacity is going away.
 
 There will only be a `capacity()`, no `maxCapacity()`.
-The capacity can only be increased by calling `ensureWritable()`, or alternatively in the case of a composite buffer, by calling `Allocator.extend()`.
+The capacity can only be increased by calling `ensureWritable()`, or alternatively in the case of a composite buffer, by calling `CompositeBuffer.extendWith()`.
 
 There is only one `ensureWritable()` method.
 It works similar to the `ByteBuf.ensureWritable(size, true)` where the “true” means it is allowed to allocate new backing memory.
@@ -350,7 +354,7 @@ The MemorySegment APIs that are being developed in the OpenJDK project will use 
 The `get`/`set`/`read`/`writeBoolean` accessor methods are being removed with no replacement planned.
 They have ambiguous meaning when working with buffers that are fundamentally byte-granular.
 
-=== Splitting buffer ownership with bifurcate()
+=== Splitting buffer ownership with split()
 
 The more explicit concept of ownership, and how ownership is now a requirement for calling some Buffer methods, may get in the way in some cases.
 For instance, in Netty, the `ByteToMessageDecoder` collects data into a collecting buffer, from which data frames are sliced off and then sent off to be processed in parallel in other threads.
@@ -358,7 +362,7 @@ For instance, in Netty, the `ByteToMessageDecoder` collects data into a collecti
 Since slices are now always retaining, they would effectively lock out all methods that require ownership.
 This would be a problem for such a collecting buffer, since it needs to grow dynamically to accommodate the largest message or frame size.
 
-To address this, the new API introduces a `Buffer.bifurcate()` (https://github.com/netty/netty-incubator-buffer-api/blob/main/src/main/java/io/netty/buffer/api/Buffer.java#L481) method.
+To address this, the new API introduces a `Buffer.split()` (https://github.com/netty/netty-incubator-buffer-api/blob/main/src/main/java/io/netty/buffer/api/Buffer.java#L481) method.
 This method splits the ownership of a buffer in two.
 All the read and readable bytes are returned in a new, independent buffer, and the existing buffer gets truncated at the head by a corresponding amount.
 The capacities and offsets of both buffers are adjusted such that they cannot access each others memory.
@@ -366,21 +370,21 @@ The capacities and offsets of both buffers are adjusted such that they cannot ac
 This way, the two regions of memory can be considered to be independent, and thus they have independent ownership.
 The two buffers still share the same underlying memory allocation, and the restrictions and mechanics ensure that this is safe to do.
 
-The memory management is handled internally with a second level of reference counting, which means that the original memory allocation is only reused or freed, when all bifurcated buffers have been closed.
-These internal details are safely managed even when slicing, sending, or expanding the bifurcated buffers with `ensureWritable()`.
+The memory management is handled internally with a second level of reference counting, which means that the original memory allocation is only reused or freed, when all split buffers have been closed.
+These internal details are safely managed even when slicing, sending, or expanding the split buffers with `ensureWritable()`.
 
 [source,java]
 ----
 buf.writeLong(x);
 buf.writeLong(y);
-executor.submit(new Task(buf.bifurcate().send()));
+executor.submit(new Task(buf.split().send()));
 buf.ensureWritable(512);
 // ...
 ----
 
 In the above example, we have written some data to the buffer, and we wish to process it in another thread while at the same time being able to write more data into our buffer.
-The `bifurcate()` call splits off the readable part of the `buf` buffer, into a new buffer with its own independent ownership, which we then send off for processing.
-Since `bifurcate()` splits the ownership of the memory, we retain ownership of the writable part of the `buf` buffer, and we are able to call `ensureWritable()` on it.
+The `split()` call splits off the readable part of the `buf` buffer, into a new buffer with its own independent ownership, which we then send off for processing.
+Since `split()` splits the ownership of the memory, we retain ownership of the writable part of the `buf` buffer, and we are able to call `ensureWritable()` on it.
 Recall that `ensureWritable()` requires ownership, or else it will throw an exception.
 
 
