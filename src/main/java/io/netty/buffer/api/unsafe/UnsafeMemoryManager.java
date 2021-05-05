@@ -57,9 +57,9 @@ public class UnsafeMemoryManager implements MemoryManager {
     }
 
     @Override
-    public Buffer allocateCopyOnWritable(Buffer ownedReadOnlyBuffer) {
-        assert ownedReadOnlyBuffer.isOwned() && ownedReadOnlyBuffer.readOnly();
-        UnsafeBuffer buf = (UnsafeBuffer) ownedReadOnlyBuffer;
+    public Buffer allocateConstChild(Buffer readOnlyConstParent) {
+        assert readOnlyConstParent.readOnly();
+        UnsafeBuffer buf = (UnsafeBuffer) readOnlyConstParent;
         return new UnsafeBuffer(buf);
     }
 

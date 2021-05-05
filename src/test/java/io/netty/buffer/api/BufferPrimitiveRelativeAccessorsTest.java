@@ -137,7 +137,7 @@ public class BufferPrimitiveRelativeAccessorsTest extends BufferTestSupport {
             buf.readerOffset(1);
             assertEquals(0, buf.readableBytes());
             assertEquals(7, buf.writableBytes());
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).readUnsignedByte());
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.makeReadOnly().readUnsignedByte());
             assertEquals(0, buf.readableBytes());
         }
     }
@@ -275,7 +275,7 @@ public class BufferPrimitiveRelativeAccessorsTest extends BufferTestSupport {
             buf.readerOffset(1);
             assertEquals(1, buf.readableBytes());
             assertEquals(6, buf.writableBytes());
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).readChar());
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.makeReadOnly().readChar());
             assertEquals(1, buf.readableBytes());
         }
     }
@@ -378,7 +378,7 @@ public class BufferPrimitiveRelativeAccessorsTest extends BufferTestSupport {
             buf.readerOffset(1);
             assertEquals(1, buf.readableBytes());
             assertEquals(6, buf.writableBytes());
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).readShort());
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.makeReadOnly().readShort());
             assertEquals(1, buf.readableBytes());
         }
     }
@@ -446,7 +446,7 @@ public class BufferPrimitiveRelativeAccessorsTest extends BufferTestSupport {
             buf.readerOffset(1);
             assertEquals(1, buf.readableBytes());
             assertEquals(6, buf.writableBytes());
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).readUnsignedShort());
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.makeReadOnly().readUnsignedShort());
             assertEquals(1, buf.readableBytes());
         }
     }
@@ -584,7 +584,7 @@ public class BufferPrimitiveRelativeAccessorsTest extends BufferTestSupport {
             buf.readerOffset(1);
             assertEquals(2, buf.readableBytes());
             assertEquals(5, buf.writableBytes());
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).readMedium());
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.makeReadOnly().readMedium());
             assertEquals(2, buf.readableBytes());
         }
     }
@@ -652,7 +652,7 @@ public class BufferPrimitiveRelativeAccessorsTest extends BufferTestSupport {
             buf.readerOffset(1);
             assertEquals(2, buf.readableBytes());
             assertEquals(5, buf.writableBytes());
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).readUnsignedMedium());
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.makeReadOnly().readUnsignedMedium());
             assertEquals(2, buf.readableBytes());
         }
     }
@@ -790,7 +790,7 @@ public class BufferPrimitiveRelativeAccessorsTest extends BufferTestSupport {
             buf.readerOffset(1);
             assertEquals(3, buf.readableBytes());
             assertEquals(4, buf.writableBytes());
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).readInt());
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.makeReadOnly().readInt());
             assertEquals(3, buf.readableBytes());
         }
     }
@@ -858,7 +858,7 @@ public class BufferPrimitiveRelativeAccessorsTest extends BufferTestSupport {
             buf.readerOffset(1);
             assertEquals(3, buf.readableBytes());
             assertEquals(4, buf.writableBytes());
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).readUnsignedInt());
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.makeReadOnly().readUnsignedInt());
             assertEquals(3, buf.readableBytes());
         }
     }
@@ -996,7 +996,7 @@ public class BufferPrimitiveRelativeAccessorsTest extends BufferTestSupport {
             buf.readerOffset(1);
             assertEquals(3, buf.readableBytes());
             assertEquals(4, buf.writableBytes());
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).readFloat());
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.makeReadOnly().readFloat());
             assertEquals(3, buf.readableBytes());
         }
     }
@@ -1099,7 +1099,7 @@ public class BufferPrimitiveRelativeAccessorsTest extends BufferTestSupport {
             buf.readerOffset(1);
             assertEquals(7, buf.readableBytes());
             assertEquals(0, buf.writableBytes());
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).readLong());
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.makeReadOnly().readLong());
             assertEquals(7, buf.readableBytes());
         }
     }
@@ -1202,7 +1202,7 @@ public class BufferPrimitiveRelativeAccessorsTest extends BufferTestSupport {
             buf.readerOffset(1);
             assertEquals(7, buf.readableBytes());
             assertEquals(0, buf.writableBytes());
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).readDouble());
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.makeReadOnly().readDouble());
             assertEquals(7, buf.readableBytes());
         }
     }

@@ -36,7 +36,7 @@ public class BufferIntOffsettedAccessorsTest extends BufferTestSupport {
     void offsettedGetOfIntReadOnlyMustBoundsCheckOnNegativeOffset(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getInt(-1));
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.makeReadOnly().getInt(-1));
         }
     }
 
@@ -82,7 +82,7 @@ public class BufferIntOffsettedAccessorsTest extends BufferTestSupport {
              Buffer buf = allocator.allocate(8)) {
             int value = 0x01020304;
             buf.writeInt(value);
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getInt(-1));
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.makeReadOnly().getInt(-1));
         }
     }
 
@@ -109,7 +109,7 @@ public class BufferIntOffsettedAccessorsTest extends BufferTestSupport {
     void offsettedGetOfIntReadOnlyMustNotBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            buf.readOnly(true).getInt(0);
+            buf.makeReadOnly().getInt(0);
         }
     }
 
@@ -118,7 +118,7 @@ public class BufferIntOffsettedAccessorsTest extends BufferTestSupport {
     void offsettedGetOfIntReadOnlyMustBoundsCheckWhenReadOffsetIsGreaterThanCapacity(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getInt(8));
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.makeReadOnly().getInt(8));
         }
     }
 
@@ -136,7 +136,7 @@ public class BufferIntOffsettedAccessorsTest extends BufferTestSupport {
     void offsettedGetOfUnsignedIntReadOnlyMustBoundsCheckOnNegativeOffset(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getUnsignedInt(-1));
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.makeReadOnly().getUnsignedInt(-1));
         }
     }
 
@@ -192,7 +192,7 @@ public class BufferIntOffsettedAccessorsTest extends BufferTestSupport {
              Buffer buf = allocator.allocate(8)) {
             long value = 0x01020304;
             buf.writeUnsignedInt(value);
-            buf.readOnly(true).getUnsignedInt(1);
+            buf.makeReadOnly().getUnsignedInt(1);
         }
     }
 
@@ -202,7 +202,7 @@ public class BufferIntOffsettedAccessorsTest extends BufferTestSupport {
             Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getUnsignedInt(5));
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.makeReadOnly().getUnsignedInt(5));
         }
     }
 
@@ -229,7 +229,7 @@ public class BufferIntOffsettedAccessorsTest extends BufferTestSupport {
     void offsettedGetOfUnsignedIntReadOnlyMustNotBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            buf.readOnly(true).getUnsignedInt(0);
+            buf.makeReadOnly().getUnsignedInt(0);
         }
     }
 
@@ -238,7 +238,7 @@ public class BufferIntOffsettedAccessorsTest extends BufferTestSupport {
     void offsettedGetOfUnsignedIntReadOnlyMustBoundsCheckWhenReadOffsetIsGreaterThanCapacity(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getUnsignedInt(8));
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.makeReadOnly().getUnsignedInt(8));
         }
     }
 

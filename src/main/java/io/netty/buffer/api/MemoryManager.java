@@ -19,7 +19,7 @@ import java.lang.ref.Cleaner;
 
 public interface MemoryManager {
     Buffer allocateShared(AllocatorControl allocatorControl, long size, Drop<Buffer> drop, Cleaner cleaner);
-    Buffer allocateCopyOnWritable(Buffer ownedReadOnlyBuffer);
+    Buffer allocateConstChild(Buffer readOnlyConstParent);
     Drop<Buffer> drop();
     Object unwrapRecoverableMemory(Buffer buf);
     int capacityOfRecoverableMemory(Object memory);

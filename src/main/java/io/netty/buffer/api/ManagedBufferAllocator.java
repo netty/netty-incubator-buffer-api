@@ -17,7 +17,6 @@ package io.netty.buffer.api;
 
 import io.netty.buffer.api.internal.Statics;
 
-import java.lang.ref.Cleaner;
 import java.util.function.Supplier;
 
 import static io.netty.buffer.api.internal.Statics.NO_OP_DROP;
@@ -38,8 +37,8 @@ class ManagedBufferAllocator implements BufferAllocator, AllocatorControl {
     @Override
     public Supplier<Buffer> constBufferSupplier(byte[] bytes) {
         Buffer constantBuffer = manager.allocateShared(this, bytes.length, manager.drop(), Statics.CLEANER);
-        constantBuffer.writeBytes(bytes).readOnly(true);
-        return () -> manager.allocateCopyOnWritable(constantBuffer);
+        constantBuffer.writeBytes(bytes).makeReadOnly();
+        return () -> manager.allocateConstChild(constantBuffer);
     }
 
     @Override

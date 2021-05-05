@@ -103,8 +103,8 @@ public class BufferComponentIterationTest extends BufferTestSupport {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer bufBERW = allocator.allocate(8).order(BIG_ENDIAN).writeLong(value);
              Buffer bufLERW = allocator.allocate(8).order(LITTLE_ENDIAN).writeLong(value);
-             Buffer bufBERO = allocator.allocate(8).order(BIG_ENDIAN).writeLong(value).readOnly(true);
-             Buffer bufLERO = allocator.allocate(8).order(LITTLE_ENDIAN).writeLong(value).readOnly(true)) {
+             Buffer bufBERO = allocator.allocate(8).order(BIG_ENDIAN).writeLong(value).makeReadOnly();
+             Buffer bufLERO = allocator.allocate(8).order(LITTLE_ENDIAN).writeLong(value).makeReadOnly()) {
             verifyForEachReadableSingleComponent(fixture, bufBERW);
             verifyForEachReadableSingleComponent(fixture, bufLERW);
             verifyForEachReadableSingleComponent(fixture, bufBERO);
@@ -361,7 +361,7 @@ public class BufferComponentIterationTest extends BufferTestSupport {
     @MethodSource("allocators")
     public void forEachWritableOnReadOnlyBufferMustThrow(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
-             Buffer buf = allocator.allocate(8).readOnly(true)) {
+             Buffer buf = allocator.allocate(8).makeReadOnly()) {
             assertThrows(IllegalStateException.class, () -> buf.forEachWritable(0, (index, component) -> true));
         }
     }

@@ -19,12 +19,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
-import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.function.Supplier;
 
 import static java.nio.ByteOrder.BIG_ENDIAN;
-import static java.nio.ByteOrder.LITTLE_ENDIAN;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -37,7 +35,7 @@ public class BufferReadOnlyTest extends BufferTestSupport {
     public void readOnlyBufferMustPreventWriteAccess(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            var b = buf.readOnly(true);
+            var b = buf.makeReadOnly();
             assertThat(b).isSameAs(buf);
             verifyWriteInaccessible(buf);
         }
@@ -48,7 +46,7 @@ public class BufferReadOnlyTest extends BufferTestSupport {
     public void closedBuffersAreNotReadOnly(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator()) {
             Buffer buf = allocator.allocate(8);
-            buf.readOnly(true);
+            buf.makeReadOnly();
             buf.close();
             assertFalse(buf.readOnly());
         }
@@ -56,18 +54,18 @@ public class BufferReadOnlyTest extends BufferTestSupport {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    public void readOnlyBufferMustBecomeWritableAgainAfterTogglingReadOnlyOff(Fixture fixture) {
+    public void readOnlyBufferMustMustStayReadOnlyAfterRepeatedToggles(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
             assertFalse(buf.readOnly());
-            buf.readOnly(true);
+            buf.makeReadOnly();
             assertTrue(buf.readOnly());
             verifyWriteInaccessible(buf);
 
-            buf.readOnly(false);
-            assertFalse(buf.readOnly());
+            buf.makeReadOnly();
+            assertTrue(buf.readOnly());
 
-            verifyWriteAccessible(buf);
+            verifyWriteInaccessible(buf);
         }
     }
 
@@ -76,7 +74,7 @@ public class BufferReadOnlyTest extends BufferTestSupport {
     public void readOnlyBufferMustRemainReadOnlyAfterSend(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            buf.readOnly(true);
+            buf.makeReadOnly();
             var send = buf.send();
             try (Buffer receive = send.receive()) {
                 assertTrue(receive.readOnly());
@@ -89,7 +87,7 @@ public class BufferReadOnlyTest extends BufferTestSupport {
     public void readOnlyBufferMustRemainReadOnlyAfterSendForEmptyCompositeBuffer() {
         try (BufferAllocator allocator = BufferAllocator.heap();
              Buffer buf = CompositeBuffer.compose(allocator)) {
-            buf.readOnly(true);
+            buf.makeReadOnly();
             var send = buf.send();
             try (Buffer receive = send.receive()) {
                 assertTrue(receive.readOnly());
@@ -104,7 +102,7 @@ public class BufferReadOnlyTest extends BufferTestSupport {
             for (int i = 0; i < 1000; i++) {
                 try (Buffer buf = allocator.allocate(8)) {
                     assertFalse(buf.readOnly());
-                    buf.readOnly(true);
+                    buf.makeReadOnly();
                     assertTrue(buf.readOnly());
                 }
             }
@@ -116,7 +114,7 @@ public class BufferReadOnlyTest extends BufferTestSupport {
     public void compactOnReadOnlyBufferMustThrow(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            buf.readOnly(true);
+            buf.makeReadOnly();
             assertThrows(IllegalStateException.class, () -> buf.compact());
         }
     }
@@ -126,7 +124,7 @@ public class BufferReadOnlyTest extends BufferTestSupport {
     public void ensureWritableOnReadOnlyBufferMustThrow(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            buf.readOnly(true);
+            buf.makeReadOnly();
             assertThrows(IllegalStateException.class, () -> buf.ensureWritable(1));
         }
     }
@@ -136,7 +134,7 @@ public class BufferReadOnlyTest extends BufferTestSupport {
     public void copyIntoOnReadOnlyBufferMustThrow(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer dest = allocator.allocate(8)) {
-            dest.readOnly(true);
+            dest.makeReadOnly();
             try (Buffer src = allocator.allocate(8)) {
                 assertThrows(IllegalStateException.class, () -> src.copyInto(0, dest, 0, 1));
             }
@@ -147,7 +145,7 @@ public class BufferReadOnlyTest extends BufferTestSupport {
     @MethodSource("allocators")
     public void readOnlyBuffersCannotChangeWriteOffset(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
-             Buffer buf = allocator.allocate(8).readOnly(true)) {
+             Buffer buf = allocator.allocate(8).makeReadOnly()) {
             assertThrows(IllegalStateException.class, () -> buf.writerOffset(4));
         }
     }
@@ -175,67 +173,30 @@ public class BufferReadOnlyTest extends BufferTestSupport {
 
     @ParameterizedTest
     @MethodSource("initialNoConstAllocators")
-    public void modifyingConstBufferDoesNotImpactSiblings(Fixture fixture) {
+    public void constBuffersCanBeSplit(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator()) {
-            Supplier<Buffer> supplier = allocator.constBufferSupplier(new byte[] {1, 2, 3, 4});
-            try (Buffer a = supplier.get().order(BIG_ENDIAN);
-                 Buffer b = supplier.get().order(LITTLE_ENDIAN)) {
-                assertThat(a.order()).isEqualTo(BIG_ENDIAN);
-                assertThat(b.order()).isEqualTo(LITTLE_ENDIAN);
-                a.readOnly(false);
-                a.setInt(0, 0xA1A2A3A4);
-                a.readerOffset(2);
-                assertThat(toByteArray(a)).containsExactly(0xA1, 0xA2, 0xA3, 0xA4);
-                assertThat(toByteArray(b)).containsExactly(1, 2, 3, 4);
-                assertThat(b.readerOffset()).isZero();
-                assertThat(a.order()).isEqualTo(BIG_ENDIAN);
-                assertThat(b.order()).isEqualTo(LITTLE_ENDIAN);
-                assertThat(a.writerOffset()).isEqualTo(4);
-                assertThat(b.writerOffset()).isEqualTo(4);
-            }
+            Supplier<Buffer> supplier = allocator.constBufferSupplier(new byte[16]);
+            verifyConstBufferSplit(supplier);
+            // These shenanigans must not interfere with the parent const buffer.
+            verifyConstBufferSplit(supplier);
         }
     }
 
-    @ParameterizedTest
-    @MethodSource("initialNoConstAllocators")
-    public void sliceOfConstBufferMustObserveChangesInParent(Fixture fixture) {
-        try (BufferAllocator allocator = fixture.createAllocator();
-             Buffer parent = allocator.constBufferSupplier(new byte[] {1, 2, 3, 4}).get();
-             Buffer slice = parent.slice(0, 4)) {
-            parent.readOnly(false);
-            parent.setByte(0, (byte) 42);
-            assertThat(slice.getByte(0)).isEqualTo((byte) 42);
-        }
-    }
-
-    @ParameterizedTest
-    @MethodSource("initialNoConstAllocators")
-    public void parentOfConstBufferSliceMustObserveChangesInSlice(Fixture fixture) {
-        try (BufferAllocator allocator = fixture.createAllocator();
-             Buffer parent = allocator.constBufferSupplier(new byte[] {1, 2, 3, 4}).get();
-             Buffer slice = parent.slice(0, 4)) {
-            slice.readOnly(false);
-            slice.setByte(0, (byte) 42);
-            assertThat(parent.getByte(0)).isEqualTo((byte) 42);
-        }
-    }
-
-    @ParameterizedTest
-    @MethodSource("initialNoConstAllocators")
-    public void splitsOfConstBuffersCanBecomeWritable(Fixture fixture) {
-        try (BufferAllocator allocator = fixture.createAllocator();
-             Buffer a = allocator.constBufferSupplier(new byte[16]).get();
+    private static void verifyConstBufferSplit(Supplier<Buffer> supplier) {
+        try (Buffer a = supplier.get();
              Buffer b = a.split(8)) {
             assertTrue(a.readOnly());
             assertTrue(b.readOnly());
+            assertTrue(a.isOwned());
+            assertTrue(b.isOwned());
             assertThat(a.capacity()).isEqualTo(8);
             assertThat(b.capacity()).isEqualTo(8);
-            a.readOnly(false);
-            b.readOnly(false);
-            a.setInt(0, 1);
-            b.setInt(0, 2);
-            assertEquals(1, a.getInt(0));
-            assertEquals(2, b.getInt(0));
+            try (Buffer c = b.slice()) {
+                assertTrue(c.readOnly());
+                assertFalse(c.isOwned());
+                assertFalse(b.isOwned());
+                assertThat(c.capacity()).isEqualTo(8);
+            }
         }
     }
 
@@ -245,18 +206,25 @@ public class BufferReadOnlyTest extends BufferTestSupport {
         try (BufferAllocator allocator = fixture.createAllocator()) {
             Supplier<Buffer> supplier = allocator.constBufferSupplier(new byte[] {1, 2, 3, 4});
             try (Buffer a = supplier.get();
-                 Buffer b = supplier.get()) {
-                a.readShort();
+                 Buffer b = supplier.get();
+                 Buffer c = a.slice()) {
+                assertEquals(1, a.readByte());
+                assertEquals(2, a.readByte());
                 assertThrows(IllegalStateException.class, () -> a.compact()); // Can't compact read-only buffer.
-                a.readOnly(false).compact(); // Setting read-only to false will deconstify the buffer.
                 assertEquals(3, a.readByte());
                 assertEquals(4, a.readByte());
-                assertEquals(0, a.readableBytes());
 
                 assertEquals(1, b.readByte());
                 assertEquals(2, b.readByte());
+                assertThrows(IllegalStateException.class, () -> b.compact()); // Can't compact read-only buffer.
                 assertEquals(3, b.readByte());
                 assertEquals(4, b.readByte());
+
+                assertEquals(1, c.readByte());
+                assertEquals(2, c.readByte());
+                assertThrows(IllegalStateException.class, () -> c.compact()); // Can't compact read-only buffer.
+                assertEquals(3, c.readByte());
+                assertEquals(4, c.readByte());
             }
         }
     }

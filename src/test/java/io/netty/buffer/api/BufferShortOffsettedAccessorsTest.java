@@ -36,7 +36,7 @@ public class BufferShortOffsettedAccessorsTest extends BufferTestSupport {
     void offsettedGetOfShortReadOnlyMustBoundsCheckOnNegativeOffset(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getShort(-1));
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.makeReadOnly().getShort(-1));
         }
     }
 
@@ -91,7 +91,7 @@ public class BufferShortOffsettedAccessorsTest extends BufferTestSupport {
              Buffer buf = allocator.allocate(8)) {
             short value = 0x0102;
             buf.writeShort(value);
-            buf.readOnly(true).getShort(1);
+            buf.makeReadOnly().getShort(1);
         }
     }
 
@@ -100,7 +100,7 @@ public class BufferShortOffsettedAccessorsTest extends BufferTestSupport {
     void offsettedGetOfShortReadOnlyMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanCapacity(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getShort(7));
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.makeReadOnly().getShort(7));
         }
     }
 
@@ -127,7 +127,7 @@ public class BufferShortOffsettedAccessorsTest extends BufferTestSupport {
     void offsettedGetOfShortReadOnlyMustNotBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            buf.readOnly(true).getShort(0);
+            buf.makeReadOnly().getShort(0);
         }
     }
 
@@ -136,7 +136,7 @@ public class BufferShortOffsettedAccessorsTest extends BufferTestSupport {
     void offsettedGetOfShortReadOnlyMustBoundsCheckWhenReadOffsetIsGreaterThanCapacity(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getShort(7));
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.makeReadOnly().getShort(7));
         }
     }
 
@@ -154,7 +154,7 @@ public class BufferShortOffsettedAccessorsTest extends BufferTestSupport {
     void offsettedGetOfUnsignedShortReadOnlyMustBoundsCheckOnNegativeOffset(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getUnsignedShort(-1));
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.makeReadOnly().getUnsignedShort(-1));
         }
     }
 
@@ -210,7 +210,7 @@ public class BufferShortOffsettedAccessorsTest extends BufferTestSupport {
              Buffer buf = allocator.allocate(8)) {
             int value = 0x0102;
             buf.writeUnsignedShort(value);
-            buf.readOnly(true).getUnsignedShort(1);
+            buf.makeReadOnly().getUnsignedShort(1);
         }
     }
 
@@ -220,7 +220,7 @@ public class BufferShortOffsettedAccessorsTest extends BufferTestSupport {
             Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getUnsignedShort(7));
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.makeReadOnly().getUnsignedShort(7));
         }
     }
 
@@ -247,7 +247,7 @@ public class BufferShortOffsettedAccessorsTest extends BufferTestSupport {
     void offsettedGetOfUnsignedShortReadOnlyMustNotBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            buf.readOnly(true).getUnsignedShort(0);
+            buf.makeReadOnly().getUnsignedShort(0);
         }
     }
 
@@ -256,7 +256,7 @@ public class BufferShortOffsettedAccessorsTest extends BufferTestSupport {
     void offsettedGetOfUnsignedShortReadOnlyMustBoundsCheckWhenReadOffsetIsGreaterThanCapacity(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getUnsignedShort(7));
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.makeReadOnly().getUnsignedShort(7));
         }
     }
 

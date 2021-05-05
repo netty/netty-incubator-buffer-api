@@ -36,7 +36,7 @@ public class BufferDoubleOffsettedAccessorsTest extends BufferTestSupport {
     void offsettedGetOfDoubleReadOnlyMustBoundsCheckOnNegativeOffset(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getDouble(-1));
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.makeReadOnly().getDouble(-1));
         }
     }
 
@@ -82,7 +82,7 @@ public class BufferDoubleOffsettedAccessorsTest extends BufferTestSupport {
              Buffer buf = allocator.allocate(8)) {
             double value = Double.longBitsToDouble(0x0102030405060708L);
             buf.writeDouble(value);
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getDouble(1));
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.makeReadOnly().getDouble(1));
         }
     }
 
@@ -109,7 +109,7 @@ public class BufferDoubleOffsettedAccessorsTest extends BufferTestSupport {
     void offsettedGetOfDoubleReadOnlyMustNotBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            buf.readOnly(true).getDouble(0);
+            buf.makeReadOnly().getDouble(0);
         }
     }
 
@@ -118,7 +118,7 @@ public class BufferDoubleOffsettedAccessorsTest extends BufferTestSupport {
     void offsettedGetOfDoubleReadOnlyMustBoundsCheckWhenReadOffsetIsGreaterThanCapacity(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getDouble(8));
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.makeReadOnly().getDouble(8));
         }
     }
 

@@ -36,7 +36,7 @@ public class BufferMediumOffsettedAccessorsTest extends BufferTestSupport {
     void offsettedGetOfMediumReadOnlyMustBoundsCheckOnNegativeOffset(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getMedium(-1));
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.makeReadOnly().getMedium(-1));
         }
     }
 
@@ -93,7 +93,7 @@ public class BufferMediumOffsettedAccessorsTest extends BufferTestSupport {
              Buffer buf = allocator.allocate(8)) {
             int value = 0x010203;
             buf.writeMedium(value);
-            buf.readOnly(true).getMedium(1);
+            buf.makeReadOnly().getMedium(1);
         }
     }
 
@@ -102,7 +102,7 @@ public class BufferMediumOffsettedAccessorsTest extends BufferTestSupport {
     void offsettedGetOfMediumReadOnlyMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanCapacity(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getMedium(6));
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.makeReadOnly().getMedium(6));
         }
     }
 
@@ -129,7 +129,7 @@ public class BufferMediumOffsettedAccessorsTest extends BufferTestSupport {
     void offsettedGetOfMediumReadOnlyMustNotBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            buf.readOnly(true).getMedium(0);
+            buf.makeReadOnly().getMedium(0);
         }
     }
 
@@ -138,7 +138,7 @@ public class BufferMediumOffsettedAccessorsTest extends BufferTestSupport {
     void offsettedGetOfMediumReadOnlyMustBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getMedium(8));
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.makeReadOnly().getMedium(8));
         }
     }
 
@@ -156,7 +156,7 @@ public class BufferMediumOffsettedAccessorsTest extends BufferTestSupport {
     void offsettedGetOfUnsignedMediumReadOnlyMustBoundsCheckOnNegativeOffset(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getUnsignedMedium(-1));
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.makeReadOnly().getUnsignedMedium(-1));
         }
     }
 
@@ -212,7 +212,7 @@ public class BufferMediumOffsettedAccessorsTest extends BufferTestSupport {
              Buffer buf = allocator.allocate(8)) {
             int value = 0x010203;
             buf.writeUnsignedMedium(value);
-            buf.readOnly(true).getUnsignedMedium(1);
+            buf.makeReadOnly().getUnsignedMedium(1);
         }
     }
 
@@ -222,7 +222,7 @@ public class BufferMediumOffsettedAccessorsTest extends BufferTestSupport {
             Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getUnsignedMedium(6));
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.makeReadOnly().getUnsignedMedium(6));
         }
     }
 
@@ -249,7 +249,7 @@ public class BufferMediumOffsettedAccessorsTest extends BufferTestSupport {
     void offsettedGetOfUnsignedMediumReadOnlyMustNotBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            buf.readOnly(true).getUnsignedMedium(0);
+            buf.makeReadOnly().getUnsignedMedium(0);
         }
     }
 
@@ -258,7 +258,7 @@ public class BufferMediumOffsettedAccessorsTest extends BufferTestSupport {
     void offsettedGetOfUnsignedMediumReadOnlyMustBoundsCheckWhenReadOffsetIsGreaterThanCapacity(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getUnsignedMedium(8));
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.makeReadOnly().getUnsignedMedium(8));
         }
     }
 

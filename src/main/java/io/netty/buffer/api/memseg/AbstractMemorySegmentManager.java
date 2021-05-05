@@ -34,9 +34,9 @@ public abstract class AbstractMemorySegmentManager implements MemoryManager {
     }
 
     @Override
-    public Buffer allocateCopyOnWritable(Buffer ownedReadOnlyBuffer) {
-        assert ownedReadOnlyBuffer.isOwned() && ownedReadOnlyBuffer.readOnly();
-        MemSegBuffer buf = (MemSegBuffer) ownedReadOnlyBuffer;
+    public Buffer allocateConstChild(Buffer readOnlyConstParent) {
+        assert readOnlyConstParent.readOnly();
+        MemSegBuffer buf = (MemSegBuffer) readOnlyConstParent;
         return new MemSegBuffer(buf);
     }
 

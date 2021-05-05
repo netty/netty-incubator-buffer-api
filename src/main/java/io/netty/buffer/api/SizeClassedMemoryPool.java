@@ -47,8 +47,6 @@ class SizeClassedMemoryPool implements BufferAllocator, AllocatorControl, Drop<B
         Object memory = sizeClassPool.poll();
         if (memory != null) {
             return recoverMemoryIntoBuffer(memory)
-                       .reset()
-                       .readOnly(false)
                        .fill((byte) 0)
                        .order(ByteOrder.nativeOrder());
         }
@@ -58,8 +56,8 @@ class SizeClassedMemoryPool implements BufferAllocator, AllocatorControl, Drop<B
     @Override
     public Supplier<Buffer> constBufferSupplier(byte[] bytes) {
         Buffer constantBuffer = manager.allocateShared(this, bytes.length, manager.drop(), Statics.CLEANER);
-        constantBuffer.writeBytes(bytes).readOnly(true);
-        return () -> manager.allocateCopyOnWritable(constantBuffer);
+        constantBuffer.writeBytes(bytes).makeReadOnly();
+        return () -> manager.allocateConstChild(constantBuffer);
     }
 
     protected MemoryManager getMemoryManager() {

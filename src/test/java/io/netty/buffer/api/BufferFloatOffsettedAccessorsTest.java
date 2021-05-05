@@ -37,7 +37,7 @@ public class BufferFloatOffsettedAccessorsTest extends BufferTestSupport {
     void offsettedGetOfFloatReadOnlyMustBoundsCheckOnNegativeOffset(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getFloat(-1));
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.makeReadOnly().getFloat(-1));
         }
     }
 
@@ -92,7 +92,7 @@ public class BufferFloatOffsettedAccessorsTest extends BufferTestSupport {
              Buffer buf = allocator.allocate(8)) {
             float value = Float.intBitsToFloat(0x01020304);
             buf.writeFloat(value);
-            buf.readOnly(true).getFloat(1);
+            buf.makeReadOnly().getFloat(1);
         }
     }
 
@@ -101,7 +101,7 @@ public class BufferFloatOffsettedAccessorsTest extends BufferTestSupport {
     void offsettedGetOfFloatReadOnlyMustBoundsCheckWhenReadOffsetAndSizeIsGreaterThanCapacity(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getFloat(5));
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.makeReadOnly().getFloat(5));
         }
     }
 
@@ -128,7 +128,7 @@ public class BufferFloatOffsettedAccessorsTest extends BufferTestSupport {
     void offsettedGetOfFloatReadOnlyMustNotBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            buf.readOnly(true).getFloat(0);
+            buf.makeReadOnly().getFloat(0);
         }
     }
 
@@ -137,7 +137,7 @@ public class BufferFloatOffsettedAccessorsTest extends BufferTestSupport {
     void offsettedGetOfFloatReadOnlyMustBoundsCheckWhenReadOffsetIsGreaterThan(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getFloat(8));
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.makeReadOnly().getFloat(8));
         }
     }
 

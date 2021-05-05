@@ -43,9 +43,9 @@ public class ByteBufferMemoryManager implements MemoryManager {
     }
 
     @Override
-    public Buffer allocateCopyOnWritable(Buffer ownedReadOnlyBuffer) {
-        assert ownedReadOnlyBuffer.isOwned() && ownedReadOnlyBuffer.readOnly();
-        NioBuffer buf = (NioBuffer) ownedReadOnlyBuffer;
+    public Buffer allocateConstChild(Buffer readOnlyConstParent) {
+        assert readOnlyConstParent.readOnly();
+        NioBuffer buf = (NioBuffer) readOnlyConstParent;
         return new NioBuffer(buf);
     }
 

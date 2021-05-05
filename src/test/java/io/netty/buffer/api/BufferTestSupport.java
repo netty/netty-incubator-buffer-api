@@ -137,21 +137,9 @@ public abstract class BufferTestSupport {
     static List<Fixture> initialAllocators() {
         return List.of(
                 new Fixture("heap", BufferAllocator::heap, HEAP),
-                new Fixture("constHeap", () -> constantBufferBasedAllocator(BufferAllocator.heap()), HEAP, CONST),
-                new Fixture("constDirect", () -> constantBufferBasedAllocator(BufferAllocator.direct()),
-                        DIRECT, CONST, CLEANER),
                 new Fixture("direct", BufferAllocator::direct, DIRECT, CLEANER),
                 new Fixture("pooledHeap", BufferAllocator::pooledHeap, POOLED, HEAP),
                 new Fixture("pooledDirect", BufferAllocator::pooledDirect, POOLED, DIRECT, CLEANER));
-    }
-
-    private static BufferAllocator constantBufferBasedAllocator(BufferAllocator allocator) {
-        return size -> {
-            if (size < 0) {
-                throw new IllegalArgumentException();
-            }
-            return allocator.constBufferSupplier(new byte[size]).get().readOnly(false).reset();
-        };
     }
 
     static List<Fixture> initialFixturesForEachImplementation() {
@@ -256,37 +244,6 @@ public abstract class BufferTestSupport {
                         var buf = CompositeBuffer.compose(allocator);
                         buf.ensureWritable(size);
                         return buf;
-                    }
-
-                    @Override
-                    public void close() {
-                        allocator.close();
-                    }
-                };
-            }, COMPOSITE));
-            builder.add(new Fixture(fixture + ".readOnly(true/false)", () -> {
-                var allocator = fixture.get();
-                return new BufferAllocator() {
-                    @Override
-                    public Buffer allocate(int size) {
-                        return allocator.allocate(size).readOnly(true).readOnly(false);
-                    }
-
-                    @Override
-                    public void close() {
-                        allocator.close();
-                    }
-                };
-            }, fixture.getProperties()));
-            builder.add(new Fixture(fixture + ".compose.readOnly(true/false)", () -> {
-                var allocator = fixture.get();
-                return new BufferAllocator() {
-                    @Override
-                    public Buffer allocate(int size) {
-                        try (Buffer buf = allocator.allocate(size)) {
-                            CompositeBuffer composite = CompositeBuffer.compose(allocator, buf);
-                            return composite.readOnly(true).readOnly(false);
-                        }
                     }
 
                     @Override

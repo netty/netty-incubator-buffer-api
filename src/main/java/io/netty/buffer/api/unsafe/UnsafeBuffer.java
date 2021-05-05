@@ -70,7 +70,7 @@ class UnsafeBuffer extends RcSupport<Buffer, UnsafeBuffer> implements Buffer, Re
     }
 
     UnsafeBuffer(UnsafeBuffer parent) {
-        super(new MakeInaccisbleOnDrop(new ArcDrop<>(((ArcDrop<UnsafeBuffer>) parent.unsafeGetDrop()).unwrap())));
+        super(new MakeInaccisbleOnDrop(new ArcDrop<>(ArcDrop.acquire(parent.unsafeGetDrop()))));
         control = parent.control;
         memory = parent.memory;
         base = parent.base;
@@ -152,12 +152,9 @@ class UnsafeBuffer extends RcSupport<Buffer, UnsafeBuffer> implements Buffer, Re
     }
 
     @Override
-    public Buffer readOnly(boolean readOnly) {
-        if (!readOnly) {
-            deconstify();
-        }
-        this.readOnly = readOnly;
-        wsize = readOnly? CLOSED_SIZE : rsize;
+    public Buffer makeReadOnly() {
+        readOnly = true;
+        wsize = CLOSED_SIZE;
         return this;
     }
 
@@ -172,13 +169,15 @@ class UnsafeBuffer extends RcSupport<Buffer, UnsafeBuffer> implements Buffer, Re
             throw new IllegalArgumentException("Length cannot be negative: " + length + '.');
         }
         checkGet(offset, length);
-        deconstify(); // Slice or parent could later be made writable, and if so, changes must be visible in both.
         ArcDrop<UnsafeBuffer> drop = (ArcDrop<UnsafeBuffer>) unsafeGetDrop();
         drop.increment();
-        return new UnsafeBuffer(memory, baseOffset + offset, length, control, drop)
+        Buffer sliceBuffer = new UnsafeBuffer(memory, baseOffset + offset, length, control, drop)
                 .writerOffset(length)
-                .order(order)
-                .readOnly(readOnly);
+                .order(order);
+        if (readOnly) {
+            sliceBuffer = sliceBuffer.makeReadOnly();
+        }
+        return sliceBuffer;
     }
 
     @Override
@@ -506,7 +505,9 @@ class UnsafeBuffer extends RcSupport<Buffer, UnsafeBuffer> implements Buffer, Re
         splitBuffer.roff = Math.min(roff, splitOffset);
         splitBuffer.order(order());
         boolean readOnly = readOnly();
-        splitBuffer.readOnly(readOnly);
+        if (readOnly) {
+            splitBuffer.makeReadOnly();
+        }
         // Note that split, unlike slice, does not deconstify, because data changes in either buffer are not visible
         // in the other. The split buffers can later deconstify independently if needed.
         splitBuffer.constBuffer = constBuffer;
@@ -1243,7 +1244,9 @@ class UnsafeBuffer extends RcSupport<Buffer, UnsafeBuffer> implements Buffer, Re
                 copy.order(order);
                 copy.roff = roff;
                 copy.woff = woff;
-                copy.readOnly(readOnly);
+                if (readOnly) {
+                    copy.makeReadOnly();
+                }
                 copy.constBuffer = isConst;
                 return copy;
             }
@@ -1294,29 +1297,6 @@ class UnsafeBuffer extends RcSupport<Buffer, UnsafeBuffer> implements Buffer, Re
         rsize = CLOSED_SIZE;
         wsize = CLOSED_SIZE;
         readOnly = false;
-    }
-
-    /**
-     * If this buffer is a {@linkplain BufferAllocator#constBufferSupplier(byte[]) const buffer}, turn it into a normal
-     * buffer, in order to protect the const parent.
-     * A const buffer is sharing its memory with some parent, whose contents cannot be allowed to change.
-     * To ensure this, we must allocate our own memory and copy the contents, because we will soon not be able to
-     * guarantee that the contents of <em>this</em> buffer won't change.
-     */
-    private void deconstify() {
-        if (constBuffer) {
-            UnsafeMemory newMemory = (UnsafeMemory) control.allocateUntethered(this, capacity());
-            UnsafeMemory oldMemory = memory;
-            try {
-                PlatformDependent.copyMemory(base, address, newMemory.base, newMemory.address, newMemory.size);
-                Drop<UnsafeBuffer> drop = ArcDrop.wrap(ArcDrop.unwrapAllArcs(unsafeGetDrop()));
-                unsafeSetDrop(drop);
-                attachNewMemory(newMemory, drop);
-            } finally {
-                Reference.reachabilityFence(newMemory);
-                Reference.reachabilityFence(oldMemory);
-            }
-        }
     }
 
     @Override

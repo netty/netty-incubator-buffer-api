@@ -226,11 +226,13 @@ public interface Buffer extends Rc<Buffer>, BufferAccessors {
     long nativeAddress();
 
     /**
-     * Set the read-only state of this buffer.
+     * Make this buffer read-only. This is irreversible.
+     * Unless a writable slice has previously been obtained from this buffer, there will no longer be any way to modify
+     * the data contained in this buffer.
      *
      * @return this buffer.
      */
-    Buffer readOnly(boolean readOnly);
+    Buffer makeReadOnly();
 
     /**
      * Query if this buffer is read-only or not.

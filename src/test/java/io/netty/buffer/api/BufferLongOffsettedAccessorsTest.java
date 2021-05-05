@@ -36,7 +36,7 @@ public class BufferLongOffsettedAccessorsTest extends BufferTestSupport {
     void offsettedGetOfLongReadOnlyMustBoundsCheckOnNegativeOffset(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getLong(-1));
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.makeReadOnly().getLong(-1));
         }
     }
 
@@ -82,7 +82,7 @@ public class BufferLongOffsettedAccessorsTest extends BufferTestSupport {
              Buffer buf = allocator.allocate(8)) {
             long value = 0x0102030405060708L;
             buf.writeLong(value);
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getLong(1));
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.makeReadOnly().getLong(1));
         }
     }
 
@@ -109,7 +109,7 @@ public class BufferLongOffsettedAccessorsTest extends BufferTestSupport {
     void offsettedGetOfLongReadOnlyMustNotBoundsCheckWhenReadOffsetIsGreaterThanWriteOffset(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            buf.readOnly(true).getLong(0);
+            buf.makeReadOnly().getLong(0);
         }
     }
 
@@ -118,7 +118,7 @@ public class BufferLongOffsettedAccessorsTest extends BufferTestSupport {
     void offsettedGetOfLongReadOnlyMustBoundsCheckWhenReadOffsetIsGreaterThanCapacity(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.readOnly(true).getLong(8));
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.makeReadOnly().getLong(8));
         }
     }
 
