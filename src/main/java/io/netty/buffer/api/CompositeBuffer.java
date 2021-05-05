@@ -444,11 +444,11 @@ public final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> im
     }
 
     @Override
-    public CompositeBuffer readOnly(boolean readOnly) {
+    public CompositeBuffer makeReadOnly() {
         for (Buffer buf : bufs) {
-            buf.readOnly(readOnly);
+            buf.makeReadOnly();
         }
-        this.readOnly = readOnly;
+        readOnly = true;
         return this;
     }
 

@@ -128,6 +128,14 @@ import java.nio.ByteOrder;
  * perhaps unknown, piece of code, and relinquish your ownership of that buffer region in the process.
  * Examples include aggregating messages into an accumulator buffer, and sending messages down the pipeline for
  * further processing, as split buffer regions, once their data has been received in its entirety.
+ *
+ * <h3>Buffers as constants</h3>
+ *
+ * Sometimes, the same bit of data will be processed or transmitted over and over again. In such cases, it can be
+ * tempting to allocate and fill a buffer once, and then reuse it.
+ * Such reuse must be done carefully, however, to avoid a number of bugs.
+ * The {@link BufferAllocator} has a {@link BufferAllocator#constBufferSupplier(byte[])} method that solves this, and
+ * prevents these bugs from occurring.
  */
 public interface Buffer extends Rc<Buffer>, BufferAccessors {
     /**
@@ -218,11 +226,13 @@ public interface Buffer extends Rc<Buffer>, BufferAccessors {
     long nativeAddress();
 
     /**
-     * Set the read-only state of this buffer.
+     * Make this buffer read-only. This is irreversible.
+     * Unless a writable slice has previously been obtained from this buffer, there will no longer be any way to modify
+     * the data contained in this buffer.
      *
      * @return this buffer.
      */
-    Buffer readOnly(boolean readOnly);
+    Buffer makeReadOnly();
 
     /**
      * Query if this buffer is read-only or not.
@@ -305,6 +315,23 @@ public interface Buffer extends Rc<Buffer>, BufferAccessors {
         writerOffset(woff + size);
         source.copyInto(source.readerOffset(), this, woff, size);
         source.readerOffset(source.readerOffset() + size);
+        return this;
+    }
+
+    /**
+     * Write into this buffer, all the bytes from the given byte array.
+     * This updates the {@linkplain #writerOffset() write offset} of this buffer by the length of the array.
+     *
+     * @param source The byte array to read from.
+     * @return This buffer.
+     */
+    default Buffer writeBytes(byte[] source) {
+        int size = source.length;
+        int woff = writerOffset();
+        writerOffset(woff + size);
+        for (int i = 0; i < size; i++) {
+            setByte(woff + i, source[i]);
+        }
         return this;
     }
 

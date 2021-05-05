@@ -35,16 +35,18 @@ public class ByteBufferMemoryManager implements MemoryManager {
     }
 
     @Override
-    public boolean isNative() {
-        return direct;
-    }
-
-    @Override
     public Buffer allocateShared(AllocatorControl allocatorControl, long size, Drop<Buffer> drop, Cleaner cleaner) {
         int capacity = Math.toIntExact(size);
         ByteBuffer buffer = direct? ByteBuffer.allocateDirect(capacity) : ByteBuffer.allocate(capacity);
         buffer.order(ByteOrder.nativeOrder());
         return new NioBuffer(buffer, buffer, allocatorControl, convert(drop));
+    }
+
+    @Override
+    public Buffer allocateConstChild(Buffer readOnlyConstParent) {
+        assert readOnlyConstParent.readOnly();
+        NioBuffer buf = (NioBuffer) readOnlyConstParent;
+        return new NioBuffer(buf);
     }
 
     @Override

@@ -17,7 +17,6 @@ package io.netty.buffer.api.examples.bytetomessagedecoder;
 
 import io.netty.buffer.api.Buffer;
 import io.netty.buffer.api.BufferAllocator;
-import io.netty.buffer.api.CompositeBuffer;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.embedded.EmbeddedChannel;
@@ -334,7 +333,7 @@ public class ByteToMessageDecoderTest {
             @Override
             protected void decode(ChannelHandlerContext ctx, Buffer in) { }
         });
-        assertFalse(channel.writeInbound(heap().allocate(8).writeByte((byte) 1).readOnly(true)));
+        assertFalse(channel.writeInbound(heap().allocate(8).writeByte((byte) 1).makeReadOnly()));
         assertFalse(channel.writeInbound(heap().allocate(1).writeByte((byte) 2)));
         assertFalse(channel.finish());
     }

@@ -34,11 +34,6 @@ public class UnsafeMemoryManager implements MemoryManager {
     }
 
     @Override
-    public boolean isNative() {
-        return offheap;
-    }
-
-    @Override
     public Buffer allocateShared(AllocatorControl allocatorControl, long size, Drop<Buffer> drop, Cleaner cleaner) {
         final Object base;
         final long address;
@@ -59,6 +54,13 @@ public class UnsafeMemoryManager implements MemoryManager {
             memory = new UnsafeMemory(base, address, size32);
         }
         return new UnsafeBuffer(memory, 0, size32, allocatorControl, convert(drop));
+    }
+
+    @Override
+    public Buffer allocateConstChild(Buffer readOnlyConstParent) {
+        assert readOnlyConstParent.readOnly();
+        UnsafeBuffer buf = (UnsafeBuffer) readOnlyConstParent;
+        return new UnsafeBuffer(buf);
     }
 
     @Override

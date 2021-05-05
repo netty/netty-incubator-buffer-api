@@ -15,14 +15,11 @@
  */
 package io.netty.buffer.api;
 
-import io.netty.buffer.api.memseg.HeapMemorySegmentManager;
-import io.netty.buffer.api.memseg.NativeMemorySegmentManager;
-
 import java.lang.ref.Cleaner;
 
 public interface MemoryManager {
-    boolean isNative();
     Buffer allocateShared(AllocatorControl allocatorControl, long size, Drop<Buffer> drop, Cleaner cleaner);
+    Buffer allocateConstChild(Buffer readOnlyConstParent);
     Drop<Buffer> drop();
     Object unwrapRecoverableMemory(Buffer buf);
     int capacityOfRecoverableMemory(Object memory);

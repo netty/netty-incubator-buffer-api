@@ -694,7 +694,7 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
     public void acquireOfReadOnlyBufferMustBeReadOnly(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            buf.readOnly(true);
+            buf.makeReadOnly();
             try (Buffer acquire = buf.acquire()) {
                 assertTrue(acquire.readOnly());
             }
@@ -707,7 +707,7 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
             buf.writeLong(0x0102030405060708L);
-            buf.readOnly(true);
+            buf.makeReadOnly();
             try (Buffer slice = buf.slice()) {
                 assertTrue(slice.readOnly());
             }
@@ -720,7 +720,7 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(16)) {
             buf.writeLong(0x0102030405060708L);
-            buf.readOnly(true);
+            buf.makeReadOnly();
             try (Buffer split = buf.split()) {
                 assertTrue(split.readOnly());
                 assertTrue(buf.readOnly());

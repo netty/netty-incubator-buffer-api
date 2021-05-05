@@ -40,6 +40,7 @@ import java.util.stream.Stream.Builder;
 
 import static io.netty.buffer.api.Fixture.Properties.CLEANER;
 import static io.netty.buffer.api.Fixture.Properties.COMPOSITE;
+import static io.netty.buffer.api.Fixture.Properties.CONST;
 import static io.netty.buffer.api.Fixture.Properties.DIRECT;
 import static io.netty.buffer.api.Fixture.Properties.HEAP;
 import static io.netty.buffer.api.Fixture.Properties.POOLED;
@@ -55,6 +56,8 @@ import static org.junit.jupiter.api.Assertions.fail;
 public abstract class BufferTestSupport {
     public static ExecutorService executor;
 
+    private static final Memoize<Fixture[]> INITIAL_NO_CONST = new Memoize<>(
+            () -> initialFixturesForEachImplementation().stream().filter(f -> !f.isConst()).toArray(Fixture[]::new));
     private static final Memoize<Fixture[]> ALL_COMBINATIONS = new Memoize<>(
             () -> fixtureCombinations().toArray(Fixture[]::new));
     private static final Memoize<Fixture[]> ALL_ALLOCATORS = new Memoize<>(
@@ -127,6 +130,10 @@ public abstract class BufferTestSupport {
         return POOLED_DIRECT_ALLOCS.get();
     }
 
+    static Fixture[] initialNoConstAllocators() {
+        return INITIAL_NO_CONST.get();
+    }
+
     static List<Fixture> initialAllocators() {
         return List.of(
                 new Fixture("heap", BufferAllocator::heap, HEAP),
@@ -135,7 +142,7 @@ public abstract class BufferTestSupport {
                 new Fixture("pooledDirect", BufferAllocator::pooledDirect, POOLED, DIRECT, CLEANER));
     }
 
-    private static Stream<Fixture> fixtureCombinations() {
+    static List<Fixture> initialFixturesForEachImplementation() {
         List<Fixture> initFixtures = initialAllocators();
 
         // Multiply by all MemoryManagers.
@@ -144,12 +151,17 @@ public abstract class BufferTestSupport {
             loadableManagers.add(provider.get());
         });
         initFixtures = initFixtures.stream().flatMap(f -> {
-            Stream.Builder<Fixture> builder = Stream.builder();
+            Builder<Fixture> builder = Stream.builder();
             for (MemoryManagers managers : loadableManagers) {
                 builder.add(new Fixture(f + "/" + managers, () -> using(managers, f), f.getProperties()));
             }
             return builder.build();
         }).toList();
+        return initFixtures;
+    }
+
+    private static Stream<Fixture> fixtureCombinations() {
+        List<Fixture> initFixtures = initialFixturesForEachImplementation();
 
         Builder<Fixture> builder = Stream.builder();
         initFixtures.forEach(builder);
@@ -244,8 +256,7 @@ public abstract class BufferTestSupport {
 
         var stream = builder.build();
         return stream.flatMap(BufferTestSupport::injectSplits)
-                     .flatMap(BufferTestSupport::injectSlices)
-                     .flatMap(BufferTestSupport::injectReadOnlyToggling);
+                     .flatMap(BufferTestSupport::injectSlices);
     }
 
     private static Stream<Fixture> injectSplits(Fixture f) {
@@ -307,26 +318,6 @@ public abstract class BufferTestSupport {
                 }
             };
         }, props));
-        return builder.build();
-    }
-
-    private static Stream<Fixture> injectReadOnlyToggling(Fixture f) {
-        Builder<Fixture> builder = Stream.builder();
-        builder.add(f);
-        builder.add(new Fixture(f + ".readOnly(true/false)", () -> {
-            var allocatorBase = f.get();
-            return new BufferAllocator() {
-                @Override
-                public Buffer allocate(int size) {
-                    return allocatorBase.allocate(size).readOnly(true).readOnly(false);
-                }
-
-                @Override
-                public void close() {
-                    allocatorBase.close();
-                }
-            };
-        }, f.getProperties()));
         return builder.build();
     }
 
