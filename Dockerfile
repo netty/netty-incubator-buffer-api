@@ -6,15 +6,15 @@ RUN dnf -y install file findutils unzip zip libXtst-devel libXt-devel libXrender
 
 # Build panama-foreign openjdk
 WORKDIR /home/build
-RUN git clone --branch foreign-memaccess+abi https://github.com/openjdk/panama-foreign.git panama-foreign
+RUN git clone --depth 1 --branch foreign-memaccess+abi https://github.com/openjdk/panama-foreign.git panama-foreign
 WORKDIR /home/build/panama-foreign
 RUN chmod +x configure
 RUN ./configure --with-debug-level=fastdebug \
                 --with-toolchain-type=clang \
                 --with-vendor-name=jackalope \
                 --enable-warnings-as-errors=no
-RUN make images
-ENV JAVA_HOME="/home/build/panama-foreign/build/linux-x86_64-server-fastdebug/images/jdk"
+RUN make images && mv build/linux-x86_64-server-fastdebug/images/jdk /home/jdk && rm -fr *
+ENV JAVA_HOME="/home/jdk"
 
 # Prepare our own build environment
 WORKDIR /home/build
