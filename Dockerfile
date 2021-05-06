@@ -22,10 +22,11 @@ RUN curl https://downloads.apache.org/maven/maven-3/3.6.3/binaries/apache-maven-
 ENV PATH=/home/build/apache-maven-3.6.3/bin:$PATH
 
 # Prepare a snapshot of Netty 5
-RUN git clone -b master https://github.com/netty/netty.git netty
-WORKDIR /home/build/netty
-RUN mvn install -DskipTests -T1C -B -am
-WORKDIR /home/build
+RUN git clone --depth 1 -b master https://github.com/netty/netty.git netty \
+    && cd netty \
+    && mvn install -DskipTests -T1C -B -am \
+    && cd .. \
+    && rm -fr netty
 
 # Prepare our own build
 COPY pom.xml pom.xml

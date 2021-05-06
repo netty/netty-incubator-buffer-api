@@ -1,4 +1,4 @@
-.PHONY: image test dbg clean build
+.PHONY: image test dbg clean build rebuild
 .DEFAULT_GOAL := build
 
 image:

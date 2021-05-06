@@ -57,3 +57,6 @@ jobs:
         with:
           name: artifacts
           path: target/
+      # Make room for the docker layer caching to package up layers
+      - name: Cleanup
+        run: rm -fr *
