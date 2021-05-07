@@ -78,11 +78,6 @@ public abstract class BufferHolder<T extends BufferHolder<T>> implements Rc<T> {
         return buf.isOwned();
     }
 
-    @Override
-    public int countBorrows() {
-        return buf.countBorrows();
-    }
-
     @SuppressWarnings("unchecked")
     @Override
     public Send<T> send() {

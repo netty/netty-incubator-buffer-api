@@ -24,6 +24,7 @@ import io.netty.buffer.SlicedByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.buffer.api.Buffer;
 import io.netty.buffer.api.BufferAllocator;
+import io.netty.buffer.api.RcSupport;
 import io.netty.util.ByteProcessor;
 import io.netty.util.IllegalReferenceCountException;
 
@@ -212,13 +213,13 @@ public final class ByteBufAdaptor extends ByteBuf {
     public ByteBuf ensureWritable(int minWritableBytes) {
         checkAccess();
         if (writableBytes() < minWritableBytes) {
-            int borrows = buffer.countBorrows();
             try {
-                if (borrows == 0) {
+                if (buffer.isOwned()) {
                     // Good place.
                     buffer.ensureWritable(minWritableBytes);
                 } else {
                     // Highly questionable place, but ByteBuf technically allows this, so we have to emulate.
+                    int borrows = countBorrows();
                     release(borrows);
                     try {
                         buffer.ensureWritable(minWritableBytes);
@@ -1650,7 +1651,18 @@ public final class ByteBufAdaptor extends ByteBuf {
 
     @Override
     public int refCnt() {
-        return buffer.isAccessible()? 1 + buffer.countBorrows() : 0;
+        return 1 + countBorrows();
+    }
+
+    private int countBorrows() {
+        if (!buffer.isAccessible()) {
+            return -1;
+        }
+        if (buffer instanceof RcSupport) {
+            var rc = (RcSupport<?, ?>) buffer;
+            return rc.countBorrows();
+        }
+        return buffer.isOwned()? 0 : 1;
     }
 
     @Override
