@@ -607,7 +607,8 @@ public interface Buffer extends Rc<Buffer>, BufferAccessors {
      * See the <a href="#slice-split">Slice vs. Split</a> section for details on the difference between slice
      * and split.
      *
-     * @return A new buffer with independent and exclusive ownership over the read and readable bytes from this buffer.
+     * @return A new buffer with independent and exclusive ownership over the bytes from the beginning to the given
+     * offset of this buffer.
      */
     Buffer split(int splitOffset);
 
