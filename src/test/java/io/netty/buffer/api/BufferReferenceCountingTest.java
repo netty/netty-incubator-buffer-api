@@ -162,12 +162,11 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
     void sliceWithoutOffsetAndSizeWillIncreaseReferenceCount(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            int borrows = buf.countBorrows();
             try (Buffer ignored = buf.slice()) {
                 assertFalse(buf.isOwned());
                 assertThrows(IllegalStateException.class, buf::send);
             }
-            assertEquals(borrows, buf.countBorrows());
+            assertTrue(buf.isOwned());
         }
     }
 
@@ -176,12 +175,11 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
     void sliceWithOffsetAndSizeWillIncreaseReferenceCount(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            int borrows = buf.countBorrows();
             try (Buffer ignored = buf.slice(0, 8)) {
                 assertFalse(buf.isOwned());
                 assertThrows(IllegalStateException.class, buf::send);
             }
-            assertEquals(borrows, buf.countBorrows());
+            assertTrue(buf.isOwned());
         }
     }
 
@@ -253,10 +251,9 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
     void sliceWithNegativeOffsetMustThrow(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            int borrows = buf.countBorrows();
             assertThrows(IndexOutOfBoundsException.class, () -> buf.slice(-1, 1));
             // Verify that the slice is closed properly afterwards.
-            assertEquals(borrows, buf.countBorrows());
+            assertTrue(buf.isOwned());
         }
     }
 
@@ -265,10 +262,9 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
     void sliceWithNegativeSizeMustThrow(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            int borrows = buf.countBorrows();
             assertThrows(IllegalArgumentException.class, () -> buf.slice(0, -1));
             // Verify that the slice is closed properly afterwards.
-            assertEquals(borrows, buf.countBorrows());
+            assertTrue(buf.isOwned());
         }
     }
 
@@ -277,12 +273,11 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
     void sliceWithSizeGreaterThanCapacityMustThrow(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            int borrows = buf.countBorrows();
             assertThrows(IndexOutOfBoundsException.class, () -> buf.slice(0, 9));
             buf.slice(0, 8).close(); // This is still fine.
             assertThrows(IndexOutOfBoundsException.class, () -> buf.slice(1, 8));
             // Verify that the slice is closed properly afterwards.
-            assertEquals(borrows, buf.countBorrows());
+            assertTrue(buf.isOwned());
         }
     }
 
@@ -291,10 +286,9 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
     void sliceWithZeroSizeMustBeAllowed(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            int borrows = buf.countBorrows();
             buf.slice(0, 0).close(); // This is fine.
             // Verify that the slice is closed properly afterwards.
-            assertEquals(borrows, buf.countBorrows());
+            assertTrue(buf.isOwned());
         }
     }
 
@@ -303,24 +297,24 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
     public void acquireComposingAndSlicingMustIncrementBorrows(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            int borrows = buf.countBorrows();
+            int borrows = countBorrows(buf);
             try (Buffer ignored = buf.acquire()) {
-                assertEquals(borrows + 1, buf.countBorrows());
+                assertEquals(borrows + 1, countBorrows(buf));
                 try (Buffer slice = buf.slice()) {
                     assertEquals(0, slice.capacity()); // We haven't written anything, so the slice is empty.
-                    int sliceBorrows = slice.countBorrows();
-                    assertEquals(borrows + 2, buf.countBorrows());
+                    int sliceBorrows = countBorrows(slice);
+                    assertEquals(borrows + 2, countBorrows(buf));
                     try (Buffer ignored1 = CompositeBuffer.compose(allocator, buf, slice)) {
-                        assertEquals(borrows + 3, buf.countBorrows());
+                        assertEquals(borrows + 3, countBorrows(buf));
                         // Note: Slice is empty; not acquired by the composite buffer.
-                        assertEquals(sliceBorrows, slice.countBorrows());
+                        assertEquals(sliceBorrows, countBorrows(slice));
                     }
-                    assertEquals(sliceBorrows, slice.countBorrows());
-                    assertEquals(borrows + 2, buf.countBorrows());
+                    assertEquals(sliceBorrows, countBorrows(slice));
+                    assertEquals(borrows + 2, countBorrows(buf));
                 }
-                assertEquals(borrows + 1, buf.countBorrows());
+                assertEquals(borrows + 1, countBorrows(buf));
             }
-            assertEquals(borrows, buf.countBorrows());
+            assertEquals(borrows, countBorrows(buf));
         }
     }
 
@@ -330,23 +324,24 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
             buf.writeByte((byte) 1);
-            int borrows = buf.countBorrows();
+            int borrows = countBorrows(buf);
             try (Buffer ignored = buf.acquire()) {
-                assertEquals(borrows + 1, buf.countBorrows());
+                assertEquals(borrows + 1, countBorrows(buf));
                 try (Buffer slice = buf.slice()) {
                     assertEquals(1, slice.capacity());
-                    int sliceBorrows = slice.countBorrows();
-                    assertEquals(borrows + 2, buf.countBorrows());
+                    int sliceBorrows = countBorrows(slice);
+                    assertEquals(borrows + 2, countBorrows(buf));
                     try (Buffer ignored1 = CompositeBuffer.compose(allocator, buf, slice)) {
-                        assertEquals(borrows + 3, buf.countBorrows());
-                        assertEquals(sliceBorrows + 1, slice.countBorrows());
+                        assertEquals(borrows + 3, countBorrows(buf));
+                        assertEquals(sliceBorrows + 1, countBorrows(slice));
                     }
-                    assertEquals(sliceBorrows, slice.countBorrows());
-                    assertEquals(borrows + 2, buf.countBorrows());
+                    assertEquals(sliceBorrows, countBorrows(slice));
+                    assertEquals(borrows + 2, countBorrows(buf));
                 }
-                assertEquals(borrows + 1, buf.countBorrows());
+                assertEquals(borrows + 1, countBorrows(buf));
             }
-            assertEquals(borrows, buf.countBorrows());
+            assertEquals(borrows, countBorrows(buf));
+            assertTrue(buf.isOwned());
         }
     }
 

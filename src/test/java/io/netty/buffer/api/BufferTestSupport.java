@@ -970,6 +970,10 @@ public abstract class BufferTestSupport {
         return bs;
     }
 
+    public static int countBorrows(Buffer buf) {
+        return ((RcSupport<?, ?>) buf).countBorrows();
+    }
+
     public static void assertEquals(Buffer expected, Buffer actual) {
         assertThat(toByteArray(actual)).containsExactly(toByteArray(expected));
     }
