@@ -26,7 +26,7 @@ jobs:
       - name: Create Cache Key
         id: cache-key
         run: |
-          echo "::set-output name=key::$(/bin/date -u "+%Y%U")"
+          echo "::set-output name=key::$(/bin/date -u "+%Y%U-2")"
         shell: bash
 
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
@@ -57,3 +57,6 @@ jobs:
         with:
           name: artifacts
           path: target/
+      # Make room for the docker layer caching to package up layers
+      - name: Cleanup
+        run: rm -fr *
