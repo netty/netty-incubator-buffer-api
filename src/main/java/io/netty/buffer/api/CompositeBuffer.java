@@ -921,8 +921,7 @@ public final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> im
         computeBufferOffsets();
     }
 
-    @Override
-    public CompositeBuffer split(int splitOffset) {
+    private void checkSplit(int splitOffset) {
         if (splitOffset < 0) {
             throw new IllegalArgumentException("The split offset cannot be negative: " + splitOffset + '.');
         }
@@ -933,6 +932,11 @@ public final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> im
         if (!isOwned()) {
             throw new IllegalStateException("Cannot split a buffer that is not owned.");
         }
+    }
+
+    @Override
+    public CompositeBuffer split(int splitOffset) {
+        checkSplit(splitOffset);
         if (bufs.length == 0) {
             // Splitting a zero-length buffer is trivial.
             return new CompositeBuffer(allocator, bufs, unsafeGetDrop(), true).order(order);
@@ -946,6 +950,10 @@ public final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> im
             splits[splits.length - 1] = bufs[0].split(off);
         }
         computeBufferOffsets();
+        return buildSplitBuffer(splits);
+    }
+
+    private CompositeBuffer buildSplitBuffer(Buffer[] splits) {
         try {
             var compositeBuf = new CompositeBuffer(allocator, splits, unsafeGetDrop(), true);
             compositeBuf.order = order; // Preserve byte order even if splits array is empty.
@@ -956,6 +964,62 @@ public final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> im
                 split.close();
             }
         }
+    }
+
+    /**
+     * Split this buffer at a component boundary that is less than or equal to the given offset.
+     * <p>
+     * This method behaves the same as {@link #split(int)}, except no components are split.
+     *
+     * @param splitOffset The maximum split offset. The real split offset will be at a component boundary that is less
+     *                   than or equal to this offset.
+     * @return A new buffer with independent and exclusive ownership over the bytes from the beginning to a component
+     * boundary less than or equal to the given offset of this buffer.
+     */
+    public CompositeBuffer splitComponentsFloor(int splitOffset) {
+        checkSplit(splitOffset);
+        if (bufs.length == 0) {
+            // Splitting a zero-length buffer is trivial.
+            return new CompositeBuffer(allocator, bufs, unsafeGetDrop(), true).order(order);
+        }
+
+        int i = searchOffsets(splitOffset);
+        int off = splitOffset - offsets[i];
+        if (off == bufs[i].capacity()) {
+            i++;
+        }
+        Buffer[] splits = Arrays.copyOf(bufs, i);
+        bufs = Arrays.copyOfRange(bufs, i, bufs.length);
+        computeBufferOffsets();
+        return buildSplitBuffer(splits);
+    }
+
+    /**
+     * Split this buffer at a component boundary that is greater than or equal to the given offset.
+     * <p>
+     * This method behaves the same as {@link #split(int)}, except no components are split.
+     *
+     * @param splitOffset The minimum split offset. The real split offset will be at a component boundary that is
+     *                   greater than or equal to this offset.
+     * @return A new buffer with independent and exclusive ownership over the bytes from the beginning to a component
+     * boundary greater than or equal to the given offset of this buffer.
+     */
+    public CompositeBuffer splitComponentsCeil(int splitOffset) {
+        checkSplit(splitOffset);
+        if (bufs.length == 0) {
+            // Splitting a zero-length buffer is trivial.
+            return new CompositeBuffer(allocator, bufs, unsafeGetDrop(), true).order(order);
+        }
+
+        int i = searchOffsets(splitOffset);
+        int off = splitOffset - offsets[i];
+        if (0 < off && off <= bufs[i].capacity()) {
+            i++;
+        }
+        Buffer[] splits = Arrays.copyOf(bufs, i);
+        bufs = Arrays.copyOfRange(bufs, i, bufs.length);
+        computeBufferOffsets();
+        return buildSplitBuffer(splits);
     }
 
     @Override

@@ -29,7 +29,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class BufferCompositionTest extends BufferTestSupport {
-
     @Test
     public void compositeBufferCanOnlyBeOwnedWhenAllConstituentBuffersAreOwned() {
         try (BufferAllocator allocator = BufferAllocator.heap()) {
@@ -467,6 +466,246 @@ public class BufferCompositionTest extends BufferTestSupport {
             }
             try (composite; Buffer b = allocator.allocate(8)) {
                 assertThrows(IllegalArgumentException.class, () -> composite.extendWith(b));
+            }
+        }
+    }
+
+    @Test
+    public void splitComponentsFloorMustThrowIfCompositeBufferIsNotOwned() {
+        try (BufferAllocator allocator = BufferAllocator.heap();
+             Buffer a = allocator.allocate(8);
+             Buffer b = allocator.allocate(8);
+             CompositeBuffer composite = CompositeBuffer.compose(allocator, a, b)) {
+            assertThrows(IllegalStateException.class, () -> composite.splitComponentsFloor(0));
+            assertThrows(IllegalStateException.class, () -> composite.splitComponentsFloor(4));
+            assertThrows(IllegalStateException.class, () -> composite.splitComponentsFloor(7));
+            assertThrows(IllegalStateException.class, () -> composite.splitComponentsFloor(8));
+            assertThrows(IllegalStateException.class, () -> composite.splitComponentsFloor(9));
+            assertThrows(IllegalStateException.class, () -> composite.splitComponentsFloor(12));
+            assertThrows(IllegalStateException.class, () -> composite.splitComponentsFloor(16));
+        }
+    }
+
+    @Test
+    public void splitComponentsCeilMustThrowIfCompositeBufferIsNotOwned() {
+        try (BufferAllocator allocator = BufferAllocator.heap();
+             Buffer a = allocator.allocate(8);
+             Buffer b = allocator.allocate(8);
+             CompositeBuffer composite = CompositeBuffer.compose(allocator, a, b)) {
+            assertThrows(IllegalStateException.class, () -> composite.splitComponentsCeil(0));
+            assertThrows(IllegalStateException.class, () -> composite.splitComponentsCeil(4));
+            assertThrows(IllegalStateException.class, () -> composite.splitComponentsCeil(7));
+            assertThrows(IllegalStateException.class, () -> composite.splitComponentsCeil(8));
+            assertThrows(IllegalStateException.class, () -> composite.splitComponentsCeil(9));
+            assertThrows(IllegalStateException.class, () -> composite.splitComponentsCeil(12));
+            assertThrows(IllegalStateException.class, () -> composite.splitComponentsCeil(16));
+        }
+    }
+
+    @Test
+    public void splitComponentsFloorMustThrowOnOutOfBounds() {
+        try (BufferAllocator allocator = BufferAllocator.heap();
+             CompositeBuffer composite = CompositeBuffer.compose(allocator,
+                     allocator.allocate(8).send(),
+                     allocator.allocate(8).send())) {
+            assertThrows(IllegalArgumentException.class, () -> composite.splitComponentsFloor(-1));
+            assertThrows(IllegalArgumentException.class, () -> composite.splitComponentsFloor(17));
+            try (CompositeBuffer split = composite.splitComponentsFloor(16)) {
+                assertThat(split.capacity()).isEqualTo(16);
+                assertThat(composite.capacity()).isZero();
+            }
+        }
+    }
+
+    @Test
+    public void splitComponentsCeilMustThrowOnOutOfBounds() {
+        try (BufferAllocator allocator = BufferAllocator.heap();
+             CompositeBuffer composite = CompositeBuffer.compose(allocator,
+                     allocator.allocate(8).send(),
+                     allocator.allocate(8).send())) {
+            assertThrows(IllegalArgumentException.class, () -> composite.splitComponentsCeil(-1));
+            assertThrows(IllegalArgumentException.class, () -> composite.splitComponentsCeil(17));
+            try (CompositeBuffer split = composite.splitComponentsCeil(16)) {
+                assertThat(split.capacity()).isEqualTo(16);
+                assertThat(composite.capacity()).isZero();
+            }
+        }
+    }
+
+    @Test
+    public void splitComponentsFloorMustGiveEmptyBufferForOffsetInFirstComponent() {
+        try (BufferAllocator allocator = BufferAllocator.heap();
+             CompositeBuffer composite = CompositeBuffer.compose(allocator,
+                     allocator.allocate(8).send(),
+                     allocator.allocate(8).send())) {
+            try (CompositeBuffer split = composite.splitComponentsFloor(4)) {
+                assertTrue(split.isOwned());
+                assertTrue(split.isAccessible());
+                assertThat(split.capacity()).isZero();
+
+                assertTrue(composite.isOwned());
+                assertTrue(composite.isAccessible());
+                assertThat(composite.capacity()).isEqualTo(16);
+            }
+        }
+    }
+
+    @Test
+    public void splitComponentsFloorMustGiveEmptyBufferForOffsetLastByteInFirstComponent() {
+        try (BufferAllocator allocator = BufferAllocator.heap();
+             CompositeBuffer composite = CompositeBuffer.compose(allocator,
+                     allocator.allocate(8).send(),
+                     allocator.allocate(8).send())) {
+            try (CompositeBuffer split = composite.splitComponentsFloor(7)) {
+                assertTrue(split.isOwned());
+                assertTrue(split.isAccessible());
+                assertThat(split.capacity()).isZero();
+
+                assertTrue(composite.isOwned());
+                assertTrue(composite.isAccessible());
+                assertThat(composite.capacity()).isEqualTo(16);
+            }
+        }
+    }
+
+    @Test
+    public void splitComponentsFloorMustGiveBufferWithFirstComponentForOffsetInSecondComponent() {
+        try (BufferAllocator allocator = BufferAllocator.heap();
+             CompositeBuffer composite = CompositeBuffer.compose(allocator,
+                     allocator.allocate(8).send(),
+                     allocator.allocate(8).send())) {
+            try (CompositeBuffer split = composite.splitComponentsFloor(12)) {
+                assertTrue(split.isOwned());
+                assertTrue(split.isAccessible());
+                assertThat(split.capacity()).isEqualTo(8);
+
+                assertTrue(composite.isOwned());
+                assertTrue(composite.isAccessible());
+                assertThat(composite.capacity()).isEqualTo(8);
+            }
+        }
+    }
+
+    @Test
+    public void splitComponentsFloorMustGiveBufferWithFirstComponentForOffsetOnFirstByteInSecondComponent() {
+        try (BufferAllocator allocator = BufferAllocator.heap();
+             CompositeBuffer composite = CompositeBuffer.compose(allocator,
+                     allocator.allocate(8).send(),
+                     allocator.allocate(8).send())) {
+            try (CompositeBuffer split = composite.splitComponentsFloor(8)) {
+                assertTrue(split.isOwned());
+                assertTrue(split.isAccessible());
+                assertThat(split.capacity()).isEqualTo(8);
+
+                assertTrue(composite.isOwned());
+                assertTrue(composite.isAccessible());
+                assertThat(composite.capacity()).isEqualTo(8);
+            }
+        }
+    }
+
+    @Test
+    public void splitComponentsCeilMustGiveBufferWithFirstComponenForOffsetInFirstComponent() {
+        try (BufferAllocator allocator = BufferAllocator.heap();
+             CompositeBuffer composite = CompositeBuffer.compose(allocator,
+                     allocator.allocate(8).send(),
+                     allocator.allocate(8).send())) {
+            try (CompositeBuffer split = composite.splitComponentsCeil(4)) {
+                assertTrue(split.isOwned());
+                assertTrue(split.isAccessible());
+                assertThat(split.capacity()).isEqualTo(8);
+
+                assertTrue(composite.isOwned());
+                assertTrue(composite.isAccessible());
+                assertThat(composite.capacity()).isEqualTo(8);
+            }
+        }
+    }
+
+    @Test
+    public void splitComponentsCeilMustGiveBufferWithFirstComponentFofOffsetOnLastByteInFirstComponent() {
+        try (BufferAllocator allocator = BufferAllocator.heap();
+             CompositeBuffer composite = CompositeBuffer.compose(allocator,
+                     allocator.allocate(8).send(),
+                     allocator.allocate(8).send())) {
+            try (CompositeBuffer split = composite.splitComponentsCeil(7)) {
+                assertTrue(split.isOwned());
+                assertTrue(split.isAccessible());
+                assertThat(split.capacity()).isEqualTo(8);
+
+                assertTrue(composite.isOwned());
+                assertTrue(composite.isAccessible());
+                assertThat(composite.capacity()).isEqualTo(8);
+            }
+        }
+    }
+
+    @Test
+    public void splitComponentsCeilMustGiveBufferWithFirstAndSecondComponentForfOffsetInSecondComponent() {
+        try (BufferAllocator allocator = BufferAllocator.heap();
+             CompositeBuffer composite = CompositeBuffer.compose(allocator,
+                     allocator.allocate(8).send(),
+                     allocator.allocate(8).send())) {
+            try (CompositeBuffer split = composite.splitComponentsCeil(12)) {
+                assertTrue(split.isOwned());
+                assertTrue(split.isAccessible());
+                assertThat(split.capacity()).isEqualTo(16);
+
+                assertTrue(composite.isOwned());
+                assertTrue(composite.isAccessible());
+                assertThat(composite.capacity()).isEqualTo(0);
+            }
+        }
+
+        try (BufferAllocator allocator = BufferAllocator.heap();
+             CompositeBuffer composite = CompositeBuffer.compose(allocator,
+                     allocator.allocate(8).send(),
+                     allocator.allocate(8).send(),
+                     allocator.allocate(8).send())) {
+            try (CompositeBuffer split = composite.splitComponentsCeil(12)) {
+                assertTrue(split.isOwned());
+                assertTrue(split.isAccessible());
+                assertThat(split.capacity()).isEqualTo(16);
+
+                assertTrue(composite.isOwned());
+                assertTrue(composite.isAccessible());
+                assertThat(composite.capacity()).isEqualTo(8);
+            }
+        }
+    }
+
+    @Test
+    public void splitComponentsCeilMustGiveBufferWithFirstComponentForfOffsetOnFirstByteInSecondComponent() {
+        try (BufferAllocator allocator = BufferAllocator.heap();
+             CompositeBuffer composite = CompositeBuffer.compose(allocator,
+                     allocator.allocate(8).send(),
+                     allocator.allocate(8).send())) {
+            try (CompositeBuffer split = composite.splitComponentsCeil(7)) {
+                assertTrue(split.isOwned());
+                assertTrue(split.isAccessible());
+                assertThat(split.capacity()).isEqualTo(8);
+
+                assertTrue(composite.isOwned());
+                assertTrue(composite.isAccessible());
+                assertThat(composite.capacity()).isEqualTo(8);
+            }
+        }
+    }
+
+    @Test
+    public void splitComponentsCeilMustGiveEmptyBufferForOffsetOnFirstByteInFirstComponent() {
+        try (BufferAllocator allocator = BufferAllocator.heap();
+             CompositeBuffer composite = CompositeBuffer.compose(allocator,
+                     allocator.allocate(8).send(),
+                     allocator.allocate(8).send())) {
+            try (CompositeBuffer split = composite.splitComponentsCeil(0)) {
+                assertTrue(split.isOwned());
+                assertTrue(split.isAccessible());
+                assertThat(split.capacity()).isZero();
+
+                assertTrue(composite.isOwned());
+                assertTrue(composite.isAccessible());
+                assertThat(composite.capacity()).isEqualTo(16);
             }
         }
     }
