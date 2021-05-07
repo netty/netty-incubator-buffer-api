@@ -82,7 +82,7 @@ class SizeClassedMemoryPool implements BufferAllocator, AllocatorControl, Drop<B
                 Object memory;
                 while ((memory = v.poll()) != null) {
                     try {
-                        dispose(recoverMemoryIntoBuffer(memory));
+                        manager.discardRecoverableMemory(memory);
                     } catch (Exception e) {
                         capturedExceptions.add(e);
                     }
@@ -99,7 +99,7 @@ class SizeClassedMemoryPool implements BufferAllocator, AllocatorControl, Drop<B
     @Override
     public void drop(Buffer buf) {
         if (closed) {
-            dispose(buf);
+            manager.drop().drop(buf);
             return;
         }
         Object mem = manager.unwrapRecoverableMemory(buf);
@@ -108,7 +108,7 @@ class SizeClassedMemoryPool implements BufferAllocator, AllocatorControl, Drop<B
         if (closed) {
             Object memory;
             while ((memory = sizeClassPool.poll()) != null) {
-                dispose(recoverMemoryIntoBuffer(memory));
+                manager.discardRecoverableMemory(memory);
             }
         }
     }
@@ -144,9 +144,5 @@ class SizeClassedMemoryPool implements BufferAllocator, AllocatorControl, Drop<B
 
     private ConcurrentLinkedQueue<Object> getSizeClassPool(int size) {
         return pool.computeIfAbsent(size, k -> new ConcurrentLinkedQueue<>());
-    }
-
-    private void dispose(Buffer buf) {
-        manager.drop().drop(buf);
     }
 }

@@ -25,4 +25,8 @@ class UnsafeMemory {
         this.address = address;
         this.size = size;
     }
+
+    public UnsafeMemory slice(int offset, int length) {
+        return new UnsafeMemory(base, address + offset, length);
+    }
 }

@@ -23,6 +23,9 @@ public interface MemoryManager {
     Drop<Buffer> drop();
     Object unwrapRecoverableMemory(Buffer buf);
     int capacityOfRecoverableMemory(Object memory);
+    void discardRecoverableMemory(Object recoverableMemory);
     // todo should recoverMemory re-attach a cleaner?
     Buffer recoverMemory(AllocatorControl allocatorControl, Object recoverableMemory, Drop<Buffer> drop);
+    Buffer recoverMemory(AllocatorControl allocatorControl, Object recoverableMemoryBase,
+                         int offset, int length, Drop<Buffer> drop);
 }

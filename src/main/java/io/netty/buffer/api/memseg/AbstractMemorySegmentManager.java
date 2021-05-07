@@ -21,6 +21,7 @@ import io.netty.buffer.api.Drop;
 import io.netty.buffer.api.MemoryManager;
 import io.netty.buffer.api.internal.ArcDrop;
 import jdk.incubator.foreign.MemorySegment;
+import jdk.incubator.foreign.ResourceScope;
 
 import java.lang.ref.Cleaner;
 
@@ -59,8 +60,25 @@ public abstract class AbstractMemorySegmentManager implements MemoryManager {
     }
 
     @Override
+    public void discardRecoverableMemory(Object recoverableMemory) {
+        var segment = (MemorySegment) recoverableMemory;
+        ResourceScope scope = segment.scope();
+        if (!scope.isImplicit()) {
+            scope.close();
+        }
+    }
+
+    @Override
     public Buffer recoverMemory(AllocatorControl allocatorControl, Object recoverableMemory, Drop<Buffer> drop) {
         var segment = (MemorySegment) recoverableMemory;
+        return new MemSegBuffer(segment, segment, convert(ArcDrop.acquire(drop)), allocatorControl);
+    }
+
+    @Override
+    public Buffer recoverMemory(AllocatorControl allocatorControl, Object recoverableMemoryBase,
+                                int offset, int length, Drop<Buffer> drop) {
+        var segment = (MemorySegment) recoverableMemoryBase;
+        segment = segment.asSlice(offset, length);
         return new MemSegBuffer(segment, segment, convert(ArcDrop.acquire(drop)), allocatorControl);
     }
 }

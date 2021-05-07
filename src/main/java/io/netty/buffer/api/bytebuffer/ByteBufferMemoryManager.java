@@ -66,8 +66,21 @@ public class ByteBufferMemoryManager implements MemoryManager {
     }
 
     @Override
+    public void discardRecoverableMemory(Object recoverableMemory) {
+        // ByteBuffers have their memory released by the GC, so there is nothing for us to do.
+    }
+
+    @Override
     public Buffer recoverMemory(AllocatorControl allocatorControl, Object recoverableMemory, Drop<Buffer> drop) {
         ByteBuffer memory = (ByteBuffer) recoverableMemory;
+        return new NioBuffer(memory, memory, allocatorControl, convert(drop));
+    }
+
+    @Override
+    public Buffer recoverMemory(AllocatorControl allocatorControl, Object recoverableMemoryBase,
+                                int offset, int length, Drop<Buffer> drop) {
+        ByteBuffer memory = (ByteBuffer) recoverableMemoryBase;
+        memory = memory.slice(offset, length);
         return new NioBuffer(memory, memory, allocatorControl, convert(drop));
     }
 }
