@@ -350,7 +350,6 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
         }
     }
 
-    @Disabled // TODO
     @ParameterizedTest
     @MethodSource("allocators")
     public void sliceMustBecomeOwnedOnSourceBufferClose(Fixture fixture) {

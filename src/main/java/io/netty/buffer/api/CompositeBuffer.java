@@ -1351,7 +1351,7 @@ public final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> im
                 for (int i = 0; i < sends.length; i++) {
                     received[i] = sends[i].receive();
                 }
-                var composite = new CompositeBuffer(allocator, received, drop, true);
+                var composite = new CompositeBuffer(allocator, received, drop, false);
                 composite.readOnly = readOnly;
                 drop.attach(composite);
                 return composite;
