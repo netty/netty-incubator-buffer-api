@@ -70,15 +70,6 @@ public interface Rc<I extends Rc<I>> extends AutoCloseable {
     boolean isOwned();
 
     /**
-     * Count the number of borrows of this object.
-     * Note that even if the number of borrows is {@code 0}, this object might not be {@linkplain #isOwned() owned}
-     * because there could be other restrictions involved in ownership.
-     *
-     * @return The number of borrows, if any, of this object.
-     */
-    int countBorrows();
-
-    /**
      * Check if this object is accessible.
      *
      * @return {@code true} if this object is still valid and can be accessed,

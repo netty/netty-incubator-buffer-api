@@ -106,7 +106,13 @@ public abstract class RcSupport<I extends Rc<I>, T extends RcSupport<I, T>> impl
         return acquires == 0;
     }
 
-    @Override
+    /**
+     * Count the number of borrows of this object.
+     * Note that even if the number of borrows is {@code 0}, this object might not be {@linkplain #isOwned() owned}
+     * because there could be other restrictions involved in ownership.
+     *
+     * @return The number of borrows, if any, of this object.
+     */
     public int countBorrows() {
         return Math.max(acquires, 0);
     }

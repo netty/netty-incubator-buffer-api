@@ -163,7 +163,6 @@ public class BufferReadOnlyTest extends BufferTestSupport {
             assertTrue(buf.isOwned());
             assertTrue(buf.isAccessible());
             assertThat(buf.countComponents()).isOne();
-            assertThat(buf.countBorrows()).isZero();
             assertEquals((byte) 1, buf.readByte());
             assertEquals((byte) 2, buf.readByte());
             assertEquals((byte) 3, buf.readByte());
