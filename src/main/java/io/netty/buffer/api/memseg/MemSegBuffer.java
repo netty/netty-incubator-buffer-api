@@ -237,16 +237,9 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
     @Override
     public ByteBuffer readableBuffer() {
         var buffer = seg.asByteBuffer();
-        if (buffer.isDirect()) {
-            // TODO Remove this when the slicing of shared, native segments JDK bug is fixed.
-            //  See https://mail.openjdk.java.net/pipermail/panama-dev/2021-January/011810.html
-            ByteBuffer tmp = ByteBuffer.allocateDirect(buffer.capacity());
-            tmp.put(buffer);
-            buffer = tmp.position(0);
-        }
         buffer = buffer.asReadOnlyBuffer();
-        // TODO avoid slicing and just set position+limit when JDK bug is fixed.
-        return buffer.slice(readerOffset(), readableBytes()).order(order);
+        buffer = buffer.position(readerOffset()).limit(readerOffset() + readableBytes());
+        return buffer.order(order);
     }
 
     @Override
@@ -277,24 +270,17 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
     @Override
     public ByteBuffer writableBuffer() {
         var buffer = wseg.asByteBuffer();
-
-        if (buffer.isDirect()) {
-            buffer = buffer.position(writerOffset()).limit(writerOffset() + writableBytes());
-        } else {
-            // TODO avoid slicing and just set position when JDK bug is fixed.
-            buffer = buffer.slice(writerOffset(), writableBytes());
-        }
+        buffer = buffer.position(writerOffset()).limit(writerOffset() + writableBytes());
         return buffer.order(order);
     }
     // </editor-fold>
 
     @Override
     public long nativeAddress() {
-        try {
+        if (seg.isNative()) {
             return seg.address().toRawLongValue();
-        } catch (UnsupportedOperationException e) {
-            return 0; // This is a heap segment.
         }
+        return 0; // This is a heap segment.
     }
 
     @Override

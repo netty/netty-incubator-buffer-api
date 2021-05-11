@@ -1244,23 +1244,7 @@ public final class ByteBufAdaptor extends ByteBuf {
             return true;
         });
 
-        int read;
-        if (isDirect()) {
-            // TODO we cannot use off-heap buffers here, until the JDK allows direct byte buffers based on native
-            //  memory segments to be used in IO operations.
-            ByteBuffer[] copies = new ByteBuffer[components.length];
-            for (int i = 0; i < copies.length; i++) {
-                copies[i] = ByteBuffer.allocateDirect(components[i].remaining());
-            }
-            read = (int) in.read(copies);
-            for (int i = 0; i < copies.length; i++) {
-                ByteBuffer copy = copies[i];
-                ByteBuffer component = components[i];
-                component.put(copy.flip()).flip();
-            }
-        } else {
-            read = (int) in.read(components);
-        }
+        int read = (int) in.read(components);
 
         if (read > 0) {
             writerIndex(read + writerIndex());
