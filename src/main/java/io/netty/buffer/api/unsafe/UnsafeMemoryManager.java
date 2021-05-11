@@ -34,6 +34,11 @@ public class UnsafeMemoryManager implements MemoryManager {
     }
 
     @Override
+    public boolean isNative() {
+        return offheap;
+    }
+
+    @Override
     public Buffer allocateShared(AllocatorControl allocatorControl, long size, Drop<Buffer> drop, Cleaner cleaner) {
         final Object base;
         final long address;
