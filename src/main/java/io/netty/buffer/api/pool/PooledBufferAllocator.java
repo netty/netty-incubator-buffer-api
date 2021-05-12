@@ -32,6 +32,7 @@ import io.netty.util.internal.ThreadExecutorMap;
 import io.netty.util.internal.logging.InternalLogger;
 import io.netty.util.internal.logging.InternalLoggerFactory;
 
+import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -283,7 +284,7 @@ public class PooledBufferAllocator implements BufferAllocator, BufferAllocatorMe
 
     @Override
     public Buffer allocate(int size) {
-        return allocate(new PooledAllocatorControl(), size);
+        return allocate(new PooledAllocatorControl(), size).order(ByteOrder.nativeOrder());
     }
 
     Buffer allocate(PooledAllocatorControl control, int size) {
