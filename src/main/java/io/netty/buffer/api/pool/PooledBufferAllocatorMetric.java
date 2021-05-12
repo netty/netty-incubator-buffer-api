@@ -5,14 +5,14 @@ import io.netty.util.internal.StringUtil;
 import java.util.List;
 
 /**
- * Exposed metric for {@link PooledByteBufAllocator}.
+ * Exposed metric for {@link PooledBufferAllocator}.
  */
 @SuppressWarnings("deprecation")
-public final class PooledByteBufAllocatorMetric implements ByteBufAllocatorMetric {
+public final class PooledBufferAllocatorMetric implements BufferAllocatorMetric {
 
-    private final PooledByteBufAllocator allocator;
+    private final PooledBufferAllocator allocator;
 
-    PooledByteBufAllocatorMetric(PooledByteBufAllocator allocator) {
+    PooledBufferAllocatorMetric(PooledBufferAllocator allocator) {
         this.allocator = allocator;
     }
 
@@ -31,7 +31,7 @@ public final class PooledByteBufAllocatorMetric implements ByteBufAllocatorMetri
     }
 
     /**
-     * Return the number of thread local caches used by this {@link PooledByteBufAllocator}.
+     * Return the number of thread local caches used by this {@link PooledBufferAllocator}.
      */
     public int numThreadLocalCaches() {
         return allocator.numThreadLocalCaches();

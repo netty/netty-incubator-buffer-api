@@ -3,7 +3,6 @@ package io.netty.buffer.api.pool;
 import static io.netty.util.internal.ObjectUtil.checkPositiveOrZero;
 import static java.util.Objects.requireNonNull;
 
-import io.netty.buffer.api.AllocatorControl;
 import io.netty.buffer.api.Buffer;
 import io.netty.buffer.api.BufferAllocator;
 import io.netty.buffer.api.MemoryManager;
@@ -23,9 +22,9 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
-public class PooledByteBufAllocator implements BufferAllocator, ByteBufAllocatorMetricProvider {
+public class PooledBufferAllocator implements BufferAllocator, BufferAllocatorMetricProvider {
 
-    private static final InternalLogger logger = InternalLoggerFactory.getInstance(PooledByteBufAllocator.class);
+    private static final InternalLogger logger = InternalLoggerFactory.getInstance(PooledBufferAllocator.class);
     private static final int DEFAULT_NUM_HEAP_ARENA;
     private static final int DEFAULT_NUM_DIRECT_ARENA;
 
@@ -152,32 +151,32 @@ public class PooledByteBufAllocator implements BufferAllocator, ByteBufAllocator
     private final List<PoolArenaMetric> arenaMetrics;
     private final PoolThreadLocalCache threadCache;
     private final int chunkSize;
-    private final PooledByteBufAllocatorMetric metric;
+    private final PooledBufferAllocatorMetric metric;
 
-    public PooledByteBufAllocator(MemoryManager manager) {
+    public PooledBufferAllocator(MemoryManager manager) {
         this(manager, manager.isNative()? DEFAULT_NUM_DIRECT_ARENA : DEFAULT_NUM_HEAP_ARENA,
                 DEFAULT_PAGE_SIZE, DEFAULT_MAX_ORDER, DEFAULT_SMALL_CACHE_SIZE,
                 DEFAULT_NORMAL_CACHE_SIZE, DEFAULT_USE_CACHE_FOR_ALL_THREADS,
                 DEFAULT_DIRECT_MEMORY_CACHE_ALIGNMENT);
     }
 
-    public PooledByteBufAllocator(MemoryManager manager, int numArenas, int pageSize, int maxOrder) {
+    public PooledBufferAllocator(MemoryManager manager, int numArenas, int pageSize, int maxOrder) {
         this(manager, numArenas, pageSize, maxOrder, DEFAULT_SMALL_CACHE_SIZE,
                 DEFAULT_NORMAL_CACHE_SIZE, DEFAULT_USE_CACHE_FOR_ALL_THREADS,
                 DEFAULT_DIRECT_MEMORY_CACHE_ALIGNMENT);
     }
 
-    public PooledByteBufAllocator(MemoryManager manager, int numArenas, int pageSize, int maxOrder,
-                                  int smallCacheSize, int normalCacheSize,
-                                  boolean useCacheForAllThreads) {
+    public PooledBufferAllocator(MemoryManager manager, int numArenas, int pageSize, int maxOrder,
+                                 int smallCacheSize, int normalCacheSize,
+                                 boolean useCacheForAllThreads) {
         this(manager, numArenas, pageSize, maxOrder,
              smallCacheSize, normalCacheSize,
              useCacheForAllThreads, DEFAULT_DIRECT_MEMORY_CACHE_ALIGNMENT);
     }
 
-    public PooledByteBufAllocator(MemoryManager manager, int numArenas, int pageSize, int maxOrder,
-                                  int smallCacheSize, int normalCacheSize,
-                                  boolean useCacheForAllThreads, int directMemoryCacheAlignment) {
+    public PooledBufferAllocator(MemoryManager manager, int numArenas, int pageSize, int maxOrder,
+                                 int smallCacheSize, int normalCacheSize,
+                                 boolean useCacheForAllThreads, int directMemoryCacheAlignment) {
         this.manager = requireNonNull(manager, "MemoryManager");
         threadCache = new PoolThreadLocalCache(useCacheForAllThreads);
         this.smallCacheSize = smallCacheSize;
@@ -225,7 +224,7 @@ public class PooledByteBufAllocator implements BufferAllocator, ByteBufAllocator
             arenaMetrics = Collections.emptyList();
         }
 
-        metric = new PooledByteBufAllocatorMetric(this);
+        metric = new PooledBufferAllocatorMetric(this);
     }
 
     private static PoolArena[] newArenaArray(int size) {
@@ -414,7 +413,7 @@ public class PooledByteBufAllocator implements BufferAllocator, ByteBufAllocator
     }
 
     @Override
-    public PooledByteBufAllocatorMetric metric() {
+    public PooledBufferAllocatorMetric metric() {
         return metric;
     }
 
@@ -426,7 +425,7 @@ public class PooledByteBufAllocator implements BufferAllocator, ByteBufAllocator
     }
 
     /**
-     * Return the number of thread local caches used by this {@link PooledByteBufAllocator}.
+     * Return the number of thread local caches used by this {@link PooledBufferAllocator}.
      */
     int numThreadLocalCaches() {
         if (arenas == null) {

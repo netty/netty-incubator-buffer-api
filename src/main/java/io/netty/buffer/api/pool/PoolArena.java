@@ -21,7 +21,7 @@ class PoolArena extends SizeClasses implements PoolArenaMetric, AllocatorControl
         Normal
     }
 
-    final PooledByteBufAllocator parent;
+    final PooledBufferAllocator parent;
     final MemoryManager manager;
 
     final int numSmallSubpagePools;
@@ -54,7 +54,7 @@ class PoolArena extends SizeClasses implements PoolArenaMetric, AllocatorControl
     // Number of thread caches backed by this arena.
     final AtomicInteger numThreadCaches = new AtomicInteger();
 
-    protected PoolArena(PooledByteBufAllocator parent, MemoryManager manager, int pageSize,
+    protected PoolArena(PooledBufferAllocator parent, MemoryManager manager, int pageSize,
                         int pageShifts, int chunkSize, int cacheAlignment) {
         super(pageSize, pageShifts, chunkSize, cacheAlignment);
         this.parent = parent;
