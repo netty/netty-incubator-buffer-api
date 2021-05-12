@@ -168,7 +168,8 @@ final class PoolChunk implements PoolChunkMetric {
     PoolChunk prev;
     PoolChunk next;
 
-    PoolChunk(PoolArena arena, Buffer base, Object memory, int pageSize, int pageShifts, int chunkSize, int maxPageIdx) {
+    PoolChunk(PoolArena arena, Buffer base, Object memory, int pageSize, int pageShifts, int chunkSize,
+              int maxPageIdx) {
         this.arena = arena;
         this.base = base;
         this.memory = memory;
