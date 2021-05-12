@@ -23,7 +23,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
-public class PooledByteBufAllocator implements BufferAllocator, ByteBufAllocatorMetricProvider, AllocatorControl {
+public class PooledByteBufAllocator implements BufferAllocator, ByteBufAllocatorMetricProvider {
 
     private static final InternalLogger logger = InternalLoggerFactory.getInstance(PooledByteBufAllocator.class);
     private static final int DEFAULT_NUM_HEAP_ARENA;
@@ -257,7 +257,7 @@ public class PooledByteBufAllocator implements BufferAllocator, ByteBufAllocator
 
         // Ensure the resulting chunkSize does not overflow.
         int chunkSize = pageSize;
-        for (int i = maxOrder; i > 0; i --) {
+        for (int i = maxOrder; i > 0; i--) {
             if (chunkSize > MAX_CHUNK_SIZE / 2) {
                 throw new IllegalArgumentException(String.format(
                         "pageSize (%d) << maxOrder (%d) must not exceed %d", pageSize, maxOrder, MAX_CHUNK_SIZE));
@@ -269,25 +269,25 @@ public class PooledByteBufAllocator implements BufferAllocator, ByteBufAllocator
 
     @Override
     public Buffer allocate(int size) {
+        return allocate(new PooledAllocatorControl(), size);
+    }
+
+    Buffer allocate(PooledAllocatorControl control, int size) {
         PoolThreadCache cache = threadCache.get();
         PoolArena arena = cache.arena;
 
         if (arena != null) {
-            return arena.allocate(cache, size);
+            return arena.allocate(control, cache, size);
         }
         BufferAllocator unpooled = manager.isNative()? BufferAllocator.direct() : BufferAllocator.heap();
         return unpooled.allocate(size);
     }
 
     @Override
-    public Object allocateUntethered(Buffer originator, int size) {
-        // TODO
-        return null;
-    }
-
-    @Override
-    public void recoverMemory(Object memory) {
-        // TODO
+    public void close() {
+        for (PoolArena arena : arenas) {
+            arena.close();
+        }
     }
 
     /**

@@ -1,5 +1,6 @@
 package io.netty.buffer.api.pool;
 
+import io.netty.buffer.api.AllocatorControl;
 import io.netty.buffer.api.Buffer;
 import io.netty.buffer.api.BufferAllocator;
 import io.netty.buffer.api.MemoryManager;
@@ -14,7 +15,7 @@ import java.util.concurrent.atomic.LongAdder;
 import static io.netty.buffer.api.pool.PoolChunk.isSubpage;
 import static java.lang.Math.max;
 
-class PoolArena extends SizeClasses implements PoolArenaMetric {
+class PoolArena extends SizeClasses implements PoolArenaMetric, AllocatorControl {
     enum SizeClass {
         Small,
         Normal
@@ -98,13 +99,13 @@ class PoolArena extends SizeClasses implements PoolArenaMetric {
         return manager.isNative();
     }
 
-    Buffer allocate(PoolThreadCache cache, int size) {
+    Buffer allocate(PooledAllocatorControl control, PoolThreadCache cache, int size) {
         final int sizeIdx = size2SizeIdx(size);
 
         if (sizeIdx <= smallMaxSizeIdx) {
-            return tcacheAllocateSmall(cache, size, sizeIdx);
+            return tcacheAllocateSmall(control, cache, size, sizeIdx);
         } else if (sizeIdx < nSizes) {
-            return tcacheAllocateNormal(cache, size, sizeIdx);
+            return tcacheAllocateNormal(control, cache, size, sizeIdx);
         } else {
             int normCapacity = directMemoryCacheAlignment > 0
                     ? normalizeSize(size) : size;
@@ -113,9 +114,9 @@ class PoolArena extends SizeClasses implements PoolArenaMetric {
         }
     }
 
-    private Buffer tcacheAllocateSmall(PoolThreadCache cache, final int size,
-                                     final int sizeIdx) {
-        Buffer buffer = cache.allocateSmall(size, sizeIdx);
+    private Buffer tcacheAllocateSmall(PooledAllocatorControl control, PoolThreadCache cache, final int size,
+                                       final int sizeIdx) {
+        Buffer buffer = cache.allocateSmall(control, size, sizeIdx);
         if (buffer != null) {
             // was able to allocate out of the cache so move on
             return buffer;
@@ -134,13 +135,13 @@ class PoolArena extends SizeClasses implements PoolArenaMetric {
                 assert s.doNotDestroy && s.elemSize == sizeIdx2size(sizeIdx);
                 long handle = s.allocate();
                 assert handle >= 0;
-                buffer = s.chunk.allocateBufferWithSubpage(handle, size, cache);
+                buffer = s.chunk.allocateBufferWithSubpage(handle, size, cache, control);
             }
         }
 
         if (needsNormalAllocation) {
             synchronized (this) {
-                buffer = allocateNormal(size, sizeIdx, cache);
+                buffer = allocateNormal(size, sizeIdx, cache, control);
             }
         }
 
@@ -148,45 +149,45 @@ class PoolArena extends SizeClasses implements PoolArenaMetric {
         return buffer;
     }
 
-    private Buffer tcacheAllocateNormal(PoolThreadCache cache, int size, int sizeIdx) {
-        Buffer buffer = cache.allocateNormal(this, size, sizeIdx);
+    private Buffer tcacheAllocateNormal(PooledAllocatorControl control, PoolThreadCache cache, int size, int sizeIdx) {
+        Buffer buffer = cache.allocateNormal(this, control, size, sizeIdx);
         if (buffer != null) {
             // was able to allocate out of the cache so move on
             return buffer;
         }
         synchronized (this) {
-            buffer = allocateNormal(size, sizeIdx, cache);
+            buffer = allocateNormal(size, sizeIdx, cache, control);
             allocationsNormal++;
         }
         return buffer;
     }
 
     // Method must be called inside synchronized(this) { ... } block
-    private Buffer allocateNormal(int size, int sizeIdx, PoolThreadCache threadCache) {
-        Buffer buffer = q050.allocate(size, sizeIdx, threadCache);
+    private Buffer allocateNormal(int size, int sizeIdx, PoolThreadCache threadCache, PooledAllocatorControl control) {
+        Buffer buffer = q050.allocate(size, sizeIdx, threadCache, control);
         if (buffer != null) {
             return buffer;
         }
-        buffer = q025.allocate(size, sizeIdx, threadCache);
+        buffer = q025.allocate(size, sizeIdx, threadCache, control);
         if (buffer != null) {
             return buffer;
         }
-        buffer = q000.allocate(size, sizeIdx, threadCache);
+        buffer = q000.allocate(size, sizeIdx, threadCache, control);
         if (buffer != null) {
             return buffer;
         }
-        buffer = qInit.allocate(size, sizeIdx, threadCache);
+        buffer = qInit.allocate(size, sizeIdx, threadCache, control);
         if (buffer != null) {
             return buffer;
         }
-        buffer = q075.allocate(size, sizeIdx, threadCache);
+        buffer = q075.allocate(size, sizeIdx, threadCache, control);
         if (buffer != null) {
             return buffer;
         }
 
         // Add a new chunk.
         PoolChunk c = newChunk(pageSize, nPSizes, pageShifts, chunkSize);
-        buffer = c.allocate(size, sizeIdx, threadCache);
+        buffer = c.allocate(size, sizeIdx, threadCache, control);
         assert buffer != null;
         qInit.add(c);
         return buffer;
@@ -247,6 +248,18 @@ class PoolArena extends SizeClasses implements PoolArenaMetric {
 
     PoolSubpage findSubpagePoolHead(int sizeIdx) {
         return smallSubpagePools[sizeIdx];
+    }
+
+    @Override
+    public Object allocateUntethered(Buffer originator, int size) {
+        throw new AssertionError("PoolChunk base buffers should never need to reallocate.");
+    }
+
+    @Override
+    public void recoverMemory(Object memory) {
+        // This means we've lost all strong references to a PoolChunk.
+        // Probably means we don't need it anymore, so just free its memory.
+        manager.discardRecoverableMemory(memory);
     }
 
     @Override
@@ -397,7 +410,7 @@ class PoolArena extends SizeClasses implements PoolArenaMetric {
     }
 
     protected final PoolChunk newChunk(int pageSize, int maxPageIdx, int pageShifts, int chunkSize) {
-        Buffer base = manager.allocateShared(parent, chunkSize, manager.drop(), Statics.CLEANER);
+        Buffer base = manager.allocateShared(this, chunkSize, manager.drop(), Statics.CLEANER);
         Object memory = manager.unwrapRecoverableMemory(base);
         return new PoolChunk(
                 this, base, memory, pageSize, pageShifts, chunkSize, maxPageIdx);
@@ -452,6 +465,15 @@ class PoolArena extends SizeClasses implements PoolArenaMetric {
                 buf.append(s);
                 s = s.next;
             } while (s != head);
+        }
+    }
+
+    public void close() {
+        for (PoolSubpage page : smallSubpagePools) {
+            page.destroy();
+        }
+        for (PoolChunkList list : new PoolChunkList[] {qInit, q000, q025, q050, q100}) {
+            list.destroy();
         }
     }
 }

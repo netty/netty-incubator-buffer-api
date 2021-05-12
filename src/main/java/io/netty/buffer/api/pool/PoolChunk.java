@@ -175,20 +175,6 @@ final class PoolChunk implements PoolChunkMetric {
         insertAvailRun(0, pages, initHandle);
     }
 
-    /** Creates a special chunk that is not pooled. */
-    PoolChunk(PoolArena arena, Buffer base, Object memory, int size) {
-        unpooled = true;
-        this.arena = arena;
-        this.base = base;
-        this.memory = memory;
-        pageSize = 0;
-        pageShifts = 0;
-        runsAvailMap = null;
-        runsAvail = null;
-        subpages = null;
-        chunkSize = size;
-    }
-
     private static LongPriorityQueue[] newRunsAvailqueueArray(int size) {
         LongPriorityQueue[] queueArray = new LongPriorityQueue[size];
         for (int i = 0; i < queueArray.length; i++) {
@@ -263,7 +249,7 @@ final class PoolChunk implements PoolChunkMetric {
         return 100 - freePercentage;
     }
 
-    Buffer allocate(int size, int sizeIdx, PoolThreadCache cache) {
+    Buffer allocate(int size, int sizeIdx, PoolThreadCache cache, PooledAllocatorControl control) {
         final long handle;
         if (sizeIdx <= arena.smallMaxSizeIdx) {
             // small
@@ -282,7 +268,7 @@ final class PoolChunk implements PoolChunkMetric {
             }
         }
 
-        return allocateBuffer(handle, size, cache);
+        return allocateBuffer(handle, size, cache, control);
     }
 
     private long allocateRun(int runSize) {
@@ -514,23 +500,25 @@ final class PoolChunk implements PoolChunkMetric {
                | (long) inUsed << IS_USED_SHIFT;
     }
 
-    Buffer allocateBuffer(long handle, int size, PoolThreadCache threadCache) {
+    Buffer allocateBuffer(long handle, int size, PoolThreadCache threadCache, PooledAllocatorControl control) {
         if (isRun(handle)) {
             int offset = runOffset(handle) << pageShifts;
             int maxLength = runSize(pageShifts, handle);
             PoolThreadCache poolThreadCache = arena.parent.threadCache();
-            return arena.manager.recoverMemory(arena.parent, memory, offset, size, new Drop<Buffer>() {
+            initAllocatorControl(control, poolThreadCache, handle, maxLength, offset, size);
+            return arena.manager.recoverMemory(control, memory, offset, size, new Drop<Buffer>() {
                 @Override
                 public void drop(Buffer obj) {
                     arena.free(PoolChunk.this, handle, maxLength, poolThreadCache);
                 }
             });
         } else {
-            return allocateBufferWithSubpage(handle, size, threadCache);
+            return allocateBufferWithSubpage(handle, size, threadCache, control);
         }
     }
 
-    Buffer allocateBufferWithSubpage(long handle, int size, PoolThreadCache threadCache) {
+    Buffer allocateBufferWithSubpage(long handle, int size, PoolThreadCache threadCache,
+                                     PooledAllocatorControl control) {
         int runOffset = runOffset(handle);
         int bitmapIdx = bitmapIdx(handle);
 
@@ -539,12 +527,25 @@ final class PoolChunk implements PoolChunkMetric {
         assert size <= s.elemSize;
 
         int offset = (runOffset << pageShifts) + bitmapIdx * s.elemSize;
-        return arena.manager.recoverMemory(arena.parent, memory, offset, size, new Drop<Buffer>() {
+        initAllocatorControl(control, threadCache, handle, s.elemSize, offset, size);
+        return arena.manager.recoverMemory(control, memory, offset, size, new Drop<Buffer>() {
             @Override
             public void drop(Buffer obj) {
                 arena.free(PoolChunk.this, handle, s.elemSize, threadCache);
             }
         });
+    }
+
+    private void initAllocatorControl(PooledAllocatorControl control, PoolThreadCache threadCache, long handle,
+                                      int normSize, int offset, int size) {
+        control.arena = arena;
+        control.chunk = this;
+        control.threadCache = threadCache;
+        control.handle = handle;
+        control.normSize = normSize;
+        control.memory = memory;
+        control.offset = offset;
+        control.size = size;
     }
 
     @Override

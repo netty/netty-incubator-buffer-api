@@ -76,7 +76,7 @@ final class PoolChunkList implements PoolChunkListMetric {
         this.prevList = prevList;
     }
 
-    Buffer allocate(int size, int sizeIdx, PoolThreadCache threadCache) {
+    Buffer allocate(int size, int sizeIdx, PoolThreadCache threadCache, PooledAllocatorControl control) {
         int normCapacity = arena.sizeIdx2size(sizeIdx);
         if (normCapacity > maxCapacity) {
             // Either this PoolChunkList is empty, or the requested capacity is larger than the capacity which can
@@ -85,7 +85,7 @@ final class PoolChunkList implements PoolChunkListMetric {
         }
 
         for (PoolChunk cur = head; cur != null; cur = cur.next) {
-            Buffer buffer = cur.allocate(size, sizeIdx, threadCache);
+            Buffer buffer = cur.allocate(size, sizeIdx, threadCache, control);
             if (buffer != null) {
                 if (cur.freeBytes <= freeMinThreshold) {
                     remove(cur);
@@ -223,10 +223,10 @@ final class PoolChunkList implements PoolChunkListMetric {
         return buf.toString();
     }
 
-    void destroy(PoolArena arena) {
+    void destroy() {
         PoolChunk chunk = head;
         while (chunk != null) {
-            arena.destroyChunk(chunk);
+            chunk.destroy();
             chunk = chunk.next;
         }
         head = null;

@@ -106,24 +106,24 @@ final class PoolThreadCache {
     /**
      * Try to allocate a small buffer out of the cache. Returns {@code true} if successful {@code false} otherwise
      */
-    Buffer allocateSmall(int size, int sizeIdx) {
-        return allocate(cacheForSmall(sizeIdx), size);
+    Buffer allocateSmall(PooledAllocatorControl control, int size, int sizeIdx) {
+        return allocate(cacheForSmall(sizeIdx), control, size);
     }
 
     /**
      * Try to allocate a normal buffer out of the cache. Returns {@code true} if successful {@code false} otherwise
      */
-    Buffer allocateNormal(PoolArena area, int size, int sizeIdx) {
-        return allocate(cacheForNormal(area, sizeIdx), size);
+    Buffer allocateNormal(PoolArena area, PooledAllocatorControl control, int size, int sizeIdx) {
+        return allocate(cacheForNormal(area, sizeIdx), control, size);
     }
 
-    private Buffer allocate(MemoryRegionCache cache, int size) {
+    private Buffer allocate(MemoryRegionCache cache, PooledAllocatorControl control, int size) {
         if (cache == null) {
             // no cache found so just return false here
             return null;
         }
-        Buffer allocated = cache.allocate(size, this);
-        if (++ allocations >= freeSweepAllocationThreshold) {
+        Buffer allocated = cache.allocate(size, this, control);
+        if (++allocations >= freeSweepAllocationThreshold) {
             allocations = 0;
             trim();
         }
@@ -237,8 +237,9 @@ final class PoolThreadCache {
         }
 
         @Override
-        protected Buffer allocBuf(PoolChunk chunk, long handle, int size, PoolThreadCache threadCache) {
-            return chunk.allocateBufferWithSubpage(handle, size, threadCache);
+        protected Buffer allocBuf(PoolChunk chunk, long handle, int size, PoolThreadCache threadCache,
+                                  PooledAllocatorControl control) {
+            return chunk.allocateBufferWithSubpage(handle, size, threadCache, control);
         }
     }
 
@@ -251,8 +252,9 @@ final class PoolThreadCache {
         }
 
         @Override
-        protected Buffer allocBuf(PoolChunk chunk, long handle, int size, PoolThreadCache threadCache) {
-            return chunk.allocateBuffer(handle, size, threadCache);
+        protected Buffer allocBuf(PoolChunk chunk, long handle, int size, PoolThreadCache threadCache,
+                                  PooledAllocatorControl control) {
+            return chunk.allocateBuffer(handle, size, threadCache, control);
         }
     }
 
@@ -271,7 +273,8 @@ final class PoolThreadCache {
         /**
          * Allocate a new {@link Buffer} using the provided chunk and handle with the capacity restrictions.
          */
-        protected abstract Buffer allocBuf(PoolChunk chunk, long handle, int size, PoolThreadCache threadCache);
+        protected abstract Buffer allocBuf(PoolChunk chunk, long handle, int size, PoolThreadCache threadCache,
+                                           PooledAllocatorControl control);
 
         /**
          * Add to cache if not already full.
@@ -290,12 +293,12 @@ final class PoolThreadCache {
         /**
          * Allocate something out of the cache if possible and remove the entry from the cache.
          */
-        public final Buffer allocate(int size, PoolThreadCache threadCache) {
+        public final Buffer allocate(int size, PoolThreadCache threadCache, PooledAllocatorControl control) {
             Entry entry = queue.poll();
             if (entry == null) {
                 return null;
             }
-            Buffer buffer = allocBuf(entry.chunk, entry.handle, size, threadCache);
+            Buffer buffer = allocBuf(entry.chunk, entry.handle, size, threadCache, control);
             entry.recycle();
 
             // allocations are not thread-safe which is fine as this is only called from the same thread all time.
