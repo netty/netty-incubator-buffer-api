@@ -220,20 +220,12 @@ class PoolArena extends SizeClasses implements PoolArenaMetric, AllocatorControl
     }
 
     void free(PoolChunk chunk, long handle, int normCapacity, PoolThreadCache cache) {
-        if (chunk.unpooled) {
-            int size = chunk.chunkSize();
-            chunk.destroy();
-            activeBytesHuge.add(-size);
-            deallocationsHuge.increment();
-        } else {
-            SizeClass sizeClass = sizeClass(handle);
-            if (cache != null && cache.add(this, chunk, handle, normCapacity, sizeClass)) {
-                // cached so not free it.
-                return;
-            }
-
-            freeChunk(chunk, handle, normCapacity, sizeClass);
+        SizeClass sizeClass = sizeClass(handle);
+        if (cache != null && cache.add(this, chunk, handle, normCapacity, sizeClass)) {
+            // cached so not free it.
+            return;
         }
+        freeChunk(chunk, handle, normCapacity, sizeClass);
     }
 
     private static SizeClass sizeClass(long handle) {

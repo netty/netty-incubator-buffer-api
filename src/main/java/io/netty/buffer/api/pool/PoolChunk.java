@@ -16,7 +16,6 @@
 package io.netty.buffer.api.pool;
 
 import io.netty.buffer.api.Buffer;
-import io.netty.buffer.api.Drop;
 
 import java.util.PriorityQueue;
 
@@ -143,7 +142,6 @@ final class PoolChunk implements PoolChunkMetric {
     final PoolArena arena;
     final Buffer base; // The buffer that is the source of the memory. Closing it will free the memory.
     final Object memory;
-    final boolean unpooled;
 
     /**
      * store the first page and last page of each avail run
@@ -171,7 +169,6 @@ final class PoolChunk implements PoolChunkMetric {
     PoolChunk next;
 
     PoolChunk(PoolArena arena, Buffer base, Object memory, int pageSize, int pageShifts, int chunkSize, int maxPageIdx) {
-        unpooled = false;
         this.arena = arena;
         this.base = base;
         this.memory = memory;
@@ -520,13 +517,9 @@ final class PoolChunk implements PoolChunkMetric {
             int offset = runOffset(handle) << pageShifts;
             int maxLength = runSize(pageShifts, handle);
             PoolThreadCache poolThreadCache = arena.parent.threadCache();
-            initAllocatorControl(control, poolThreadCache, handle, maxLength, offset, size);
-            return arena.manager.recoverMemory(control, memory, offset, size, new Drop<Buffer>() {
-                @Override
-                public void drop(Buffer obj) {
-                    arena.free(PoolChunk.this, handle, maxLength, poolThreadCache);
-                }
-            });
+            initAllocatorControl(control, poolThreadCache, handle, maxLength);
+            return arena.manager.recoverMemory(control, memory, offset, size,
+                    new PooledDrop(control, arena, this, poolThreadCache, handle, maxLength));
         } else {
             return allocateBufferWithSubpage(handle, size, threadCache, control);
         }
@@ -542,25 +535,19 @@ final class PoolChunk implements PoolChunkMetric {
         assert size <= s.elemSize;
 
         int offset = (runOffset << pageShifts) + bitmapIdx * s.elemSize;
-        initAllocatorControl(control, threadCache, handle, s.elemSize, offset, size);
-        return arena.manager.recoverMemory(control, memory, offset, size, new Drop<Buffer>() {
-            @Override
-            public void drop(Buffer obj) {
-                arena.free(PoolChunk.this, handle, s.elemSize, threadCache);
-            }
-        });
+        initAllocatorControl(control, threadCache, handle, s.elemSize);
+        return arena.manager.recoverMemory(control, memory, offset, size,
+                new PooledDrop(control, arena, this, threadCache, handle, s.elemSize));
     }
 
     private void initAllocatorControl(PooledAllocatorControl control, PoolThreadCache threadCache, long handle,
-                                      int normSize, int offset, int size) {
+                                      int normSize) {
         control.arena = arena;
         control.chunk = this;
         control.threadCache = threadCache;
         control.handle = handle;
         control.normSize = normSize;
-        control.memory = memory;
-        control.offset = offset;
-        control.size = size;
+        control.updates++;
     }
 
     @Override

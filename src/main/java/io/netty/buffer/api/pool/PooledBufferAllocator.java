@@ -45,7 +45,7 @@ public class PooledBufferAllocator implements BufferAllocator, BufferAllocatorMe
     private static final int DEFAULT_NUM_DIRECT_ARENA;
 
     private static final int DEFAULT_PAGE_SIZE;
-    private static final int DEFAULT_MAX_ORDER; // 8192 << 11 = 16 MiB per chunk
+    private static final int DEFAULT_MAX_ORDER; // 8192 << 9 = 4 MiB per chunk
     private static final int DEFAULT_SMALL_CACHE_SIZE;
     private static final int DEFAULT_NORMAL_CACHE_SIZE;
     static final int DEFAULT_MAX_CACHED_BUFFER_CAPACITY;
@@ -75,7 +75,7 @@ public class PooledBufferAllocator implements BufferAllocator, BufferAllocatorMe
         DEFAULT_PAGE_SIZE = defaultPageSize;
         DEFAULT_DIRECT_MEMORY_CACHE_ALIGNMENT = defaultAlignment;
 
-        int defaultMaxOrder = SystemPropertyUtil.getInt("io.netty.allocator.maxOrder", 11);
+        int defaultMaxOrder = SystemPropertyUtil.getInt("io.netty.allocator.maxOrder", 9);
         Throwable maxOrderFallbackCause = null;
         try {
             validateAndCalculateChunkSize(DEFAULT_PAGE_SIZE, defaultMaxOrder);
@@ -284,7 +284,10 @@ public class PooledBufferAllocator implements BufferAllocator, BufferAllocatorMe
 
     @Override
     public Buffer allocate(int size) {
-        return allocate(new PooledAllocatorControl(), size).order(ByteOrder.nativeOrder());
+        if (size < 1) {
+            throw new IllegalArgumentException("Allocation size must be positive, but was " + size + '.');
+        }
+        return allocate(new PooledAllocatorControl(), size);
     }
 
     Buffer allocate(PooledAllocatorControl control, int size) {
@@ -292,7 +295,7 @@ public class PooledBufferAllocator implements BufferAllocator, BufferAllocatorMe
         PoolArena arena = cache.arena;
 
         if (arena != null) {
-            return arena.allocate(control, cache, size);
+            return arena.allocate(control, cache, size).fill((byte) 0).order(ByteOrder.nativeOrder());
         }
         BufferAllocator unpooled = manager.isNative()? BufferAllocator.direct() : BufferAllocator.heap();
         return unpooled.allocate(size);
@@ -300,9 +303,11 @@ public class PooledBufferAllocator implements BufferAllocator, BufferAllocatorMe
 
     @Override
     public void close() {
+        trimCurrentThreadCache();
         for (PoolArena arena : arenas) {
             arena.close();
         }
+        threadCache.remove();
     }
 
     /**

@@ -24,9 +24,7 @@ class PooledAllocatorControl implements AllocatorControl {
     public PoolThreadCache threadCache;
     public long handle;
     public int normSize;
-    public Object memory;
-    public int offset;
-    public int size;
+    public int updates;
 
     @Override
     public Object allocateUntethered(Buffer originator, int size) {

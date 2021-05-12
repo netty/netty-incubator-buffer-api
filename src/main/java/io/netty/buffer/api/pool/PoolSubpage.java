@@ -108,7 +108,7 @@ final class PoolSubpage implements PoolSubpageMetric {
 
         setNextAvail(bitmapIdx);
 
-        if (numAvail ++ == 0) {
+        if (numAvail++ == 0) {
             addToPool(head);
             // When maxNumElems == 1, the maximum numAvail is also 1.
             // Each of these PoolSubpages will go in here when they do free operation.
