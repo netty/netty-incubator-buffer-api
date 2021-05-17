@@ -289,6 +289,7 @@ public class PooledBufferAllocator implements BufferAllocator, BufferAllocatorMe
             throw new IllegalArgumentException("Allocation size must be positive, but was " + size + '.');
         }
         PooledAllocatorControl control = new PooledAllocatorControl();
+        control.parent = this;
         UntetheredMemory memory = allocate(control, size);
         Buffer buffer = manager.recoverMemory(control, memory.memory(), memory.drop());
         return buffer.fill((byte) 0).order(ByteOrder.nativeOrder());
@@ -305,7 +306,7 @@ public class PooledBufferAllocator implements BufferAllocator, BufferAllocatorMe
     }
 
     private UntetheredMemory allocateUnpooled(int size) {
-        return new UnpooledUnthetheredMemory(manager, size);
+        return new UnpooledUnthetheredMemory(this, manager, size);
     }
 
     @Override
@@ -423,7 +424,7 @@ public class PooledBufferAllocator implements BufferAllocator, BufferAllocatorMe
             threadCache.free();
         }
 
-        private  PoolArena leastUsedArena(PoolArena[] arenas) {
+        private static PoolArena leastUsedArena(PoolArena[] arenas) {
             if (arenas == null || arenas.length == 0) {
                 return null;
             }

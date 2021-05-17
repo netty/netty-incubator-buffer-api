@@ -19,16 +19,16 @@ import io.netty.buffer.api.AllocatorControl;
 import io.netty.buffer.api.Buffer;
 
 class PooledAllocatorControl implements AllocatorControl {
+    public PooledBufferAllocator parent;
     public PoolArena arena;
     public PoolChunk chunk;
     public PoolThreadCache threadCache;
     public long handle;
     public int normSize;
-    public int updates;
 
     @Override
     public UntetheredMemory allocateUntethered(Buffer originator, int size) {
-        return arena.parent.allocate(this, size);
+        return parent.allocate(this, size);
     }
 
     @Override

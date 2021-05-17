@@ -515,14 +515,15 @@ final class PoolChunk implements PoolChunkMetric {
                | (long) inUsed << IS_USED_SHIFT;
     }
 
-    UntetheredMemory allocateBuffer(long handle, int size, PoolThreadCache threadCache, PooledAllocatorControl control) {
+    UntetheredMemory allocateBuffer(long handle, int size, PoolThreadCache threadCache,
+                                    PooledAllocatorControl control) {
         if (isRun(handle)) {
             int offset = runOffset(handle) << pageShifts;
             int maxLength = runSize(pageShifts, handle);
             PoolThreadCache poolThreadCache = arena.parent.threadCache();
             initAllocatorControl(control, poolThreadCache, handle, maxLength);
             return new UntetheredChunkAllocation(
-                    memory, control, this, poolThreadCache, handle, maxLength, offset, size);
+                    memory, this, poolThreadCache, handle, maxLength, offset, size);
         } else {
             return allocateBufferWithSubpage(handle, size, threadCache, control);
         }
@@ -539,13 +540,12 @@ final class PoolChunk implements PoolChunkMetric {
 
         int offset = (runOffset << pageShifts) + bitmapIdx * s.elemSize;
         initAllocatorControl(control, threadCache, handle, s.elemSize);
-        return new UntetheredChunkAllocation(memory, control, this, threadCache, handle, s.elemSize, offset, size);
+        return new UntetheredChunkAllocation(memory, this, threadCache, handle, s.elemSize, offset, size);
     }
 
     @SuppressWarnings("unchecked")
-    private static class UntetheredChunkAllocation implements UntetheredMemory {
+    private static final class UntetheredChunkAllocation implements UntetheredMemory {
         private final Object memory;
-        private final PooledAllocatorControl control;
         private final PoolChunk chunk;
         private final PoolThreadCache threadCache;
         private final long handle;
@@ -554,10 +554,9 @@ final class PoolChunk implements PoolChunkMetric {
         private final int size;
 
         private UntetheredChunkAllocation(
-                Object memory, PooledAllocatorControl control, PoolChunk chunk, PoolThreadCache threadCache,
+                Object memory, PoolChunk chunk, PoolThreadCache threadCache,
                 long handle, int maxLength, int offset, int size) {
             this.memory = memory;
-            this.control = control;
             this.chunk = chunk;
             this.threadCache = threadCache;
             this.handle = handle;
@@ -573,7 +572,7 @@ final class PoolChunk implements PoolChunkMetric {
 
         @Override
         public <BufferType extends Buffer> Drop<BufferType> drop() {
-            return (Drop<BufferType>) new PooledDrop(control, chunk.arena, chunk, threadCache, handle, maxLength);
+            return (Drop<BufferType>) new PooledDrop(chunk.arena, chunk, threadCache, handle, maxLength);
         }
     }
 
@@ -584,7 +583,6 @@ final class PoolChunk implements PoolChunkMetric {
         control.threadCache = threadCache;
         control.handle = handle;
         control.normSize = normSize;
-        control.updates++;
     }
 
     @Override

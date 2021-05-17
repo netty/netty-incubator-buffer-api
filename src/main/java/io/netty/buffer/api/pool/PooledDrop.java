@@ -19,16 +19,13 @@ import io.netty.buffer.api.Buffer;
 import io.netty.buffer.api.Drop;
 
 class PooledDrop implements Drop<Buffer> {
-    private final PooledAllocatorControl control;
-    private PoolArena arena;
-    private PoolChunk chunk;
-    private PoolThreadCache threadCache;
-    private long handle;
-    private int normSize;
+    private final PoolArena arena;
+    private final PoolChunk chunk;
+    private final PoolThreadCache threadCache;
+    private final long handle;
+    private final int normSize;
 
-    PooledDrop(PooledAllocatorControl control, PoolArena arena, PoolChunk chunk, PoolThreadCache threadCache,
-               long handle, int normSize) {
-        this.control = control;
+    PooledDrop(PoolArena arena, PoolChunk chunk, PoolThreadCache threadCache, long handle, int normSize) {
         this.arena = arena;
         this.chunk = chunk;
         this.threadCache = threadCache;
@@ -39,17 +36,5 @@ class PooledDrop implements Drop<Buffer> {
     @Override
     public void drop(Buffer obj) {
         arena.free(chunk, handle, normSize, threadCache);
-    }
-
-    @Override
-    public void attach(Buffer obj) {
-        if (control.updates > 0) {
-            arena = control.arena;
-            chunk = control.chunk;
-            threadCache = control.threadCache;
-            handle = control.handle;
-            normSize = control.normSize;
-            control.updates = 0;
-        }
     }
 }

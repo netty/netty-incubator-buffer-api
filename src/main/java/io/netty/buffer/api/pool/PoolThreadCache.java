@@ -288,8 +288,8 @@ final class PoolThreadCache {
         /**
          * Allocate a new {@link UntetheredMemory} using the provided chunk and handle with the capacity restrictions.
          */
-        protected abstract UntetheredMemory allocBuf(PoolChunk chunk, long handle, int size, PoolThreadCache threadCache,
-                                           PooledAllocatorControl control);
+        protected abstract UntetheredMemory allocBuf(
+                PoolChunk chunk, long handle, int size, PoolThreadCache threadCache, PooledAllocatorControl control);
 
         /**
          * Add to cache if not already full.

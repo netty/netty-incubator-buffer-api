@@ -17,7 +17,6 @@ package io.netty.buffer.api.pool;
 
 import io.netty.buffer.api.AllocatorControl;
 import io.netty.buffer.api.Buffer;
-import io.netty.buffer.api.BufferAllocator;
 import io.netty.buffer.api.MemoryManager;
 import io.netty.buffer.api.internal.Statics;
 import io.netty.util.internal.StringUtil;
@@ -110,10 +109,6 @@ class PoolArena extends SizeClasses implements PoolArenaMetric, AllocatorControl
         return new PoolSubpage[size];
     }
 
-    boolean isDirect() {
-        return manager.isNative();
-    }
-
     UntetheredMemory allocate(PooledAllocatorControl control, PoolThreadCache cache, int size) {
         final int sizeIdx = size2SizeIdx(size);
 
@@ -164,7 +159,8 @@ class PoolArena extends SizeClasses implements PoolArenaMetric, AllocatorControl
         return memory;
     }
 
-    private UntetheredMemory tcacheAllocateNormal(PooledAllocatorControl control, PoolThreadCache cache, int size, int sizeIdx) {
+    private UntetheredMemory tcacheAllocateNormal(
+            PooledAllocatorControl control, PoolThreadCache cache, int size, int sizeIdx) {
         UntetheredMemory memory = cache.allocateNormal(this, control, size, sizeIdx);
         if (memory != null) {
             // was able to allocate out of the cache so move on
@@ -178,7 +174,8 @@ class PoolArena extends SizeClasses implements PoolArenaMetric, AllocatorControl
     }
 
     // Method must be called inside synchronized(this) { ... } block
-    private UntetheredMemory allocateNormal(int size, int sizeIdx, PoolThreadCache threadCache, PooledAllocatorControl control) {
+    private UntetheredMemory allocateNormal(
+            int size, int sizeIdx, PoolThreadCache threadCache, PooledAllocatorControl control) {
         UntetheredMemory memory = q050.allocate(size, sizeIdx, threadCache, control);
         if (memory != null) {
             return memory;
@@ -215,7 +212,7 @@ class PoolArena extends SizeClasses implements PoolArenaMetric, AllocatorControl
     private UntetheredMemory allocateHuge(int size) {
         activeBytesHuge.add(size);
         allocationsHuge.increment();
-        return new UnpooledUnthetheredMemory(manager, size);
+        return new UnpooledUnthetheredMemory(parent, manager, size);
     }
 
     void free(PoolChunk chunk, long handle, int normCapacity, PoolThreadCache cache) {
@@ -234,15 +231,12 @@ class PoolArena extends SizeClasses implements PoolArenaMetric, AllocatorControl
     void freeChunk(PoolChunk chunk, long handle, int normCapacity, SizeClass sizeClass) {
         final boolean destroyChunk;
         synchronized (this) {
-            switch (sizeClass) {
-                case Normal:
-                    ++deallocationsNormal;
-                    break;
-                case Small:
-                    ++deallocationsSmall;
-                    break;
-                default:
-                    throw new Error();
+            if (sizeClass == SizeClass.Normal) {
+                ++deallocationsNormal;
+            } else if (sizeClass == SizeClass.Small) {
+                ++deallocationsSmall;
+            } else {
+                throw new AssertionError("Unexpected size class: " + sizeClass);
             }
             destroyChunk = !chunk.parent.free(chunk, handle, normCapacity);
         }

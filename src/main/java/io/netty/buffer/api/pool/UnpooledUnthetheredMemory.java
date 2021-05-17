@@ -26,9 +26,10 @@ class UnpooledUnthetheredMemory implements AllocatorControl.UntetheredMemory {
     private final MemoryManager manager;
     private final Buffer buffer;
 
-    UnpooledUnthetheredMemory(MemoryManager manager, int size) {
+    UnpooledUnthetheredMemory(PooledBufferAllocator allocator, MemoryManager manager, int size) {
         this.manager = manager;
         PooledAllocatorControl allocatorControl = new PooledAllocatorControl();
+        allocatorControl.parent = allocator;
         buffer = manager.allocateShared(allocatorControl, size, manager.drop(), Statics.CLEANER);
     }
 
