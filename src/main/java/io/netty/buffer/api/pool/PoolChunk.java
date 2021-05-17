@@ -18,6 +18,7 @@ package io.netty.buffer.api.pool;
 import io.netty.buffer.api.AllocatorControl.UntetheredMemory;
 import io.netty.buffer.api.Buffer;
 import io.netty.buffer.api.Drop;
+import io.netty.buffer.api.internal.CleanerDrop;
 
 import java.util.PriorityQueue;
 
@@ -572,7 +573,8 @@ final class PoolChunk implements PoolChunkMetric {
 
         @Override
         public <BufferType extends Buffer> Drop<BufferType> drop() {
-            return (Drop<BufferType>) new PooledDrop(chunk.arena, chunk, threadCache, handle, maxLength);
+            PooledDrop pooledDrop = new PooledDrop(chunk.arena, chunk, threadCache, handle, maxLength);
+            return (Drop<BufferType>) CleanerDrop.wrap(pooledDrop);
         }
     }
 

@@ -130,6 +130,7 @@ public interface BufferAllocator extends AutoCloseable {
     }
 
     static BufferAllocator pooledDirect() {
-        return new SizeClassedMemoryPool(MemoryManagers.getManagers().getNativeMemoryManager());
+        return new PooledBufferAllocator(MemoryManagers.getManagers().getNativeMemoryManager());
+//        return new SizeClassedMemoryPool(MemoryManagers.getManagers().getNativeMemoryManager());
     }
 }

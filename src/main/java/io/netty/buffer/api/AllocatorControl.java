@@ -47,7 +47,16 @@ public interface AllocatorControl {
      * Memory that isn't attached to any particular buffer.
      */
     interface UntetheredMemory {
+        /**
+         * Produce the recoverable memory object associated with this piece of untethered memory.
+         * @implNote This method should only be called once, since it might be expensive.
+         */
         <Memory> Memory memory();
+
+        /**
+         * Produce the drop instance associated with this piece of untethered memory.
+         * @implNote This method should only be called once, since it might be expensive, or interact with Cleaners.
+         */
         <BufferType extends Buffer> Drop<BufferType> drop();
     }
 }

@@ -59,7 +59,7 @@ public abstract class BufferTestSupport {
     private static final Memoize<Fixture[]> INITIAL_NO_CONST = new Memoize<>(
             () -> initialFixturesForEachImplementation().stream().filter(f -> !f.isConst()).toArray(Fixture[]::new));
     private static final Memoize<Fixture[]> ALL_COMBINATIONS = new Memoize<>(
-            () -> fixtureCombinations().toArray(Fixture[]::new));
+            () -> fixtureCombinations(initialFixturesForEachImplementation()).toArray(Fixture[]::new));
     private static final Memoize<Fixture[]> ALL_ALLOCATORS = new Memoize<>(
             () -> Arrays.stream(ALL_COMBINATIONS.get())
                     .filter(sample())
@@ -160,9 +160,7 @@ public abstract class BufferTestSupport {
         return initFixtures;
     }
 
-    private static Stream<Fixture> fixtureCombinations() {
-        List<Fixture> initFixtures = initialFixturesForEachImplementation();
-
+    static Stream<Fixture> fixtureCombinations(List<Fixture> initFixtures) {
         Builder<Fixture> builder = Stream.builder();
         initFixtures.forEach(builder);
 

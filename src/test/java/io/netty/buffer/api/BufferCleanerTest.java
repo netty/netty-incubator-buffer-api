@@ -19,11 +19,29 @@ import io.netty.buffer.api.memseg.NativeMemorySegmentManager;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
+import java.util.List;
+import java.util.stream.Stream;
+
+import static io.netty.buffer.api.MemoryManagers.using;
 import static org.assertj.core.api.Assertions.assertThat;
 
 public class BufferCleanerTest extends BufferTestSupport {
+    @SuppressWarnings("OptionalGetWithoutIsPresent")
+    static Fixture[] memorySegmentAllocators() {
+        MemoryManagers managers = MemoryManagers.getAllManagers()
+                .map(p -> p.get())
+                .filter(mm -> "MS".equals(mm.toString()))
+                .findFirst().get();
+        List<Fixture> initFixtures = initialAllocators().stream().flatMap(f -> {
+            Stream.Builder<Fixture> builder = Stream.builder();
+            builder.add(new Fixture(f + "/" + managers, () -> using(managers, f), f.getProperties()));
+            return builder.build();
+        }).toList();
+        return fixtureCombinations(initFixtures).filter(f -> f.isDirect()).toArray(Fixture[]::new);
+    }
+
     @ParameterizedTest
-    @MethodSource("directAllocators")
+    @MethodSource("memorySegmentAllocators")
     public void bufferMustBeClosedByCleaner(Fixture fixture) throws InterruptedException {
         var initial = NativeMemorySegmentManager.MEM_USAGE_NATIVE.sum();
         int allocationSize = 1024;
@@ -34,6 +52,7 @@ public class BufferCleanerTest extends BufferTestSupport {
             System.runFinalization();
             sum = NativeMemorySegmentManager.MEM_USAGE_NATIVE.sum() - initial;
             if (sum < allocationSize) {
+                // The memory must have been cleaned.
                 return;
             }
         }
@@ -42,7 +61,7 @@ public class BufferCleanerTest extends BufferTestSupport {
 
     private static void allocateAndForget(Fixture fixture, int size) {
         var allocator = fixture.createAllocator();
-        allocator.close();
         allocator.allocate(size);
+        allocator.close();
     }
 }
