@@ -75,10 +75,8 @@ public abstract class AbstractMemorySegmentManager implements MemoryManager {
     }
 
     @Override
-    public Buffer recoverMemory(AllocatorControl allocatorControl, Object recoverableMemoryBase,
-                                int offset, int length, Drop<Buffer> drop) {
-        var segment = (MemorySegment) recoverableMemoryBase;
-        segment = segment.asSlice(offset, length);
-        return new MemSegBuffer(segment, segment, convert(ArcDrop.acquire(drop)), allocatorControl);
+    public Object sliceMemory(Object memory, int offset, int length) {
+        var segment = (MemorySegment) memory;
+        return segment.asSlice(offset, length);
     }
 }

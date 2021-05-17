@@ -96,10 +96,7 @@ public class UnsafeMemoryManager implements MemoryManager {
     }
 
     @Override
-    public Buffer recoverMemory(AllocatorControl allocatorControl, Object recoverableMemoryBase,
-                                int offset, int length, Drop<Buffer> drop) {
-        UnsafeMemory memory = (UnsafeMemory) recoverableMemoryBase;
-        memory = memory.slice(offset, length);
-        return new UnsafeBuffer(memory, 0, memory.size, allocatorControl, convert(drop));
+    public Object sliceMemory(Object memory, int offset, int length) {
+        return ((UnsafeMemory) memory).slice(offset, length);
     }
 }

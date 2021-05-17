@@ -114,7 +114,7 @@ class PoolArena extends SizeClasses implements PoolArenaMetric, AllocatorControl
         return manager.isNative();
     }
 
-    Buffer allocate(PooledAllocatorControl control, PoolThreadCache cache, int size) {
+    UntetheredMemory allocate(PooledAllocatorControl control, PoolThreadCache cache, int size) {
         final int sizeIdx = size2SizeIdx(size);
 
         if (sizeIdx <= smallMaxSizeIdx) {
@@ -129,12 +129,12 @@ class PoolArena extends SizeClasses implements PoolArenaMetric, AllocatorControl
         }
     }
 
-    private Buffer tcacheAllocateSmall(PooledAllocatorControl control, PoolThreadCache cache, final int size,
-                                       final int sizeIdx) {
-        Buffer buffer = cache.allocateSmall(control, size, sizeIdx);
-        if (buffer != null) {
+    private UntetheredMemory tcacheAllocateSmall(PooledAllocatorControl control, PoolThreadCache cache, final int size,
+                                                 final int sizeIdx) {
+        UntetheredMemory memory = cache.allocateSmall(control, size, sizeIdx);
+        if (memory != null) {
             // was able to allocate out of the cache so move on
-            return buffer;
+            return memory;
         }
 
         /*
@@ -150,73 +150,72 @@ class PoolArena extends SizeClasses implements PoolArenaMetric, AllocatorControl
                 assert s.doNotDestroy && s.elemSize == sizeIdx2size(sizeIdx);
                 long handle = s.allocate();
                 assert handle >= 0;
-                buffer = s.chunk.allocateBufferWithSubpage(handle, size, cache, control);
+                memory = s.chunk.allocateBufferWithSubpage(handle, size, cache, control);
             }
         }
 
         if (needsNormalAllocation) {
             synchronized (this) {
-                buffer = allocateNormal(size, sizeIdx, cache, control);
+                memory = allocateNormal(size, sizeIdx, cache, control);
             }
         }
 
         incSmallAllocation();
-        return buffer;
+        return memory;
     }
 
-    private Buffer tcacheAllocateNormal(PooledAllocatorControl control, PoolThreadCache cache, int size, int sizeIdx) {
-        Buffer buffer = cache.allocateNormal(this, control, size, sizeIdx);
-        if (buffer != null) {
+    private UntetheredMemory tcacheAllocateNormal(PooledAllocatorControl control, PoolThreadCache cache, int size, int sizeIdx) {
+        UntetheredMemory memory = cache.allocateNormal(this, control, size, sizeIdx);
+        if (memory != null) {
             // was able to allocate out of the cache so move on
-            return buffer;
+            return memory;
         }
         synchronized (this) {
-            buffer = allocateNormal(size, sizeIdx, cache, control);
+            memory = allocateNormal(size, sizeIdx, cache, control);
             allocationsNormal++;
         }
-        return buffer;
+        return memory;
     }
 
     // Method must be called inside synchronized(this) { ... } block
-    private Buffer allocateNormal(int size, int sizeIdx, PoolThreadCache threadCache, PooledAllocatorControl control) {
-        Buffer buffer = q050.allocate(size, sizeIdx, threadCache, control);
-        if (buffer != null) {
-            return buffer;
+    private UntetheredMemory allocateNormal(int size, int sizeIdx, PoolThreadCache threadCache, PooledAllocatorControl control) {
+        UntetheredMemory memory = q050.allocate(size, sizeIdx, threadCache, control);
+        if (memory != null) {
+            return memory;
         }
-        buffer = q025.allocate(size, sizeIdx, threadCache, control);
-        if (buffer != null) {
-            return buffer;
+        memory = q025.allocate(size, sizeIdx, threadCache, control);
+        if (memory != null) {
+            return memory;
         }
-        buffer = q000.allocate(size, sizeIdx, threadCache, control);
-        if (buffer != null) {
-            return buffer;
+        memory = q000.allocate(size, sizeIdx, threadCache, control);
+        if (memory != null) {
+            return memory;
         }
-        buffer = qInit.allocate(size, sizeIdx, threadCache, control);
-        if (buffer != null) {
-            return buffer;
+        memory = qInit.allocate(size, sizeIdx, threadCache, control);
+        if (memory != null) {
+            return memory;
         }
-        buffer = q075.allocate(size, sizeIdx, threadCache, control);
-        if (buffer != null) {
-            return buffer;
+        memory = q075.allocate(size, sizeIdx, threadCache, control);
+        if (memory != null) {
+            return memory;
         }
 
         // Add a new chunk.
         PoolChunk c = newChunk(pageSize, nPSizes, pageShifts, chunkSize);
-        buffer = c.allocate(size, sizeIdx, threadCache, control);
-        assert buffer != null;
+        memory = c.allocate(size, sizeIdx, threadCache, control);
+        assert memory != null;
         qInit.add(c);
-        return buffer;
+        return memory;
     }
 
     private void incSmallAllocation() {
         allocationsSmall.increment();
     }
 
-    private Buffer allocateHuge(int size) {
+    private UntetheredMemory allocateHuge(int size) {
         activeBytesHuge.add(size);
         allocationsHuge.increment();
-        BufferAllocator allocator = isDirect()? BufferAllocator.direct() : BufferAllocator.heap();
-        return allocator.allocate(size);
+        return new UnpooledUnthetheredMemory(manager, size);
     }
 
     void free(PoolChunk chunk, long handle, int normCapacity, PoolThreadCache cache) {
@@ -258,7 +257,7 @@ class PoolArena extends SizeClasses implements PoolArenaMetric, AllocatorControl
     }
 
     @Override
-    public Object allocateUntethered(Buffer originator, int size) {
+    public UntetheredMemory allocateUntethered(Buffer originator, int size) {
         throw new AssertionError("PoolChunk base buffers should never need to reallocate.");
     }
 

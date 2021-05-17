@@ -22,7 +22,7 @@ package io.netty.buffer.api;
  */
 public interface AllocatorControl {
     /**
-     * Allocate a buffer that is not tethered to any particular {@link Drop} implementation,
+     * Allocate a buffer that is not tethered to any particular {@link Buffer} object,
      * and return the recoverable memory object from it.
      * <p>
      * This allows a buffer to implement {@link Buffer#ensureWritable(int)} by having new memory allocated to it,
@@ -30,9 +30,9 @@ public interface AllocatorControl {
      *
      * @param originator The buffer that originated the request for an untethered memory allocated.
      * @param size The size of the requested memory allocation, in bytes.
-     * @return A "recoverable memory" object that is the requested allocation.
+     * @return A {@link UntetheredMemory} object that is the requested allocation.
      */
-    Object allocateUntethered(Buffer originator, int size);
+    UntetheredMemory allocateUntethered(Buffer originator, int size);
 
     /**
      * Return memory to the allocator, after it has been untethered from it's lifetime.
@@ -42,4 +42,12 @@ public interface AllocatorControl {
      * @param memory The untethered memory to return to the allocator.
      */
     void recoverMemory(Object memory);
+
+    /**
+     * Memory that isn't attached to any particular buffer.
+     */
+    interface UntetheredMemory {
+        <Memory> Memory memory();
+        <BufferType extends Buffer> Drop<BufferType> drop();
+    }
 }

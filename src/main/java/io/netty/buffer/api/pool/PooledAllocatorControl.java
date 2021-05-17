@@ -27,9 +27,8 @@ class PooledAllocatorControl implements AllocatorControl {
     public int updates;
 
     @Override
-    public Object allocateUntethered(Buffer originator, int size) {
-        Buffer allocate = arena.parent.allocate(this, size);
-        return arena.manager.unwrapRecoverableMemory(allocate);
+    public UntetheredMemory allocateUntethered(Buffer originator, int size) {
+        return arena.parent.allocate(this, size);
     }
 
     @Override

@@ -15,7 +15,7 @@
  */
 package io.netty.buffer.api.pool;
 
-import io.netty.buffer.api.Buffer;
+import io.netty.buffer.api.AllocatorControl.UntetheredMemory;
 import io.netty.util.internal.StringUtil;
 
 import java.util.ArrayList;
@@ -23,7 +23,8 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 
-import static java.lang.Math.*;
+import static java.lang.Math.max;
+import static java.lang.Math.min;
 
 final class PoolChunkList implements PoolChunkListMetric {
     private static final Iterator<PoolChunkMetric> EMPTY_METRICS = Collections.emptyIterator();
@@ -91,7 +92,7 @@ final class PoolChunkList implements PoolChunkListMetric {
         this.prevList = prevList;
     }
 
-    Buffer allocate(int size, int sizeIdx, PoolThreadCache threadCache, PooledAllocatorControl control) {
+    UntetheredMemory allocate(int size, int sizeIdx, PoolThreadCache threadCache, PooledAllocatorControl control) {
         int normCapacity = arena.sizeIdx2size(sizeIdx);
         if (normCapacity > maxCapacity) {
             // Either this PoolChunkList is empty, or the requested capacity is larger than the capacity which can
@@ -100,13 +101,13 @@ final class PoolChunkList implements PoolChunkListMetric {
         }
 
         for (PoolChunk cur = head; cur != null; cur = cur.next) {
-            Buffer buffer = cur.allocate(size, sizeIdx, threadCache, control);
-            if (buffer != null) {
+            UntetheredMemory memory = cur.allocate(size, sizeIdx, threadCache, control);
+            if (memory != null) {
                 if (cur.freeBytes <= freeMinThreshold) {
                     remove(cur);
                     nextList.add(cur);
                 }
-                return buffer;
+                return memory;
             }
         }
         return null;

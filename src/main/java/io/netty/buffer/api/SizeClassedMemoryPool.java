@@ -118,15 +118,29 @@ class SizeClassedMemoryPool implements BufferAllocator, AllocatorControl, Drop<B
         return "SizeClassedMemoryPool";
     }
 
+    @SuppressWarnings("unchecked")
     @Override
-    public Object allocateUntethered(Buffer originator, int size) {
+    public UntetheredMemory allocateUntethered(Buffer originator, int size) {
         var sizeClassPool = getSizeClassPool(size);
-        Object memory = sizeClassPool.poll();
-        if (memory == null) {
+        Object candidateMemory = sizeClassPool.poll();
+        if (candidateMemory == null) {
             Buffer untetheredBuf = createBuf(size, NO_OP_DROP);
-            memory = manager.unwrapRecoverableMemory(untetheredBuf);
+            candidateMemory = manager.unwrapRecoverableMemory(untetheredBuf);
         }
-        return memory;
+        Object memory = candidateMemory;
+
+        return new UntetheredMemory() {
+
+            @Override
+            public <Memory> Memory memory() {
+                return (Memory) memory;
+            }
+
+            @Override
+            public <BufferType extends Buffer> Drop<BufferType> drop() {
+                return (Drop<BufferType>) getDrop();
+            }
+        };
     }
 
     @Override

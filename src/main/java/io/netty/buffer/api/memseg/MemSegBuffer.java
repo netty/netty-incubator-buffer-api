@@ -524,32 +524,27 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
         // Allocate a bigger buffer.
         long newSize = capacity() + (long) Math.max(size - writableBytes(), minimumGrowth);
         BufferAllocator.checkSize(newSize);
-        MemorySegment newSegment = (MemorySegment) control.allocateUntethered(this, (int) newSize);
+        var untethered = control.allocateUntethered(this, (int) newSize);
+        MemorySegment newSegment = untethered.memory();
 
         // Copy contents.
         newSegment.copyFrom(seg);
 
         // Release the old memory segment and install the new one:
-        Drop<MemSegBuffer> drop = disconnectDrop();
+        Drop<MemSegBuffer> drop = untethered.drop();
+        disconnectDrop(drop);
         attachNewMemorySegment(newSegment, drop);
     }
 
-    private Drop<MemSegBuffer> disconnectDrop() {
+    private void disconnectDrop(Drop<MemSegBuffer> newDrop) {
         var drop = unsafeGetDrop();
-        if (drop instanceof ArcDrop) {
-            // Disconnect from the current arc drop, since we'll get our own fresh memory segment.
-            int roff = this.roff;
-            int woff = this.woff;
-            drop.drop(this);
-            drop = ArcDrop.unwrapAllArcs(drop);
-            unsafeSetDrop(new ArcDrop<>(drop));
-            this.roff = roff;
-            this.woff = woff;
-        } else {
-            // TODO would we ever get here?
-            control.recoverMemory(recoverableMemory());
-        }
-        return drop;
+        // Disconnect from the current arc drop, since we'll get our own fresh memory segment.
+        int roff = this.roff;
+        int woff = this.woff;
+        drop.drop(this);
+        unsafeSetDrop(new ArcDrop<>(newDrop));
+        this.roff = roff;
+        this.woff = woff;
     }
 
     private void attachNewMemorySegment(MemorySegment newSegment, Drop<MemSegBuffer> drop) {

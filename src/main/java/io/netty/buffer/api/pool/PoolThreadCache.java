@@ -15,10 +15,7 @@
  */
 package io.netty.buffer.api.pool;
 
-import static io.netty.buffer.api.pool.PoolArena.SizeClass.*;
-import static io.netty.util.internal.ObjectUtil.checkPositiveOrZero;
-
-import io.netty.buffer.api.Buffer;
+import io.netty.buffer.api.AllocatorControl.UntetheredMemory;
 import io.netty.buffer.api.pool.PoolArena.SizeClass;
 import io.netty.util.internal.MathUtil;
 import io.netty.util.internal.ObjectPool;
@@ -30,6 +27,10 @@ import io.netty.util.internal.logging.InternalLoggerFactory;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Queue;
+
+import static io.netty.buffer.api.pool.PoolArena.SizeClass.Normal;
+import static io.netty.buffer.api.pool.PoolArena.SizeClass.Small;
+import static io.netty.util.internal.ObjectUtil.checkPositiveOrZero;
 
 /**
  * Acts a Thread cache for allocations. This implementation is modelled after
@@ -121,23 +122,23 @@ final class PoolThreadCache {
     /**
      * Try to allocate a small buffer out of the cache. Returns {@code true} if successful {@code false} otherwise
      */
-    Buffer allocateSmall(PooledAllocatorControl control, int size, int sizeIdx) {
+    UntetheredMemory allocateSmall(PooledAllocatorControl control, int size, int sizeIdx) {
         return allocate(cacheForSmall(sizeIdx), control, size);
     }
 
     /**
      * Try to allocate a normal buffer out of the cache. Returns {@code true} if successful {@code false} otherwise
      */
-    Buffer allocateNormal(PoolArena area, PooledAllocatorControl control, int size, int sizeIdx) {
+    UntetheredMemory allocateNormal(PoolArena area, PooledAllocatorControl control, int size, int sizeIdx) {
         return allocate(cacheForNormal(area, sizeIdx), control, size);
     }
 
-    private Buffer allocate(MemoryRegionCache cache, PooledAllocatorControl control, int size) {
+    private UntetheredMemory allocate(MemoryRegionCache cache, PooledAllocatorControl control, int size) {
         if (cache == null) {
             // no cache found so just return false here
             return null;
         }
-        Buffer allocated = cache.allocate(size, this, control);
+        UntetheredMemory allocated = cache.allocate(size, this, control);
         if (++allocations >= freeSweepAllocationThreshold) {
             allocations = 0;
             trim();
@@ -160,14 +161,13 @@ final class PoolThreadCache {
     }
 
     private MemoryRegionCache cache(PoolArena area, int sizeIdx, SizeClass sizeClass) {
-        switch (sizeClass) {
-        case Normal:
+        if (sizeClass == Normal) {
             return cacheForNormal(area, sizeIdx);
-        case Small:
-            return cacheForSmall(sizeIdx);
-        default:
-            throw new Error();
         }
+        if (sizeClass == Small) {
+            return cacheForSmall(sizeIdx);
+        }
+        throw new AssertionError("Unexpected size class: " + sizeClass);
     }
 
     /**
@@ -252,7 +252,7 @@ final class PoolThreadCache {
         }
 
         @Override
-        protected Buffer allocBuf(PoolChunk chunk, long handle, int size, PoolThreadCache threadCache,
+        protected UntetheredMemory allocBuf(PoolChunk chunk, long handle, int size, PoolThreadCache threadCache,
                                   PooledAllocatorControl control) {
             return chunk.allocateBufferWithSubpage(handle, size, threadCache, control);
         }
@@ -267,7 +267,7 @@ final class PoolThreadCache {
         }
 
         @Override
-        protected Buffer allocBuf(PoolChunk chunk, long handle, int size, PoolThreadCache threadCache,
+        protected UntetheredMemory allocBuf(PoolChunk chunk, long handle, int size, PoolThreadCache threadCache,
                                   PooledAllocatorControl control) {
             return chunk.allocateBuffer(handle, size, threadCache, control);
         }
@@ -286,9 +286,9 @@ final class PoolThreadCache {
         }
 
         /**
-         * Allocate a new {@link Buffer} using the provided chunk and handle with the capacity restrictions.
+         * Allocate a new {@link UntetheredMemory} using the provided chunk and handle with the capacity restrictions.
          */
-        protected abstract Buffer allocBuf(PoolChunk chunk, long handle, int size, PoolThreadCache threadCache,
+        protected abstract UntetheredMemory allocBuf(PoolChunk chunk, long handle, int size, PoolThreadCache threadCache,
                                            PooledAllocatorControl control);
 
         /**
@@ -308,12 +308,12 @@ final class PoolThreadCache {
         /**
          * Allocate something out of the cache if possible and remove the entry from the cache.
          */
-        public final Buffer allocate(int size, PoolThreadCache threadCache, PooledAllocatorControl control) {
+        public final UntetheredMemory allocate(int size, PoolThreadCache threadCache, PooledAllocatorControl control) {
             Entry entry = queue.poll();
             if (entry == null) {
                 return null;
             }
-            Buffer buffer = allocBuf(entry.chunk, entry.handle, size, threadCache, control);
+            UntetheredMemory buffer = allocBuf(entry.chunk, entry.handle, size, threadCache, control);
             entry.recycle();
 
             // allocations are not thread-safe which is fine as this is only called from the same thread all time.

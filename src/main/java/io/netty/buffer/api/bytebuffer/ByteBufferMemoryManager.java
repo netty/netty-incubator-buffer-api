@@ -82,10 +82,8 @@ public class ByteBufferMemoryManager implements MemoryManager {
     }
 
     @Override
-    public Buffer recoverMemory(AllocatorControl allocatorControl, Object recoverableMemoryBase,
-                                int offset, int length, Drop<Buffer> drop) {
-        ByteBuffer memory = (ByteBuffer) recoverableMemoryBase;
-        memory = memory.slice(offset, length);
-        return new NioBuffer(memory, memory, allocatorControl, convert(drop));
+    public Object sliceMemory(Object memory, int offset, int length) {
+        var buffer = (ByteBuffer) memory;
+        return buffer.slice(offset, length);
     }
 }

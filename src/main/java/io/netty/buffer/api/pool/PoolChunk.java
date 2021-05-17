@@ -15,7 +15,9 @@
  */
 package io.netty.buffer.api.pool;
 
+import io.netty.buffer.api.AllocatorControl.UntetheredMemory;
 import io.netty.buffer.api.Buffer;
+import io.netty.buffer.api.Drop;
 
 import java.util.PriorityQueue;
 
@@ -262,7 +264,7 @@ final class PoolChunk implements PoolChunkMetric {
         return 100 - freePercentage;
     }
 
-    Buffer allocate(int size, int sizeIdx, PoolThreadCache cache, PooledAllocatorControl control) {
+    UntetheredMemory allocate(int size, int sizeIdx, PoolThreadCache cache, PooledAllocatorControl control) {
         final long handle;
         if (sizeIdx <= arena.smallMaxSizeIdx) {
             // small
@@ -513,21 +515,21 @@ final class PoolChunk implements PoolChunkMetric {
                | (long) inUsed << IS_USED_SHIFT;
     }
 
-    Buffer allocateBuffer(long handle, int size, PoolThreadCache threadCache, PooledAllocatorControl control) {
+    UntetheredMemory allocateBuffer(long handle, int size, PoolThreadCache threadCache, PooledAllocatorControl control) {
         if (isRun(handle)) {
             int offset = runOffset(handle) << pageShifts;
             int maxLength = runSize(pageShifts, handle);
             PoolThreadCache poolThreadCache = arena.parent.threadCache();
             initAllocatorControl(control, poolThreadCache, handle, maxLength);
-            return arena.manager.recoverMemory(control, memory, offset, size,
-                    new PooledDrop(control, arena, this, poolThreadCache, handle, maxLength));
+            return new UntetheredChunkAllocation(
+                    memory, control, this, poolThreadCache, handle, maxLength, offset, size);
         } else {
             return allocateBufferWithSubpage(handle, size, threadCache, control);
         }
     }
 
-    Buffer allocateBufferWithSubpage(long handle, int size, PoolThreadCache threadCache,
-                                     PooledAllocatorControl control) {
+    UntetheredMemory allocateBufferWithSubpage(long handle, int size, PoolThreadCache threadCache,
+                                                                PooledAllocatorControl control) {
         int runOffset = runOffset(handle);
         int bitmapIdx = bitmapIdx(handle);
 
@@ -537,8 +539,42 @@ final class PoolChunk implements PoolChunkMetric {
 
         int offset = (runOffset << pageShifts) + bitmapIdx * s.elemSize;
         initAllocatorControl(control, threadCache, handle, s.elemSize);
-        return arena.manager.recoverMemory(control, memory, offset, size,
-                new PooledDrop(control, arena, this, threadCache, handle, s.elemSize));
+        return new UntetheredChunkAllocation(memory, control, this, threadCache, handle, s.elemSize, offset, size);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static class UntetheredChunkAllocation implements UntetheredMemory {
+        private final Object memory;
+        private final PooledAllocatorControl control;
+        private final PoolChunk chunk;
+        private final PoolThreadCache threadCache;
+        private final long handle;
+        private final int maxLength;
+        private final int offset;
+        private final int size;
+
+        private UntetheredChunkAllocation(
+                Object memory, PooledAllocatorControl control, PoolChunk chunk, PoolThreadCache threadCache,
+                long handle, int maxLength, int offset, int size) {
+            this.memory = memory;
+            this.control = control;
+            this.chunk = chunk;
+            this.threadCache = threadCache;
+            this.handle = handle;
+            this.maxLength = maxLength;
+            this.offset = offset;
+            this.size = size;
+        }
+
+        @Override
+        public <Memory> Memory memory() {
+            return (Memory) chunk.arena.manager.sliceMemory(memory, offset, size);
+        }
+
+        @Override
+        public <BufferType extends Buffer> Drop<BufferType> drop() {
+            return (Drop<BufferType>) new PooledDrop(control, chunk.arena, chunk, threadCache, handle, maxLength);
+        }
     }
 
     private void initAllocatorControl(PooledAllocatorControl control, PoolThreadCache threadCache, long handle,

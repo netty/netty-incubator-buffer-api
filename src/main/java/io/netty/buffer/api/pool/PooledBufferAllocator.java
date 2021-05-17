@@ -15,9 +15,7 @@
  */
 package io.netty.buffer.api.pool;
 
-import static io.netty.util.internal.ObjectUtil.checkPositiveOrZero;
-import static java.util.Objects.requireNonNull;
-
+import io.netty.buffer.api.AllocatorControl.UntetheredMemory;
 import io.netty.buffer.api.Buffer;
 import io.netty.buffer.api.BufferAllocator;
 import io.netty.buffer.api.MemoryManager;
@@ -37,6 +35,9 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+
+import static io.netty.util.internal.ObjectUtil.checkPositiveOrZero;
+import static java.util.Objects.requireNonNull;
 
 public class PooledBufferAllocator implements BufferAllocator, BufferAllocatorMetricProvider {
 
@@ -287,18 +288,24 @@ public class PooledBufferAllocator implements BufferAllocator, BufferAllocatorMe
         if (size < 1) {
             throw new IllegalArgumentException("Allocation size must be positive, but was " + size + '.');
         }
-        return allocate(new PooledAllocatorControl(), size);
+        PooledAllocatorControl control = new PooledAllocatorControl();
+        UntetheredMemory memory = allocate(control, size);
+        Buffer buffer = manager.recoverMemory(control, memory.memory(), memory.drop());
+        return buffer.fill((byte) 0).order(ByteOrder.nativeOrder());
     }
 
-    Buffer allocate(PooledAllocatorControl control, int size) {
+    UntetheredMemory allocate(PooledAllocatorControl control, int size) {
         PoolThreadCache cache = threadCache.get();
         PoolArena arena = cache.arena;
 
         if (arena != null) {
-            return arena.allocate(control, cache, size).fill((byte) 0).order(ByteOrder.nativeOrder());
+            return arena.allocate(control, cache, size);
         }
-        BufferAllocator unpooled = manager.isNative()? BufferAllocator.direct() : BufferAllocator.heap();
-        return unpooled.allocate(size);
+        return allocateUnpooled(size);
+    }
+
+    private UntetheredMemory allocateUnpooled(int size) {
+        return new UnpooledUnthetheredMemory(manager, size);
     }
 
     @Override
