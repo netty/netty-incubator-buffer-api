@@ -13,20 +13,7 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package io.netty.buffer.api.unsafe;
-
-class UnsafeMemory {
-    final Object base;
-    final long address;
-    final int size;
-
-    UnsafeMemory(Object base, long address, int size) {
-        this.base = base;
-        this.address = address;
-        this.size = size;
-    }
-
-    public UnsafeMemory slice(int offset, int length) {
-        return new UnsafeMemory(base, address + offset, length);
-    }
-}
+/**
+ * A pooling {@link io.netty.buffer.api.BufferAllocator} implementation based on jemalloc.
+ */
+package io.netty.buffer.api.pool;

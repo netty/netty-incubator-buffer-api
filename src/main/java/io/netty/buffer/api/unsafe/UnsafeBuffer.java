@@ -447,7 +447,8 @@ class UnsafeBuffer extends RcSupport<Buffer, UnsafeBuffer> implements Buffer, Re
         // Allocate a bigger buffer.
         long newSize = capacity() + (long) Math.max(size - writableBytes(), minimumGrowth);
         BufferAllocator.checkSize(newSize);
-        UnsafeMemory memory = (UnsafeMemory) control.allocateUntethered(this, (int) newSize);
+        var untethered = control.allocateUntethered(this, (int) newSize);
+        UnsafeMemory memory = untethered.memory();
 
         // Copy contents.
         try {
@@ -458,17 +459,17 @@ class UnsafeBuffer extends RcSupport<Buffer, UnsafeBuffer> implements Buffer, Re
         }
 
         // Release the old memory, and install the new memory:
-        Drop<UnsafeBuffer> drop = disconnectDrop();
+        Drop<UnsafeBuffer> drop = untethered.drop();
+        disconnectDrop(drop);
         attachNewMemory(memory, drop);
     }
 
-    private Drop<UnsafeBuffer> disconnectDrop() {
+    private Drop<UnsafeBuffer> disconnectDrop(Drop<UnsafeBuffer> newDrop) {
         var drop = (Drop<UnsafeBuffer>) unsafeGetDrop();
         int roff = this.roff;
         int woff = this.woff;
         drop.drop(this);
-        drop = ArcDrop.unwrapAllArcs(drop);
-        unsafeSetDrop(new ArcDrop<>(drop));
+        unsafeSetDrop(new ArcDrop<>(newDrop));
         this.roff = roff;
         this.woff = woff;
         return drop;

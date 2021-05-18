@@ -15,6 +15,8 @@
  */
 package io.netty.buffer.api;
 
+import io.netty.buffer.api.pool.PooledBufferAllocator;
+
 import java.nio.ByteOrder;
 import java.util.function.Supplier;
 
@@ -123,10 +125,10 @@ public interface BufferAllocator extends AutoCloseable {
     }
 
     static BufferAllocator pooledHeap() {
-        return new SizeClassedMemoryPool(MemoryManagers.getManagers().getHeapMemoryManager());
+        return new PooledBufferAllocator(MemoryManagers.getManagers().getHeapMemoryManager());
     }
 
     static BufferAllocator pooledDirect() {
-        return new SizeClassedMemoryPool(MemoryManagers.getManagers().getNativeMemoryManager());
+        return new PooledBufferAllocator(MemoryManagers.getManagers().getNativeMemoryManager());
     }
 }

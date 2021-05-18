@@ -46,13 +46,6 @@ public final class ArcDrop<T> implements Drop<T> {
         return new ArcDrop<X>(drop);
     }
 
-    public static <X> Drop<X> unwrapAllArcs(Drop<X> drop) {
-        while (drop instanceof ArcDrop) {
-            drop = ((ArcDrop<X>) drop).unwrap();
-        }
-        return drop;
-    }
-
     public static <X> Drop<X> acquire(Drop<X> drop) {
         if (drop.getClass() == ArcDrop.class) {
             ((ArcDrop<X>) drop).increment();
@@ -103,7 +96,10 @@ public final class ArcDrop<T> implements Drop<T> {
 
     @Override
     public String toString() {
-        StringBuilder builder = new StringBuilder().append("ArcDrop(").append(count).append(", ");
+        StringBuilder builder = new StringBuilder()
+                .append("ArcDrop@")
+                .append(Integer.toHexString(System.identityHashCode(this)))
+                .append('(').append(count).append(", ");
         Drop<T> drop = this;
         while ((drop = ((ArcDrop<T>) drop).unwrap()) instanceof ArcDrop) {
             builder.append(((ArcDrop<T>) drop).count).append(", ");

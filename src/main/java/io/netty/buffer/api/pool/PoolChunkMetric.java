@@ -13,20 +13,25 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package io.netty.buffer.api.unsafe;
+package io.netty.buffer.api.pool;
 
-class UnsafeMemory {
-    final Object base;
-    final long address;
-    final int size;
+/**
+ * Metrics for a chunk.
+ */
+public interface PoolChunkMetric {
 
-    UnsafeMemory(Object base, long address, int size) {
-        this.base = base;
-        this.address = address;
-        this.size = size;
-    }
+    /**
+     * Return the percentage of the current usage of the chunk.
+     */
+    int usage();
 
-    public UnsafeMemory slice(int offset, int length) {
-        return new UnsafeMemory(base, address + offset, length);
-    }
+    /**
+     * Return the size of the chunk in bytes, this is the maximum of bytes that can be served out of the chunk.
+     */
+    int chunkSize();
+
+    /**
+     * Return the number of free bytes in the chunk.
+     */
+    int freeBytes();
 }

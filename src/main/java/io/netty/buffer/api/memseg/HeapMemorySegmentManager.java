@@ -24,4 +24,9 @@ public class HeapMemorySegmentManager extends AbstractMemorySegmentManager {
     protected MemorySegment createSegment(long size, Cleaner cleaner) {
         return MemorySegment.ofArray(new byte[Math.toIntExact(size)]);
     }
+
+    @Override
+    public boolean isNative() {
+        return false;
+    }
 }

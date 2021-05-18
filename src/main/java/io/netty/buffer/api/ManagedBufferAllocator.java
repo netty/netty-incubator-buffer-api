@@ -41,11 +41,22 @@ class ManagedBufferAllocator implements BufferAllocator, AllocatorControl {
         return () -> manager.allocateConstChild(constantBuffer);
     }
 
+    @SuppressWarnings("unchecked")
     @Override
-    public Object allocateUntethered(Buffer originator, int size) {
+    public UntetheredMemory allocateUntethered(Buffer originator, int size) {
         BufferAllocator.checkSize(size);
         var buf = manager.allocateShared(this, size, NO_OP_DROP, Statics.CLEANER);
-        return manager.unwrapRecoverableMemory(buf);
+        return new UntetheredMemory() {
+            @Override
+            public <Memory> Memory memory() {
+                return (Memory) manager.unwrapRecoverableMemory(buf);
+            }
+
+            @Override
+            public <BufferType extends Buffer> Drop<BufferType> drop() {
+                return (Drop<BufferType>) manager.drop();
+            }
+        };
     }
 
     @Override

@@ -13,20 +13,13 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package io.netty.buffer.api.unsafe;
+package io.netty.buffer.api.pool;
 
-class UnsafeMemory {
-    final Object base;
-    final long address;
-    final int size;
+import io.netty.buffer.api.BufferAllocator;
 
-    UnsafeMemory(Object base, long address, int size) {
-        this.base = base;
-        this.address = address;
-        this.size = size;
-    }
-
-    public UnsafeMemory slice(int offset, int length) {
-        return new UnsafeMemory(base, address + offset, length);
-    }
+public interface BufferAllocatorMetric {
+    /**
+     * Returns the number of bytes of heap memory used by a {@link BufferAllocator} or {@code -1} if unknown.
+     */
+    long usedMemory();
 }

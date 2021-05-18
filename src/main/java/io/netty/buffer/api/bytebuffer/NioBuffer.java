@@ -408,27 +408,27 @@ class NioBuffer extends RcSupport<Buffer, NioBuffer> implements Buffer, Readable
         // Allocate a bigger buffer.
         long newSize = capacity() + (long) Math.max(size - writableBytes(), minimumGrowth);
         BufferAllocator.checkSize(newSize);
-        ByteBuffer buffer = (ByteBuffer) control.allocateUntethered(this, (int) newSize);
+        var untethered = control.allocateUntethered(this, (int) newSize);
+        ByteBuffer buffer = untethered.memory();
         buffer.order(order());
 
         // Copy contents.
         copyInto(0, buffer, 0, capacity());
 
         // Release the old memory and install the new:
-        Drop<NioBuffer> drop = disconnectDrop();
+        Drop<NioBuffer> drop = untethered.drop();
+        disconnectDrop(drop);
         attachNewBuffer(buffer, drop);
     }
 
-    private Drop<NioBuffer> disconnectDrop() {
+    private void disconnectDrop(Drop<NioBuffer> newDrop) {
         var drop = (Drop<NioBuffer>) unsafeGetDrop();
         int roff = this.roff;
         int woff = this.woff;
         drop.drop(this);
-        drop = ArcDrop.unwrapAllArcs(drop);
-        unsafeSetDrop(new ArcDrop<>(drop));
+        unsafeSetDrop(new ArcDrop<>(newDrop));
         this.roff = roff;
         this.woff = woff;
-        return drop;
     }
 
     private void attachNewBuffer(ByteBuffer buffer, Drop<NioBuffer> drop) {

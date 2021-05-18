@@ -35,6 +35,11 @@ public class ByteBufferMemoryManager implements MemoryManager {
     }
 
     @Override
+    public boolean isNative() {
+        return direct;
+    }
+
+    @Override
     public Buffer allocateShared(AllocatorControl allocatorControl, long size, Drop<Buffer> drop, Cleaner cleaner) {
         int capacity = Math.toIntExact(size);
         ByteBuffer buffer = direct? ByteBuffer.allocateDirect(capacity) : ByteBuffer.allocate(capacity);
@@ -66,8 +71,19 @@ public class ByteBufferMemoryManager implements MemoryManager {
     }
 
     @Override
+    public void discardRecoverableMemory(Object recoverableMemory) {
+        // ByteBuffers have their memory released by the GC, so there is nothing for us to do.
+    }
+
+    @Override
     public Buffer recoverMemory(AllocatorControl allocatorControl, Object recoverableMemory, Drop<Buffer> drop) {
         ByteBuffer memory = (ByteBuffer) recoverableMemory;
         return new NioBuffer(memory, memory, allocatorControl, convert(drop));
+    }
+
+    @Override
+    public Object sliceMemory(Object memory, int offset, int length) {
+        var buffer = (ByteBuffer) memory;
+        return buffer.slice(offset, length);
     }
 }

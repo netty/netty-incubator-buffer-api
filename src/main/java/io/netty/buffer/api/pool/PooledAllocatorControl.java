@@ -13,20 +13,26 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package io.netty.buffer.api.unsafe;
+package io.netty.buffer.api.pool;
 
-class UnsafeMemory {
-    final Object base;
-    final long address;
-    final int size;
+import io.netty.buffer.api.AllocatorControl;
+import io.netty.buffer.api.Buffer;
 
-    UnsafeMemory(Object base, long address, int size) {
-        this.base = base;
-        this.address = address;
-        this.size = size;
+class PooledAllocatorControl implements AllocatorControl {
+    public PooledBufferAllocator parent;
+    public PoolArena arena;
+    public PoolChunk chunk;
+    public PoolThreadCache threadCache;
+    public long handle;
+    public int normSize;
+
+    @Override
+    public UntetheredMemory allocateUntethered(Buffer originator, int size) {
+        return parent.allocate(this, size);
     }
 
-    public UnsafeMemory slice(int offset, int length) {
-        return new UnsafeMemory(base, address + offset, length);
+    @Override
+    public void recoverMemory(Object memory) {
+        arena.free(chunk, handle, normSize, threadCache);
     }
 }

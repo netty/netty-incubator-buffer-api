@@ -13,20 +13,20 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package io.netty.buffer.api.unsafe;
+package io.netty.buffer.api.pool;
 
-class UnsafeMemory {
-    final Object base;
-    final long address;
-    final int size;
+/**
+ * Metrics for a list of chunks.
+ */
+public interface PoolChunkListMetric extends Iterable<PoolChunkMetric> {
 
-    UnsafeMemory(Object base, long address, int size) {
-        this.base = base;
-        this.address = address;
-        this.size = size;
-    }
+    /**
+     * Return the minimum usage of the chunk list before which chunks are promoted to the previous list.
+     */
+    int minUsage();
 
-    public UnsafeMemory slice(int offset, int length) {
-        return new UnsafeMemory(base, address + offset, length);
-    }
+    /**
+     * Return the maximum usage of the chunk list after which chunks are promoted to the next list.
+     */
+    int maxUsage();
 }

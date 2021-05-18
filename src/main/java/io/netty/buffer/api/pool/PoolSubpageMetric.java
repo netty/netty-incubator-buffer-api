@@ -13,20 +13,30 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package io.netty.buffer.api.unsafe;
+package io.netty.buffer.api.pool;
 
-class UnsafeMemory {
-    final Object base;
-    final long address;
-    final int size;
+/**
+ * Metrics for a sub-page.
+ */
+public interface PoolSubpageMetric {
 
-    UnsafeMemory(Object base, long address, int size) {
-        this.base = base;
-        this.address = address;
-        this.size = size;
-    }
+    /**
+     * Return the number of maximal elements that can be allocated out of the sub-page.
+     */
+    int maxNumElements();
 
-    public UnsafeMemory slice(int offset, int length) {
-        return new UnsafeMemory(base, address + offset, length);
-    }
+    /**
+     * Return the number of available elements to be allocated.
+     */
+    int numAvailable();
+
+    /**
+     * Return the size (in bytes) of the elements that will be allocated.
+     */
+    int elementSize();
+
+    /**
+     * Return the page size (in bytes) of this page.
+     */
+    int pageSize();
 }

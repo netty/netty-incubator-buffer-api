@@ -34,6 +34,11 @@ public class UnsafeMemoryManager implements MemoryManager {
     }
 
     @Override
+    public boolean isNative() {
+        return offheap;
+    }
+
+    @Override
     public Buffer allocateShared(AllocatorControl allocatorControl, long size, Drop<Buffer> drop, Cleaner cleaner) {
         final Object base;
         final long address;
@@ -80,8 +85,18 @@ public class UnsafeMemoryManager implements MemoryManager {
     }
 
     @Override
+    public void discardRecoverableMemory(Object recoverableMemory) {
+        // We cannot reliably drop unsafe memory. We have to rely on the cleaner to do that.
+    }
+
+    @Override
     public Buffer recoverMemory(AllocatorControl allocatorControl, Object recoverableMemory, Drop<Buffer> drop) {
         UnsafeMemory memory = (UnsafeMemory) recoverableMemory;
         return new UnsafeBuffer(memory, 0, memory.size, allocatorControl, convert(drop));
+    }
+
+    @Override
+    public Object sliceMemory(Object memory, int offset, int length) {
+        return ((UnsafeMemory) memory).slice(offset, length);
     }
 }
