@@ -126,11 +126,9 @@ public interface BufferAllocator extends AutoCloseable {
 
     static BufferAllocator pooledHeap() {
         return new PooledBufferAllocator(MemoryManagers.getManagers().getHeapMemoryManager());
-//        return new SizeClassedMemoryPool(MemoryManagers.getManagers().getHeapMemoryManager());
     }
 
     static BufferAllocator pooledDirect() {
         return new PooledBufferAllocator(MemoryManagers.getManagers().getNativeMemoryManager());
-//        return new SizeClassedMemoryPool(MemoryManagers.getManagers().getNativeMemoryManager());
     }
 }

@@ -18,7 +18,10 @@ package io.netty.buffer.api.pool;
 import io.netty.buffer.api.AllocatorControl.UntetheredMemory;
 import io.netty.buffer.api.Buffer;
 import io.netty.buffer.api.Drop;
+import io.netty.buffer.api.MemoryManager;
+import io.netty.buffer.api.internal.ArcDrop;
 import io.netty.buffer.api.internal.CleanerDrop;
+import io.netty.buffer.api.internal.Statics;
 
 import java.util.PriorityQueue;
 
@@ -145,6 +148,7 @@ final class PoolChunk implements PoolChunkMetric {
     final PoolArena arena;
     final Buffer base; // The buffer that is the source of the memory. Closing it will free the memory.
     final Object memory;
+    final Drop<Buffer> baseDrop; // An ArcDrop that manages references to the base Buffer.
 
     /**
      * store the first page and last page of each avail run
@@ -171,11 +175,13 @@ final class PoolChunk implements PoolChunkMetric {
     PoolChunk prev;
     PoolChunk next;
 
-    PoolChunk(PoolArena arena, Buffer base, Object memory, int pageSize, int pageShifts, int chunkSize,
+    PoolChunk(PoolArena arena, int pageSize, int pageShifts, int chunkSize,
               int maxPageIdx) {
         this.arena = arena;
-        this.base = base;
-        this.memory = memory;
+        MemoryManager manager = arena.manager;
+        base = manager.allocateShared(arena, chunkSize, manager.drop(), Statics.CLEANER);
+        memory = manager.unwrapRecoverableMemory(base);
+        baseDrop = ArcDrop.wrap(Buffer::close);
         this.pageSize = pageSize;
         this.pageShifts = pageShifts;
         this.chunkSize = chunkSize;
@@ -419,6 +425,7 @@ final class PoolChunk implements PoolChunkMetric {
      * @param handle handle to free
      */
     void free(long handle, int normCapacity) {
+        baseDrop.drop(base); // Decrement reference count.
         if (isSubpage(handle)) {
             int sizeIdx = arena.size2SizeIdx(normCapacity);
             PoolSubpage head = arena.findSubpagePoolHead(sizeIdx);
@@ -523,6 +530,7 @@ final class PoolChunk implements PoolChunkMetric {
             int maxLength = runSize(pageShifts, handle);
             PoolThreadCache poolThreadCache = arena.parent.threadCache();
             initAllocatorControl(control, poolThreadCache, handle, maxLength);
+            ArcDrop.acquire(baseDrop);
             return new UntetheredChunkAllocation(
                     memory, this, poolThreadCache, handle, maxLength, offset, size);
         } else {
@@ -541,6 +549,7 @@ final class PoolChunk implements PoolChunkMetric {
 
         int offset = (runOffset << pageShifts) + bitmapIdx * s.elemSize;
         initAllocatorControl(control, threadCache, handle, s.elemSize);
+        ArcDrop.acquire(baseDrop);
         return new UntetheredChunkAllocation(memory, this, threadCache, handle, s.elemSize, offset, size);
     }
 
@@ -620,7 +629,7 @@ final class PoolChunk implements PoolChunkMetric {
     }
 
     void destroy() {
-        base.close();
+        baseDrop.drop(base); // Decrement reference count from the chunk (allocated buffers may keep the base alive)
     }
 
     static int runOffset(long handle) {

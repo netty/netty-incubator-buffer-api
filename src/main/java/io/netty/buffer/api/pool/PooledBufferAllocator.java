@@ -166,6 +166,7 @@ public class PooledBufferAllocator implements BufferAllocator, BufferAllocatorMe
     private final int smallCacheSize;
     private final int normalCacheSize;
     private final List<PoolArenaMetric> arenaMetrics;
+    private final List<PoolArenaMetric> arenaMetricsView;
     private final PoolThreadLocalCache threadCache;
     private final int chunkSize;
     private final PooledBufferAllocatorMetric metric;
@@ -235,10 +236,12 @@ public class PooledBufferAllocator implements BufferAllocator, BufferAllocatorMe
                 arenas[i] = arena;
                 metrics.add(arena);
             }
-            arenaMetrics = Collections.unmodifiableList(metrics);
+            arenaMetrics = metrics;
+            arenaMetricsView = Collections.unmodifiableList(metrics);
         } else {
             arenas = null;
-            arenaMetrics = Collections.emptyList();
+            arenaMetrics = new ArrayList<>(1);
+            arenaMetricsView = Collections.emptyList();
         }
 
         metric = new PooledBufferAllocatorMetric(this);
@@ -312,10 +315,15 @@ public class PooledBufferAllocator implements BufferAllocator, BufferAllocatorMe
     @Override
     public void close() {
         trimCurrentThreadCache();
-        for (PoolArena arena : arenas) {
-            arena.close();
-        }
         threadCache.remove();
+        for (int i = 0, arenasLength = arenas.length; i < arenasLength; i++) {
+            PoolArena arena = arenas[i];
+            if (arena != null) {
+                arena.close();
+                arenas[i] = null;
+            }
+        }
+        arenaMetrics.clear();
     }
 
     /**
@@ -416,7 +424,7 @@ public class PooledBufferAllocator implements BufferAllocator, BufferAllocatorMe
                 return cache;
             }
             // No caching so just use 0 as sizes.
-            return new PoolThreadCache(arena, 0, 0, 0, 0);
+            return new PoolThreadCache(null, 0, 0, 0, 0);
         }
 
         @Override
@@ -450,7 +458,7 @@ public class PooledBufferAllocator implements BufferAllocator, BufferAllocatorMe
      * Return a {@link List} of all heap {@link PoolArenaMetric}s that are provided by this pool.
      */
     List<PoolArenaMetric> arenaMetrics() {
-        return arenaMetrics;
+        return arenaMetricsView;
     }
 
     /**

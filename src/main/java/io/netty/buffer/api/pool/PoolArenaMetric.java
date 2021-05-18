@@ -109,14 +109,6 @@ public interface PoolArenaMetric extends SizeClassesMetric {
     long numActiveAllocations();
 
     /**
-     * Return the number of currently active tiny allocations.
-     *
-     * @deprecated Tiny allocations have been merged into small allocations.
-     */
-    @Deprecated
-    long numActiveTinyAllocations();
-
-    /**
      * Return the number of currently active small allocations.
      */
     long numActiveSmallAllocations();

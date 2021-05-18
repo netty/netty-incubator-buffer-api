@@ -18,7 +18,6 @@ package io.netty.buffer.api.pool;
 import io.netty.buffer.api.AllocatorControl;
 import io.netty.buffer.api.Buffer;
 import io.netty.buffer.api.MemoryManager;
-import io.netty.buffer.api.internal.Statics;
 import io.netty.util.internal.StringUtil;
 
 import java.util.ArrayList;
@@ -363,18 +362,12 @@ class PoolArena extends SizeClasses implements PoolArenaMetric, AllocatorControl
 
     @Override
     public  long numActiveAllocations() {
-
         long val = allocationsSmall.longValue() + allocationsHuge.longValue()
                 - deallocationsHuge.longValue();
         synchronized (this) {
             val += allocationsNormal - (deallocationsSmall + deallocationsNormal);
         }
         return max(val, 0);
-    }
-
-    @Override
-    public long numActiveTinyAllocations() {
-        return 0;
     }
 
     @Override
@@ -410,10 +403,7 @@ class PoolArena extends SizeClasses implements PoolArenaMetric, AllocatorControl
     }
 
     protected final PoolChunk newChunk(int pageSize, int maxPageIdx, int pageShifts, int chunkSize) {
-        Buffer base = manager.allocateShared(this, chunkSize, manager.drop(), Statics.CLEANER);
-        Object memory = manager.unwrapRecoverableMemory(base);
-        return new PoolChunk(
-                this, base, memory, pageSize, pageShifts, chunkSize, maxPageIdx);
+        return new PoolChunk(this, pageSize, pageShifts, chunkSize, maxPageIdx);
     }
 
     @Override

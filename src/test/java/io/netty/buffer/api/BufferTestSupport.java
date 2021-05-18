@@ -167,12 +167,14 @@ public abstract class BufferTestSupport {
         // Add 2-way composite buffers of all combinations.
         for (Fixture first : initFixtures) {
             for (Fixture second : initFixtures) {
-                var a = first.get();
-                var b = second.get();
                 builder.add(new Fixture("compose(" + first + ", " + second + ')', () -> {
                     return new BufferAllocator() {
+                        BufferAllocator a;
+                        BufferAllocator b;
                         @Override
                         public Buffer allocate(int size) {
+                            a = first.get();
+                            b = second.get();
                             int half = size / 2;
                             try (Buffer firstHalf = a.allocate(half);
                                  Buffer secondHalf = b.allocate(size - half)) {
@@ -182,8 +184,14 @@ public abstract class BufferTestSupport {
 
                         @Override
                         public void close() {
-                            a.close();
-                            b.close();
+                            if (a != null) {
+                                a.close();
+                                a = null;
+                            }
+                            if (b != null) {
+                                b.close();
+                                b = null;
+                            }
                         }
                     };
                 }, COMPOSITE));
@@ -193,9 +201,10 @@ public abstract class BufferTestSupport {
         // Also add a 3-way composite buffer.
         builder.add(new Fixture("compose(heap,heap,heap)", () -> {
             return new BufferAllocator() {
-                final BufferAllocator alloc = BufferAllocator.heap();
+                BufferAllocator alloc;
                 @Override
                 public Buffer allocate(int size) {
+                    alloc = BufferAllocator.heap();
                     int part = size / 3;
                     try (Buffer a = alloc.allocate(part);
                          Buffer b = alloc.allocate(part);
@@ -206,17 +215,21 @@ public abstract class BufferTestSupport {
 
                 @Override
                 public void close() {
-                    alloc.close();
+                    if (alloc != null) {
+                        alloc.close();
+                        alloc = null;
+                    }
                 }
             };
         }, COMPOSITE));
 
         for (Fixture fixture : initFixtures) {
             builder.add(new Fixture(fixture + ".ensureWritable", () -> {
-                var allocator = fixture.createAllocator();
                 return new BufferAllocator() {
+                    BufferAllocator allocator;
                     @Override
                     public Buffer allocate(int size) {
+                        allocator = fixture.createAllocator();
                         if (size < 2) {
                             return allocator.allocate(size);
                         }
@@ -227,15 +240,19 @@ public abstract class BufferTestSupport {
 
                     @Override
                     public void close() {
-                        allocator.close();
+                        if (allocator != null) {
+                            allocator.close();
+                            allocator = null;
+                        }
                     }
                 };
             }, fixture.getProperties()));
             builder.add(new Fixture(fixture + ".compose.ensureWritable", () -> {
-                var allocator = fixture.createAllocator();
                 return new BufferAllocator() {
+                    BufferAllocator allocator;
                     @Override
                     public Buffer allocate(int size) {
+                        allocator = fixture.createAllocator();
                         if (size < 2) {
                             return allocator.allocate(size);
                         }
@@ -246,7 +263,10 @@ public abstract class BufferTestSupport {
 
                     @Override
                     public void close() {
-                        allocator.close();
+                        if (allocator != null) {
+                            allocator.close();
+                            allocator = null;
+                        }
                     }
                 };
             }, COMPOSITE));
@@ -261,10 +281,11 @@ public abstract class BufferTestSupport {
         Builder<Fixture> builder = Stream.builder();
         builder.add(f);
         builder.add(new Fixture(f + ".split", () -> {
-            var allocatorBase = f.get();
             return new BufferAllocator() {
+                BufferAllocator allocatorBase;
                 @Override
                 public Buffer allocate(int size) {
+                    allocatorBase = f.get();
                     try (Buffer buf = allocatorBase.allocate(size + 1)) {
                         buf.writerOffset(size);
                         return buf.split().writerOffset(0);
@@ -273,7 +294,10 @@ public abstract class BufferTestSupport {
 
                 @Override
                 public void close() {
-                    allocatorBase.close();
+                    if (allocatorBase != null) {
+                        allocatorBase.close();
+                        allocatorBase = null;
+                    }
                 }
             };
         }, f.getProperties()));
@@ -285,10 +309,11 @@ public abstract class BufferTestSupport {
         builder.add(f);
         var props = concat(f.getProperties(), Properties.SLICE);
         builder.add(new Fixture(f + ".slice(0, capacity())", () -> {
-            var allocatorBase = f.get();
             return new BufferAllocator() {
+                BufferAllocator allocatorBase;
                 @Override
                 public Buffer allocate(int size) {
+                    allocatorBase = f.get();
                     try (Buffer base = allocatorBase.allocate(size)) {
                         return base.slice(0, base.capacity()).writerOffset(0);
                     }
@@ -296,15 +321,19 @@ public abstract class BufferTestSupport {
 
                 @Override
                 public void close() {
-                    allocatorBase.close();
+                    if (allocatorBase != null) {
+                        allocatorBase.close();
+                        allocatorBase = null;
+                    }
                 }
             };
         }, props));
         builder.add(new Fixture(f + ".slice(1, capacity() - 2)", () -> {
-            var allocatorBase = f.get();
             return new BufferAllocator() {
+                BufferAllocator allocatorBase;
                 @Override
                 public Buffer allocate(int size) {
+                    allocatorBase = f.get();
                     try (Buffer base = allocatorBase.allocate(size + 2)) {
                         return base.slice(1, size).writerOffset(0);
                     }
@@ -312,7 +341,10 @@ public abstract class BufferTestSupport {
 
                 @Override
                 public void close() {
-                    allocatorBase.close();
+                    if (allocatorBase != null) {
+                        allocatorBase.close();
+                        allocatorBase = null;
+                    }
                 }
             };
         }, props));
