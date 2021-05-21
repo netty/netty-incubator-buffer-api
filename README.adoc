@@ -6,9 +6,9 @@ See the xref:RATIONALE.adoc[RATIONALE] document for more background.
 
 == Building and Testing
 
-Short version: just run `make`.
+Short version: just run `make` if you want to build on Java 17, otherwise run `mvn install` if you want to build with Java 11, and without support for the `jdk.incubator.foreign` APIs.
 
-The project currently relies on snapshot versions of the https://github.com/openjdk/panama-foreign[Panama Foreign] fork of OpenJDK.
+The project (specifically, the `buffer-memseg` module) currently relies on snapshot versions of the https://github.com/openjdk/panama-foreign[Panama Foreign] fork of OpenJDK.
 This allows us to test out the most recent version of the `jdk.incubator.foreign` APIs, but also make building, and local development more involved.
 To simplify things, we have a Docker based build, controlled via a Makefile with the following commands:
 
