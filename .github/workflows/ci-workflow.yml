@@ -45,7 +45,7 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           report_paths: '**/target/surefire-reports/TEST-*.xml'
           commit: ${{ github.event.workflow_run.head_commit.id }}
-          check_name: Build test reports
+          check_name: java17 test reports
       - name: Upload build artefacts
         uses: actions/upload-artifact@v2
         if: ${{ failure() }}
@@ -72,3 +72,17 @@ jobs:
             ${{ runner.os }}-maven-
       - name: Maven build
         run: mvn verify -B -C -T1C -fae
+      - name: Publish Test Report
+        uses: scacap/action-surefire-report@v1.0.9
+        if: ${{ always() }}
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          report_paths: '**/target/surefire-reports/TEST-*.xml'
+          commit: ${{ github.event.workflow_run.head_commit.id }}
+          check_name: java11 test reports
+      - name: Upload build artefacts
+        uses: actions/upload-artifact@v2
+        if: ${{ failure() }}
+        with:
+          name: artifacts
+          path: target/
