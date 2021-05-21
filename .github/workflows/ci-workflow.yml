@@ -64,7 +64,7 @@ jobs:
         with:
           distribution: 'adopt' # See 'Supported distributions' for available options
           java-version: '11'
-      - uses: actions/cache@v1
+      - uses: actions/cache@v2
         with:
           path: ~/.m2/repository
           key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
@@ -80,6 +80,7 @@ jobs:
           report_paths: '**/target/surefire-reports/TEST-*.xml'
           commit: ${{ github.event.workflow_run.head_commit.id }}
           check_name: java11 test reports
+      - run: ls -la ~
       - name: Upload build artefacts
         uses: actions/upload-artifact@v2
         if: ${{ failure() }}
