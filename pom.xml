@@ -105,6 +105,15 @@
         <module>buffer-memseg</module>
       </modules>
     </profile>
+    <profile>
+      <id>Java 11 support for tests</id>
+      <activation>
+        <jdk>!17</jdk>
+      </activation>
+      <modules>
+        <module>buffer-memseg-dummy</module>
+      </modules>
+    </profile>
   </profiles>
 
   <build>
@@ -381,6 +390,11 @@
       <dependency>
         <groupId>io.netty.incubator</groupId>
         <artifactId>netty-incubator-buffer-memseg</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.netty.incubator</groupId>
+        <artifactId>netty-incubator-buffer-memseg-dummy</artifactId>
         <version>${project.version}</version>
       </dependency>
 

@@ -266,6 +266,7 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
             assertThrows(IllegalArgumentException.class, () -> buf.slice(0, -1));
+            assertThrows(IllegalArgumentException.class, () -> buf.slice(2, -1));
             // Verify that the slice is closed properly afterwards.
             assertTrue(buf.isOwned());
         }

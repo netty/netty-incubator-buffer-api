@@ -13,15 +13,7 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-open module netty.incubator.buffer.tests {
-    requires io.netty.common;
-    requires io.netty.buffer;
-
-    // Optional dependencies, needed for some examples.
-    requires static java.logging;
-
-    requires netty.incubator.buffer;
-    // We need to require memseg in order for its implementation to be service loaded.
-    // Just having it on the module path is not enough.
-    requires netty.incubator.buffer.memseg;
+module netty.incubator.buffer.memseg {
+    // Java 11 compatible stand-in module for the memory segment implementation.
+    // We need this module in order for the tests module to pull in the memseg module.
 }
