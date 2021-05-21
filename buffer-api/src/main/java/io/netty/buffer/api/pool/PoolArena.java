@@ -312,11 +312,6 @@ class PoolArena extends SizeClasses implements PoolArenaMetric, AllocatorControl
     }
 
     @Override
-    public long numTinyAllocations() {
-        return 0;
-    }
-
-    @Override
     public long numSmallAllocations() {
         return allocationsSmall.longValue();
     }
@@ -333,11 +328,6 @@ class PoolArena extends SizeClasses implements PoolArenaMetric, AllocatorControl
             deallocs = deallocationsSmall + deallocationsNormal;
         }
         return deallocs + deallocationsHuge.longValue();
-    }
-
-    @Override
-    public long numTinyDeallocations() {
-        return 0;
     }
 
     @Override

@@ -53,14 +53,6 @@ public interface PoolArenaMetric extends SizeClassesMetric {
     long numAllocations();
 
     /**
-     * Return the number of tiny allocations done via the arena.
-     *
-     * @deprecated Tiny allocations have been merged into small allocations.
-     */
-    @Deprecated
-    long numTinyAllocations();
-
-    /**
      * Return the number of small allocations done via the arena.
      */
     long numSmallAllocations();
@@ -79,14 +71,6 @@ public interface PoolArenaMetric extends SizeClassesMetric {
      * Return the number of deallocations done via the arena. This includes all sizes.
      */
     long numDeallocations();
-
-    /**
-     * Return the number of tiny deallocations done via the arena.
-     *
-     * @deprecated Tiny deallocations have been merged into small deallocations.
-     */
-    @Deprecated
-    long numTinyDeallocations();
 
     /**
      * Return the number of small deallocations done via the arena.
