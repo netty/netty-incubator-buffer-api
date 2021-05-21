@@ -20,6 +20,8 @@ import io.netty.buffer.api.Buffer;
 import io.netty.buffer.api.MemoryManager;
 import io.netty.util.internal.StringUtil;
 
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.VarHandle;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -29,6 +31,7 @@ import static io.netty.buffer.api.pool.PoolChunk.isSubpage;
 import static java.lang.Math.max;
 
 class PoolArena extends SizeClasses implements PoolArenaMetric, AllocatorControl {
+    private static final VarHandle SUBPAGE_ARRAY = MethodHandles.arrayElementVarHandle(PoolSubpage[].class);
     enum SizeClass {
         Small,
         Normal
@@ -76,9 +79,6 @@ class PoolArena extends SizeClasses implements PoolArenaMetric, AllocatorControl
 
         numSmallSubpagePools = nSubpages;
         smallSubpagePools = newSubpagePoolArray(numSmallSubpagePools);
-        for (int i = 0; i < smallSubpagePools.length; i ++) {
-            smallSubpagePools[i] = newSubpagePoolHead();
-        }
 
         q100 = new PoolChunkList(this, null, 100, Integer.MAX_VALUE, chunkSize);
         q075 = new PoolChunkList(this, q100, 75, 100, chunkSize);
@@ -135,7 +135,7 @@ class PoolArena extends SizeClasses implements PoolArenaMetric, AllocatorControl
          * Synchronize on the head. This is needed as {@link PoolChunk#allocateSubpage(int)} and
          * {@link PoolChunk#free(long)} may modify the doubly linked list as well.
          */
-        final PoolSubpage head = smallSubpagePools[sizeIdx];
+        PoolSubpage head = findSubpagePoolHead(sizeIdx);
         final boolean needsNormalAllocation;
         synchronized (head) {
             final PoolSubpage s = head.next;
@@ -246,7 +246,15 @@ class PoolArena extends SizeClasses implements PoolArenaMetric, AllocatorControl
     }
 
     PoolSubpage findSubpagePoolHead(int sizeIdx) {
-        return smallSubpagePools[sizeIdx];
+        PoolSubpage head = (PoolSubpage) SUBPAGE_ARRAY.getVolatile(smallSubpagePools, sizeIdx);
+        if (head == null) {
+            head = newSubpagePoolHead();
+            if (!SUBPAGE_ARRAY.compareAndSet(smallSubpagePools, sizeIdx, null, head)) {
+                // We lost the race. Read the winning value.
+                head = (PoolSubpage) SUBPAGE_ARRAY.getVolatile(smallSubpagePools, sizeIdx);
+            }
+        }
+        return head;
     }
 
     @Override
@@ -288,8 +296,9 @@ class PoolArena extends SizeClasses implements PoolArenaMetric, AllocatorControl
 
     private static List<PoolSubpageMetric> subPageMetricList(PoolSubpage[] pages) {
         List<PoolSubpageMetric> metrics = new ArrayList<>();
-        for (PoolSubpage head : pages) {
-            if (head.next == head) {
+        for (int i = 0, len = pages.length; i < len; i++) {
+            PoolSubpage head = (PoolSubpage) SUBPAGE_ARRAY.getVolatile(pages, i);
+            if (head == null || head.next == head) {
                 continue;
             }
             PoolSubpage s = head.next;
@@ -432,8 +441,8 @@ class PoolArena extends SizeClasses implements PoolArenaMetric, AllocatorControl
 
     private static void appendPoolSubPages(StringBuilder buf, PoolSubpage[] subpages) {
         for (int i = 0; i < subpages.length; i ++) {
-            PoolSubpage head = subpages[i];
-            if (head.next == head) {
+            PoolSubpage head = (PoolSubpage) SUBPAGE_ARRAY.getVolatile(subpages, i);
+            if (head == null || head.next == head) {
                 continue;
             }
 
@@ -449,8 +458,11 @@ class PoolArena extends SizeClasses implements PoolArenaMetric, AllocatorControl
     }
 
     public void close() {
-        for (PoolSubpage page : smallSubpagePools) {
-            page.destroy();
+        for (int i = 0, len = smallSubpagePools.length; i < len; i++) {
+            PoolSubpage page = (PoolSubpage) SUBPAGE_ARRAY.getVolatile(smallSubpagePools, i);
+            if (page != null) {
+                page.destroy();
+            }
         }
         for (PoolChunkList list : new PoolChunkList[] {qInit, q000, q025, q050, q100}) {
             list.destroy();
