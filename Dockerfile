@@ -29,8 +29,12 @@ RUN git clone --depth 1 -b master https://github.com/netty/netty.git netty \
     && rm -fr netty
 
 # Prepare our own build
+RUN mkdir buffer-api && mkdir buffer-memseg && mkdir buffer-tests
 COPY pom.xml pom.xml
-RUN mvn dependency:go-offline surefire:test checkstyle:check -ntp
+COPY buffer-api/pom.xml buffer-api/pom.xml
+COPY buffer-memseg/pom.xml buffer-memseg/pom.xml
+COPY buffer-tests/pom.xml buffer-tests/pom.xml
+RUN mvn install dependency:go-offline surefire:test checkstyle:check -ntp
 
 # Copy over the project code and run our build
 COPY . .
