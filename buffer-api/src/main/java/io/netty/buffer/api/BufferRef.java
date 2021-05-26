@@ -27,7 +27,7 @@ public final class BufferRef extends BufferHolder<BufferRef> {
      *
      * @param buf The buffer to reference.
      */
-    public BufferRef(Buffer buf) {
+    private BufferRef(Buffer buf) {
         super(buf);
         // BufferRef is meant to be atomic, so we need to add a fence to get the semantics of a volatile store.
         VarHandle.fullFence();
@@ -53,20 +53,6 @@ public final class BufferRef extends BufferHolder<BufferRef> {
      * Replace the underlying referenced buffer with the given buffer.
      * <p>
      * <strong>Note:</strong> this method decreases the reference count of the current buffer,
-     * and increases the reference count of the new buffer.
-     * <p>
-     * The buffer assignment is performed using a volatile store.
-     *
-     * @param newBuf The new {@link Buffer} instance that is replacing the currently held buffer.
-     */
-    public void replace(Buffer newBuf) {
-        replaceBufVolatile(newBuf);
-    }
-
-    /**
-     * Replace the underlying referenced buffer with the given buffer.
-     * <p>
-     * <strong>Note:</strong> this method decreases the reference count of the current buffer,
      * and takes exclusive ownership of the sent buffer.
      * <p>
      * The buffer assignment is performed using a volatile store.
@@ -74,7 +60,7 @@ public final class BufferRef extends BufferHolder<BufferRef> {
      * @param send The {@link Send} with the new {@link Buffer} instance that is replacing the currently held buffer.
      */
     public void replace(Send<Buffer> send) {
-        replaceBufVolatile(send);
+        replaceBufferVolatile(send);
     }
 
     /**
@@ -83,6 +69,6 @@ public final class BufferRef extends BufferHolder<BufferRef> {
      * @return The buffer held by the reference.
      */
     public Buffer contents() {
-        return getBufVolatile();
+        return getBufferVolatile();
     }
 }

@@ -74,8 +74,8 @@ public interface BufferAllocator extends AutoCloseable {
      * byte contents. The buffer has the same capacity as the byte array length, and its write offset is placed at the
      * end, and its read offset is at the beginning, such that the entire buffer contents are readable.
      * <p>
-     * The buffers produced by the supplier will have {@linkplain Buffer#isOwned() ownership}, and closing them will
-     * make them {@linkplain Buffer#isAccessible() inaccessible}, just like a normally allocated buffer.
+     * The buffers produced by the supplier will each have their own independent life-cycle, and closing them will
+     * make them {@linkplain Buffer#isAccessible() inaccessible}, just like normally allocated buffers.
      * <p>
      * The buffers produced are "constants", in the sense that they are {@linkplain Buffer#readOnly() read-only}.
      * <p>

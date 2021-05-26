@@ -27,6 +27,7 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.Future;
 import java.util.concurrent.SynchronousQueue;
 
+import static io.netty.buffer.api.internal.Statics.asRS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -77,12 +78,12 @@ public class BufferSendTest extends BufferTestSupport {
     void sendMustThrowWhenBufIsAcquired(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            try (Buffer ignored = buf.acquire()) {
-                assertFalse(buf.isOwned());
+            try (Buffer ignored = asRS(buf).acquire()) {
+                assertFalse(asRS(buf).isOwned());
                 assertThrows(IllegalStateException.class, buf::send);
             }
             // Now send() should work again.
-            assertTrue(buf.isOwned());
+            assertTrue(asRS(buf).isOwned());
             buf.send().receive().close();
         }
     }

@@ -32,43 +32,17 @@ import java.nio.ByteOrder;
  * <h3>Life cycle and reference counting</h3>
  *
  * The buffer has a life cycle, where it is allocated, used, and deallocated.
- * The reference count controls this life cycle.
- * <p>
  * When the buffer is initially allocated, a pairing {@link #close()} call will deallocate it.
- * In this state, the buffer {@linkplain #isOwned() is "owned"}.
- * <p>
- * The buffer can also be {@linkplain #acquire() acquired} when it's about to be involved in a complicated lifetime.
- * The {@link #acquire()} call increments the reference count of the buffer,
- * and a pairing {@link #close()} call will decrement the reference count.
- * Each acquire lends out the buffer, and the buffer is said to be in a "borrowed" state.
- * <p>
- * Certain operations, such as {@link #send()}, are only available on owned buffers.
+ * If a buffer is {@linkplain #send() sent} elsewhere, the {@linkplain #close() close} method on the given instance
+ * will become a no-op.
+ * The buffer can be thought of as a view onto memory, and calling {@link #send()} on the buffer will effectively close
+ * that view, and recreate it upon reception at its destination.
  *
  * <h3>Thread-safety</h3>
  *
  * Buffers are not thread-safe.
- * The reference counting implied by the {@link Rc} interface is itself not thread-safe,
- * and buffers additionally contain other mutable data that is not thread-safe.
- * Depending on the buffer implementation, the buffer may impose confinement restrictions as well,
- * so that the buffer cannot even be read using absolute offsets,
- * such as with the {@link #getByte(int)} method,
- * from multiple threads.
- * <p>
- * If a buffer needs to be accessed by a different thread,
- * then the ownership of that buffer must be sent to that thread.
- * This can be done with the {@link #send()} method.
- * The send method consumes the buffer, if it is in an owned state, and produces a {@link Send} object.
- * The {@link Send} object can then be shared in a thread-safe way (so-called "safe publication"),
- * with the intended recipient thread.
- * <p>
- * To send a buffer to another thread, the buffer must not have any outstanding borrows.
- * That is to say, all {@linkplain #acquire() acquires} must have been paired with a {@link #close()};
- * all {@linkplain #slice() slices} must have been closed.
- * And if this buffer is a constituent of a
- * {@linkplain CompositeBuffer#compose(BufferAllocator, Buffer...) composite buffer}, then that composite buffer must
- * be closed.
- * And if this buffer is itself a composite buffer, then it must own all of its constituent buffers.
- * The {@link #isOwned()} method can be used on any buffer to check if it can be sent or not.
+ * The {@linkplain #isAccessible() accessibility state} implied by the {@link Resource} interface is itself not
+ * thread-safe, and buffers additionally contain other mutable data that is not thread-safe.
  *
  * <h3>Accessing data</h3>
  *
@@ -137,7 +111,7 @@ import java.nio.ByteOrder;
  * The {@link BufferAllocator} has a {@link BufferAllocator#constBufferSupplier(byte[])} method that solves this, and
  * prevents these bugs from occurring.
  */
-public interface Buffer extends Rc<Buffer>, BufferAccessors {
+public interface Buffer extends Resource<Buffer>, BufferAccessors {
     /**
      * Change the default byte order of this buffer, and return this buffer.
      *
@@ -412,7 +386,6 @@ public interface Buffer extends Rc<Buffer>, BufferAccessors {
     /**
      * Ensure that this buffer has {@linkplain #writableBytes() available space for writing} the given number of
      * bytes.
-     * The buffer must be in {@linkplain #isOwned() an owned state}, or an exception will be thrown.
      * If this buffer already has the necessary space, then this method returns immediately.
      * If this buffer does not already have the necessary space, then it will be expanded using the
      * {@link BufferAllocator} the buffer was created with.
@@ -420,8 +393,7 @@ public interface Buffer extends Rc<Buffer>, BufferAccessors {
      * {@code false}.
      *
      * @param size The requested number of bytes of space that should be available for writing.
-     * @throws IllegalStateException if this buffer is not in an {@linkplain #isOwned() owned} state,
-     * or is {@linkplain #readOnly() read-only}.
+     * @throws IllegalStateException if this buffer is not in a bad state, or is {@linkplain #readOnly() read-only}.
      */
     default void ensureWritable(int size) {
         ensureWritable(size, 1, true);
@@ -430,7 +402,6 @@ public interface Buffer extends Rc<Buffer>, BufferAccessors {
     /**
      * Ensure that this buffer has {@linkplain #writableBytes() available space for writing} the given number of
      * bytes.
-     * The buffer must be in {@linkplain #isOwned() an owned state}, or an exception will be thrown.
      * If this buffer already has the necessary space, then this method returns immediately.
      * If this buffer does not already have the necessary space, then space will be made available in one or all of
      * the following available ways:
@@ -463,8 +434,7 @@ public interface Buffer extends Rc<Buffer>, BufferAccessors {
      * @param allowCompaction {@code true} if the method is allowed to modify the
      *                                   {@linkplain #readerOffset() reader offset} and
      *                                   {@linkplain #writerOffset() writer offset}, otherwise {@code false}.
-     * @throws IllegalStateException if this buffer is not in an {@linkplain #isOwned() owned} state,
-     * or is {@linkplain #readOnly() read-only}.
+     * @throws IllegalStateException if this buffer is not in a bad state, or is {@linkplain #readOnly() read-only}.
      */
     void ensureWritable(int size, int minimumGrowth, boolean allowCompaction);
 
@@ -513,8 +483,6 @@ public interface Buffer extends Rc<Buffer>, BufferAccessors {
 
     /**
      * Split the buffer into two, at the {@linkplain #writerOffset() write offset} position.
-     * <p>
-     * The buffer must be in {@linkplain #isOwned() an owned state}, or an exception will be thrown.
      * <p>
      * The region of this buffer that contain the read and readable bytes, will be captured and returned in a new
      * buffer, that will hold its own ownership of that region. This allows the returned buffer to be independently
@@ -565,8 +533,6 @@ public interface Buffer extends Rc<Buffer>, BufferAccessors {
     /**
      * Split the buffer into two, at the given {@code splitOffset}.
      * <p>
-     * The buffer must be in {@linkplain #isOwned() an owned state}, or an exception will be thrown.
-     * <p>
      * The region of this buffer that precede the {@code splitOffset}, will be captured and returned in a new
      * buffer, that will hold its own ownership of that region. This allows the returned buffer to be independently
      * {@linkplain #send() sent} to other threads.
@@ -615,8 +581,7 @@ public interface Buffer extends Rc<Buffer>, BufferAccessors {
     /**
      * Discards the read bytes, and moves the buffer contents to the beginning of the buffer.
      *
-     * @throws IllegalStateException if this buffer is not in an {@linkplain #isOwned() owned} state,
-     * or is {@linkplain #readOnly() read-only}.
+     * @throws IllegalStateException if this buffer is not in a bad state, or is {@linkplain #readOnly() read-only}.
      */
     void compact();
 
@@ -675,7 +640,8 @@ public interface Buffer extends Rc<Buffer>, BufferAccessors {
      * <p>
      * The {@link ByteBuffer} instances obtained from the component, share lifetime with that internal component.
      * This means they can be accessed as long as the internal memory store remain unchanged. Methods that may cause
-     * such changes, are any method that requires the buffer to be {@linkplain #isOwned() owned}.
+     * such changes are {@link #split(int)}, {@link #split()}, {@link #compact()}, {@link #ensureWritable(int)},
+     * {@link #ensureWritable(int, int, boolean)}, and {@link #send()}.
      * <p>
      * The best way to ensure this doesn't cause any trouble, is to use the buffers directly as part of the iteration,
      * or immediately after the iteration while we are still in the scope of the method that triggered the iteration.
@@ -717,7 +683,8 @@ public interface Buffer extends Rc<Buffer>, BufferAccessors {
      * <p>
      * The {@link ByteBuffer} instances obtained from the component, share lifetime with that internal component.
      * This means they can be accessed as long as the internal memory store remain unchanged. Methods that may cause
-     * such changes, are any method that requires the buffer to be {@linkplain #isOwned() owned}.
+     * such changes are {@link #split(int)}, {@link #split()}, {@link #compact()}, {@link #ensureWritable(int)},
+     * {@link #ensureWritable(int, int, boolean)}, and {@link #send()}.
      * <p>
      * The best way to ensure this doesn't cause any trouble, is to use the buffers directly as part of the iteration,
      * or immediately after the iteration while we are still in the scope of the method that triggered the iteration.

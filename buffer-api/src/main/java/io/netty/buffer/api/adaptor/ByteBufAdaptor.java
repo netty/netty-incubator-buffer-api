@@ -25,7 +25,7 @@ import io.netty.buffer.Unpooled;
 import io.netty.buffer.api.BufferAllocator;
 import io.netty.buffer.api.internal.Statics;
 import io.netty.buffer.api.Buffer;
-import io.netty.buffer.api.RcSupport;
+import io.netty.buffer.api.internal.ResourceSupport;
 import io.netty.util.ByteProcessor;
 import io.netty.util.IllegalReferenceCountException;
 
@@ -39,6 +39,8 @@ import java.nio.channels.GatheringByteChannel;
 import java.nio.channels.ScatteringByteChannel;
 import java.nio.charset.Charset;
 import java.util.concurrent.atomic.AtomicReference;
+
+import static io.netty.buffer.api.internal.Statics.asRS;
 
 public final class ByteBufAdaptor extends ByteBuf {
     private final ByteBufAllocatorAdaptor alloc;
@@ -80,7 +82,7 @@ public final class ByteBufAdaptor extends ByteBuf {
             try {
                 buffer.ensureWritable(diff);
             } catch (IllegalStateException e) {
-                if (!buffer.isOwned()) {
+                if (!asRS(buffer).isOwned()) {
                     throw new UnsupportedOperationException(e);
                 }
                 throw e;
@@ -215,7 +217,7 @@ public final class ByteBufAdaptor extends ByteBuf {
         checkAccess();
         if (writableBytes() < minWritableBytes) {
             try {
-                if (buffer.isOwned()) {
+                if (asRS(buffer).isOwned()) {
                     // Good place.
                     buffer.ensureWritable(minWritableBytes);
                 } else {
@@ -1629,7 +1631,7 @@ public final class ByteBufAdaptor extends ByteBuf {
     @Override
     public ByteBuf retain(int increment) {
         for (int i = 0; i < increment; i++) {
-            buffer.acquire();
+            asRS(buffer).acquire();
         }
         return this;
     }
@@ -1643,11 +1645,11 @@ public final class ByteBufAdaptor extends ByteBuf {
         if (!buffer.isAccessible()) {
             return -1;
         }
-        if (buffer instanceof RcSupport) {
-            var rc = (RcSupport<?, ?>) buffer;
+        if (buffer instanceof ResourceSupport) {
+            var rc = (ResourceSupport<?, ?>) buffer;
             return rc.countBorrows();
         }
-        return buffer.isOwned()? 0 : 1;
+        return asRS(buffer).isOwned()? 0 : 1;
     }
 
     @Override

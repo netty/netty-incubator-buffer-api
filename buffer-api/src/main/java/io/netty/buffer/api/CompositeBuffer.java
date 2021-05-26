@@ -15,6 +15,8 @@
  */
 package io.netty.buffer.api;
 
+import io.netty.buffer.api.internal.ResourceSupport;
+
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Arrays;
@@ -32,11 +34,6 @@ import java.util.stream.Stream;
  * A composite buffer is constructed using one of the {@code compose} methods:
  * <ul>
  *     <li>
- *         {@link #compose(BufferAllocator, Buffer...)} creates a composite buffer from the given set of buffers.
- *         The reference count to the passed buffers will be increased, and the resulting composite buffer may or may
- *         not have ownership.
- *     </li>
- *     <li>
  *         {@link #compose(BufferAllocator, Send[])} creates a composite buffer from the buffers that are sent to it via
  *         the passed in send objects. Since {@link Send#receive()} transfers ownership, the resulting composite buffer
  *         will have ownership, because it is guaranteed that there are no other references to its constituent buffers.
@@ -48,7 +45,7 @@ import java.util.stream.Stream;
  *     </li>
  * </ul>
  * Composite buffers can later be extended with internally allocated components, with {@link #ensureWritable(int)},
- * or with externally allocated buffers, using {@link #extendWith(Buffer)}.
+ * or with externally allocated buffers, using {@link #extendWith(Send)}.
  *
  * <h3>Constituent buffer requirements</h3>
  *
@@ -82,12 +79,12 @@ import java.util.stream.Stream;
  *
  * <h3>Ownership and Send</h3>
  *
- * {@linkplain Buffer#send() Sending} a composite buffer implies sending all of its constituent buffers.
- * For sending to be possible, both the composite buffer itself, and all of its constituent buffers, must be in an
- * {@linkplain Rc#isOwned() owned state}.
- * This means that the composite buffer must be the only reference to the constituent buffers.
+ * {@linkplain Resource#send() Sending} a composite buffer implies sending all of its constituent buffers.
+ * For sending to be possible, both the composite buffer itself, and all of its constituent buffers, must be in a
+ * state that permits them being sent. This should be the case by default, as it shouldn't be possible to create
+ * composite buffers that can't be sent.
  */
-public final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> implements Buffer {
+public final class CompositeBuffer extends ResourceSupport<Buffer, CompositeBuffer> implements Buffer {
     /**
      * The max array size is JVM implementation dependant, but most seem to settle on {@code Integer.MAX_VALUE - 8}.
      * We set the max composite buffer capacity to the same, since it would otherwise be impossible to create a
@@ -121,37 +118,6 @@ public final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> im
     private ByteOrder order;
     private boolean closed;
     private boolean readOnly;
-
-    /**
-     * Compose the given sequence of buffers and present them as a single buffer.
-     * <p>
-     * <strong>Note:</strong> The composite buffer increments the reference count on all the constituent buffers,
-     * and holds a reference to them until the composite buffer is deallocated.
-     * This means the constituent buffers must still have their outside-reference count decremented as normal.
-     * If the buffers are allocated for the purpose of participating in the composite buffer,
-     * then they should be closed as soon as the composite buffer has been created, like in this example:
-     * <pre>{@code
-     *     try (Buffer a = allocator.allocate(size);
-     *          Buffer b = allocator.allocate(size)) {
-     *         return allocator.compose(a, b); // Reference counts for 'a' and 'b' incremented here.
-     *     } // Reference count for 'a' and 'b' decremented here; composite buffer now holds the last references.
-     * }</pre>
-     * <p>
-     * See the class documentation for more information on what is required of the given buffers for composition to be
-     * allowed.
-     *
-     * @param allocator The allocator for the composite buffer. This allocator will be used e.g. to service
-     * {@link #ensureWritable(int)} calls.
-     * @param bufs The buffers to compose into a single buffer view.
-     * @return A buffer composed of, and backed by, the given buffers.
-     * @throws IllegalArgumentException if the given buffers have an inconsistent
-     * {@linkplain Buffer#order() byte order}.
-     */
-    public static CompositeBuffer compose(BufferAllocator allocator, Buffer... bufs) {
-        Stream<Buffer> bufferStream = Arrays.stream(bufs)
-                .map(buf -> buf.acquire()); // Increments reference counts.
-        return new CompositeBuffer(allocator, filterExternalBufs(bufferStream), COMPOSITE_DROP, false);
-    }
 
     /**
      * Compose the given sequence of sends of buffers and present them as a single buffer.
@@ -201,25 +167,25 @@ public final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> im
         if (ise != null) {
             throw ise;
         }
-        return new CompositeBuffer(allocator, filterExternalBufs(Arrays.stream(bufs)), COMPOSITE_DROP, false);
+        return new CompositeBuffer(allocator, filterExternalBufs(Arrays.stream(bufs)), COMPOSITE_DROP);
     }
 
     /**
      * Create an empty composite buffer, that has no components. The buffer can be extended with components using either
-     * {@link #ensureWritable(int)} or {@link #extendWith(Buffer)}.
+     * {@link #ensureWritable(int)} or {@link #extendWith(Send)}.
      *
      * @param allocator The allocator for the composite buffer. This allocator will be used e.g. to service
      * {@link #ensureWritable(int)} calls.
      * @return A composite buffer that has no components, and has a capacity of zero.
      */
     public static CompositeBuffer compose(BufferAllocator allocator) {
-        return new CompositeBuffer(allocator, EMPTY_BUFFER_ARRAY, COMPOSITE_DROP, false);
+        return new CompositeBuffer(allocator, EMPTY_BUFFER_ARRAY, COMPOSITE_DROP);
     }
 
     /**
-     * Check if the given buffer is a {@linkplain #compose(BufferAllocator, Buffer...) composite} buffer or not.
+     * Check if the given buffer is a {@linkplain #compose(BufferAllocator, Send...) composite} buffer or not.
      * @param composite The buffer to check.
-     * @return {@code true} if the given buffer was created with {@link #compose(BufferAllocator, Buffer...)},
+     * @return {@code true} if the given buffer was created with {@link #compose(BufferAllocator, Send...)},
      * {@code false} otherwise.
      */
     public static boolean isComposite(Buffer composite) {
@@ -267,24 +233,14 @@ public final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> im
             // Extract components and move our reference count from the composite onto the components.
             var composite = (CompositeBuffer) buf;
             var bufs = composite.bufs;
-            for (Buffer b : bufs) {
-                b.acquire();
-            }
-            buf.close(); // Important: acquire on components *before* closing composite.
             return Stream.of(bufs);
         }
         return Stream.of(buf);
     }
 
-    private CompositeBuffer(BufferAllocator allocator, Buffer[] bufs, Drop<CompositeBuffer> drop,
-                            boolean acquireBufs) {
+    private CompositeBuffer(BufferAllocator allocator, Buffer[] bufs, Drop<CompositeBuffer> drop) {
         super(drop);
         this.allocator = allocator;
-        if (acquireBufs) {
-            for (Buffer buf : bufs) {
-                buf.acquire();
-            }
-        }
         try {
             if (bufs.length > 0) {
                 ByteOrder targetOrder = bufs[0].order();
@@ -490,7 +446,7 @@ public final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> im
         // This is important because 1) slice() already acquired the buffers, and 2) if this slice is empty
         // then we need to keep holding on to it to prevent this originating composite buffer from getting
         // ownership. If it did, its behaviour would be inconsistent with that of a non-composite buffer.
-        return new CompositeBuffer(allocator, slices, COMPOSITE_DROP, false);
+        return new CompositeBuffer(allocator, slices, COMPOSITE_DROP);
     }
 
     @Override
@@ -838,33 +794,37 @@ public final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> im
      * the composite buffer was created.
      * The extension buffer is added to the end of this composite buffer, which is modified in-place.
      *
-     * @see #compose(BufferAllocator, Buffer...)
      * @see #compose(BufferAllocator, Send...)
      * @param extension The buffer to extend the composite buffer with.
      */
-    public void extendWith(Buffer extension) {
+    public void extendWith(Send<Buffer> extension) {
         Objects.requireNonNull(extension, "Extension buffer cannot be null.");
+        Buffer buffer = extension.receive();
         if (!isOwned()) {
+            buffer.close();
             throw new IllegalStateException("This buffer cannot be extended because it is not in an owned state.");
         }
-        if (bufs.length > 0 && extension.order() != order()) {
+        if (bufs.length > 0 && buffer.order() != order()) {
+            buffer.close();
             throw new IllegalArgumentException(
                     "This buffer uses " + order() + " byte order, and cannot be extended with " +
-                    "a buffer that uses " + extension.order() + " byte order.");
+                    "a buffer that uses " + buffer.order() + " byte order.");
         }
-        if (bufs.length > 0 && extension.readOnly() != readOnly()) {
+        if (bufs.length > 0 && buffer.readOnly() != readOnly()) {
+            buffer.close();
             throw new IllegalArgumentException(
                     "This buffer is " + (readOnly? "read-only" : "writable") + ", " +
                     "and cannot be extended with a buffer that is " +
-                    (extension.readOnly()? "read-only." : "writable."));
+                    (buffer.readOnly()? "read-only." : "writable."));
         }
 
-        long extensionCapacity = extension.capacity();
+        long extensionCapacity = buffer.capacity();
         if (extensionCapacity == 0) {
             // Extending by a zero-sized buffer makes no difference. Especially since it's not allowed to change the
             // capacity of buffers that are constiuents of composite buffers.
             // This also ensures that methods like countComponents, and forEachReadable, do not have to worry about
             // overflow in their component counters.
+            buffer.close();
             return;
         }
 
@@ -873,10 +833,10 @@ public final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> im
 
         Buffer[] restoreTemp = bufs; // We need this to restore our buffer array, in case offset computations fail.
         try {
-            if (extension instanceof CompositeBuffer) {
+            if (buffer instanceof CompositeBuffer) {
                 // If the extension is itself a composite buffer, then extend this one by all the constituent
                 // component buffers.
-                CompositeBuffer compositeExtension = (CompositeBuffer) extension;
+                CompositeBuffer compositeExtension = (CompositeBuffer) buffer;
                 Buffer[] addedBuffers = compositeExtension.bufs;
                 Set<Buffer> duplicatesCheck = Collections.newSetFromMap(new IdentityHashMap<>());
                 duplicatesCheck.addAll(Arrays.asList(bufs));
@@ -884,24 +844,21 @@ public final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> im
                 if (duplicatesCheck.size() < bufs.length + addedBuffers.length) {
                     throw extensionDuplicatesException();
                 }
-                for (Buffer addedBuffer : addedBuffers) {
-                    addedBuffer.acquire();
-                }
                 int extendAtIndex = bufs.length;
                 bufs = Arrays.copyOf(bufs, extendAtIndex + addedBuffers.length);
                 System.arraycopy(addedBuffers, 0, bufs, extendAtIndex, addedBuffers.length);
                 computeBufferOffsets();
             } else {
                 for (Buffer buf : restoreTemp) {
-                    if (buf == extension) {
+                    if (buf == buffer) {
                         throw extensionDuplicatesException();
                     }
                 }
-                unsafeExtendWith(extension.acquire());
+                unsafeExtendWith(buffer);
             }
             if (restoreTemp.length == 0) {
-                order = extension.order();
-                readOnly = extension.readOnly();
+                order = buffer.order();
+                readOnly = buffer.readOnly();
             }
         } catch (Exception e) {
             bufs = restoreTemp;
@@ -939,7 +896,7 @@ public final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> im
         checkSplit(splitOffset);
         if (bufs.length == 0) {
             // Splitting a zero-length buffer is trivial.
-            return new CompositeBuffer(allocator, bufs, unsafeGetDrop(), true).order(order);
+            return new CompositeBuffer(allocator, bufs, unsafeGetDrop()).order(order);
         }
 
         int i = searchOffsets(splitOffset);
@@ -954,16 +911,9 @@ public final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> im
     }
 
     private CompositeBuffer buildSplitBuffer(Buffer[] splits) {
-        try {
-            var compositeBuf = new CompositeBuffer(allocator, splits, unsafeGetDrop(), true);
-            compositeBuf.order = order; // Preserve byte order even if splits array is empty.
-            return compositeBuf;
-        } finally {
-            // Drop our references to the buffers in the splits array. They belong to the new composite buffer now.
-            for (Buffer split : splits) {
-                split.close();
-            }
-        }
+        var compositeBuf = new CompositeBuffer(allocator, splits, unsafeGetDrop());
+        compositeBuf.order = order; // Preserve byte order even if splits array is empty.
+        return compositeBuf;
     }
 
     /**
@@ -980,7 +930,7 @@ public final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> im
         checkSplit(splitOffset);
         if (bufs.length == 0) {
             // Splitting a zero-length buffer is trivial.
-            return new CompositeBuffer(allocator, bufs, unsafeGetDrop(), true).order(order);
+            return new CompositeBuffer(allocator, bufs, unsafeGetDrop()).order(order);
         }
 
         int i = searchOffsets(splitOffset);
@@ -1008,7 +958,7 @@ public final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> im
         checkSplit(splitOffset);
         if (bufs.length == 0) {
             // Splitting a zero-length buffer is trivial.
-            return new CompositeBuffer(allocator, bufs, unsafeGetDrop(), true).order(order);
+            return new CompositeBuffer(allocator, bufs, unsafeGetDrop()).order(order);
         }
 
         int i = searchOffsets(splitOffset);
@@ -1415,7 +1365,7 @@ public final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> im
                 for (int i = 0; i < sends.length; i++) {
                     received[i] = sends[i].receive();
                 }
-                var composite = new CompositeBuffer(allocator, received, drop, false);
+                var composite = new CompositeBuffer(allocator, received, drop);
                 composite.readOnly = readOnly;
                 drop.attach(composite);
                 return composite;
@@ -1439,7 +1389,8 @@ public final class CompositeBuffer extends RcSupport<Buffer, CompositeBuffer> im
     private boolean allConstituentsAreOwned() {
         boolean result = true;
         for (Buffer buf : bufs) {
-            result &= buf.isOwned();
+            //noinspection unchecked
+            result &= ((ResourceSupport<Buffer, ?>) buf).isOwned();
         }
         return result;
     }

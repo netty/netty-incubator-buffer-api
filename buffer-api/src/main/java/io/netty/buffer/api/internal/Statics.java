@@ -160,6 +160,14 @@ public interface Statics {
         dest.position(destPos).put(bbslice(src, srcPos, length));
     }
 
+    static <T extends ResourceSupport<Buffer, ?> & Buffer> T asRS(Buffer buf) {
+        if (!(buf instanceof ResourceSupport)) {
+            throw new IllegalArgumentException("Buffer instance is not an instance of ResourceSupport.");
+        }
+        //noinspection unchecked
+        return (T) buf;
+    }
+
     static IllegalStateException bufferIsClosed() {
         return new IllegalStateException("This buffer is closed.");
     }

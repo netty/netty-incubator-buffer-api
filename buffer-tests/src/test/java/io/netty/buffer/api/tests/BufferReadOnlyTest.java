@@ -26,6 +26,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 import java.nio.ByteOrder;
 import java.util.function.Supplier;
 
+import static io.netty.buffer.api.internal.Statics.asRS;
 import static java.nio.ByteOrder.BIG_ENDIAN;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -164,7 +165,7 @@ public class BufferReadOnlyTest extends BufferTestSupport {
             assertThat(buf.readerOffset()).isZero();
             assertThat(buf.capacity()).isEqualTo(4);
             assertThat(buf.writerOffset()).isEqualTo(4);
-            assertTrue(buf.isOwned());
+            assertTrue(asRS(buf).isOwned());
             assertTrue(buf.isAccessible());
             assertThat(buf.countComponents()).isOne();
             assertEquals((byte) 1, buf.readByte());
@@ -190,14 +191,14 @@ public class BufferReadOnlyTest extends BufferTestSupport {
              Buffer b = a.split(8)) {
             assertTrue(a.readOnly());
             assertTrue(b.readOnly());
-            assertTrue(a.isOwned());
-            assertTrue(b.isOwned());
+            assertTrue(asRS(a).isOwned());
+            assertTrue(asRS(b).isOwned());
             assertThat(a.capacity()).isEqualTo(8);
             assertThat(b.capacity()).isEqualTo(8);
             try (Buffer c = b.slice()) {
                 assertTrue(c.readOnly());
-                assertFalse(c.isOwned());
-                assertFalse(b.isOwned());
+                assertFalse(asRS(c).isOwned());
+                assertFalse(asRS(b).isOwned());
                 assertThat(c.capacity()).isEqualTo(8);
             }
         }

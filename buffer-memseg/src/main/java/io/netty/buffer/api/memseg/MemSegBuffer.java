@@ -31,7 +31,7 @@ import io.netty.buffer.api.WritableComponent;
 import io.netty.buffer.api.WritableComponentProcessor;
 import io.netty.buffer.api.Drop;
 import io.netty.buffer.api.Owned;
-import io.netty.buffer.api.RcSupport;
+import io.netty.buffer.api.internal.ResourceSupport;
 import jdk.incubator.foreign.MemorySegment;
 import jdk.incubator.foreign.ResourceScope;
 
@@ -53,8 +53,8 @@ import static jdk.incubator.foreign.MemoryAccess.setIntAtOffset;
 import static jdk.incubator.foreign.MemoryAccess.setLongAtOffset;
 import static jdk.incubator.foreign.MemoryAccess.setShortAtOffset;
 
-class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, ReadableComponent, WritableComponent,
-        BufferIntegratable {
+class MemSegBuffer extends ResourceSupport<Buffer, MemSegBuffer> implements Buffer, ReadableComponent,
+        WritableComponent, BufferIntegratable {
     private static final MemorySegment CLOSED_SEGMENT;
     static final Drop<MemSegBuffer> SEGMENT_CLOSE;
 

@@ -13,16 +13,27 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package io.netty.buffer.api;
+package io.netty.buffer.api.internal;
+
+import io.netty.buffer.api.Drop;
+import io.netty.buffer.api.Owned;
+import io.netty.buffer.api.Resource;
+import io.netty.buffer.api.Send;
 
 import java.util.Objects;
 
-public abstract class RcSupport<I extends Rc<I>, T extends RcSupport<I, T>> implements Rc<I> {
+/**
+ * Internal support class for resources.
+ *
+ * @param <I> The public interface for the resource.
+ * @param <T> The concrete implementation of the resource.
+ */
+public abstract class ResourceSupport<I extends Resource<I>, T extends ResourceSupport<I, T>> implements Resource<I> {
     private int acquires; // Closed if negative.
     private Drop<T> drop;
     private final LifecycleTracer tracer;
 
-    protected RcSupport(Drop<T> drop) {
+    protected ResourceSupport(Drop<T> drop) {
         this.drop = drop;
         tracer = LifecycleTracer.get();
     }
@@ -30,11 +41,10 @@ public abstract class RcSupport<I extends Rc<I>, T extends RcSupport<I, T>> impl
     /**
      * Increment the reference count.
      * <p>
-     * Note, this method is not thread-safe because Rc's are meant to thread-confined.
+     * Note, this method is not thread-safe because Resources are meant to thread-confined.
      *
-     * @return This Rc instance.
+     * @return This {@link Resource} instance.
      */
-    @Override
     public final I acquire() {
         if (acquires < 0) {
             throw attachTrace(new IllegalStateException("This resource is closed: " + this + '.'));
@@ -50,9 +60,9 @@ public abstract class RcSupport<I extends Rc<I>, T extends RcSupport<I, T>> impl
     /**
      * Decrement the reference count, and despose of the resource if the last reference is closed.
      * <p>
-     * Note, this method is not thread-safe because Rc's are meant to be thread-confined.
+     * Note, this method is not thread-safe because Resources are meant to be thread-confined.
      *
-     * @throws IllegalStateException If this Rc has already been closed.
+     * @throws IllegalStateException If this Resource has already been closed.
      */
     @Override
     public final void close() {
@@ -68,11 +78,12 @@ public abstract class RcSupport<I extends Rc<I>, T extends RcSupport<I, T>> impl
     }
 
     /**
-     * Send this Rc instance to another Thread, transferring the ownership to the recipient. This method can be used
-     * when the receiving thread is not known up front.
+     * Send this Resource instance to another Thread, transferring the ownership to the recipient.
+     * This method can be used when the receiving thread is not known up front.
      * <p>
-     * This instance immediately becomes inaccessible, and all attempts at accessing this Rc will throw. Calling {@link
-     * #close()} will have no effect, so this method is safe to call within a try-with-resources statement.
+     * This instance immediately becomes inaccessible, and all attempts at accessing this resource will throw.
+     * Calling {@link #close()} will have no effect, so this method is safe to call within a try-with-resources
+     * statement.
      *
      * @throws IllegalStateException if this object has any outstanding acquires; that is, if this object has been
      * {@link #acquire() acquired} more times than it has been {@link #close() closed}.
@@ -92,8 +103,8 @@ public abstract class RcSupport<I extends Rc<I>, T extends RcSupport<I, T>> impl
     }
 
     /**
-     * Create an {@link IllegalStateException} with a custom message, tailored to this particular {@link Rc} instance,
-     * for when the object cannot be sent for some reason.
+     * Create an {@link IllegalStateException} with a custom message, tailored to this particular
+     * {@link Resource} instance, for when the object cannot be sent for some reason.
      * @return An {@link IllegalStateException} to be thrown when this object cannot be sent.
      */
     protected IllegalStateException notSendableException() {
@@ -101,7 +112,6 @@ public abstract class RcSupport<I extends Rc<I>, T extends RcSupport<I, T>> impl
                 "Cannot send() a reference counted object with " + countBorrows() + " borrows: " + this + '.');
     }
 
-    @Override
     public boolean isOwned() {
         return acquires == 0;
     }
@@ -124,11 +134,12 @@ public abstract class RcSupport<I extends Rc<I>, T extends RcSupport<I, T>> impl
 
     /**
      * Prepare this instance for ownsership transfer. This method is called from {@link #send()} in the sending thread.
-     * This method should put this Rc in a deactivated state where it is no longer accessible from the currently owning
-     * thread. In this state, the Rc instance should only allow a call to {@link Owned#transferOwnership(Drop)} in
-     * the recipient thread.
+     * This method should put this resource in a deactivated state where it is no longer accessible from the currently
+     * owning thread.
+     * In this state, the resource instance should only allow a call to {@link Owned#transferOwnership(Drop)} in the
+     * recipient thread.
      *
-     * @return This Rc instance in a deactivated state.
+     * @return This resource instance in a deactivated state.
      */
     protected abstract Owned<T> prepareSend();
 

@@ -30,6 +30,7 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static io.netty.buffer.api.internal.Statics.asRS;
 import static io.netty.buffer.api.tests.BufferTestSupport.assertEquals;
 import static io.netty.buffer.api.CompositeBuffer.compose;
 import static java.nio.ByteOrder.BIG_ENDIAN;
@@ -131,7 +132,7 @@ public class ByteToMessageDecoderTest {
             @Override
             protected void decode(ChannelHandlerContext ctx, Buffer in) {
                 Buffer buf = internalBuffer();
-                assertTrue(buf.isOwned());
+                buf.ensureWritable(8, 8, false); // Verify we have full access to the buffer.
                 in.readByte();
                 // Removal from pipeline should clear internal buffer
                 ctx.pipeline().remove(this);
@@ -352,7 +353,7 @@ public class ByteToMessageDecoderTest {
 
         assertThat(thrown).hasMessage("boom");
         assertFalse(in.isAccessible());
-        assertTrue(oldCumulation.isOwned());
+        oldCumulation.ensureWritable(8, 8, false); // Will throw if we don't have full access to the buffer.
         oldCumulation.close();
     }
 
@@ -407,13 +408,13 @@ public class ByteToMessageDecoderTest {
 
         if (shouldFail) {
             assertThat(thrown).hasMessage("boom");
-            assertTrue(oldCumulation.isOwned());
+            oldCumulation.ensureWritable(8, 8, false); // Will throw if we don't have full access to the buffer.
             oldCumulation.close();
             assertFalse(newCumulation.isAccessible());
         } else {
             assertNull(thrown);
             assertFalse(oldCumulation.isAccessible());
-            assertTrue(newCumulation.isOwned());
+            newCumulation.ensureWritable(8, 8, false); // Will throw if we don't have full access to the buffer.
             newCumulation.close();
         }
     }

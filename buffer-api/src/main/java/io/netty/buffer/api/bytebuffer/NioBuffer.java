@@ -21,7 +21,7 @@ import io.netty.buffer.api.BufferAllocator;
 import io.netty.buffer.api.ByteCursor;
 import io.netty.buffer.api.Drop;
 import io.netty.buffer.api.Owned;
-import io.netty.buffer.api.RcSupport;
+import io.netty.buffer.api.internal.ResourceSupport;
 import io.netty.buffer.api.ReadableComponent;
 import io.netty.buffer.api.ReadableComponentProcessor;
 import io.netty.buffer.api.WritableComponent;
@@ -39,7 +39,7 @@ import static io.netty.buffer.api.internal.Statics.bbslice;
 import static io.netty.buffer.api.internal.Statics.bufferIsClosed;
 import static io.netty.buffer.api.internal.Statics.bufferIsReadOnly;
 
-class NioBuffer extends RcSupport<Buffer, NioBuffer> implements Buffer, ReadableComponent, WritableComponent {
+class NioBuffer extends ResourceSupport<Buffer, NioBuffer> implements Buffer, ReadableComponent, WritableComponent {
     private static final ByteBuffer CLOSED_BUFFER = ByteBuffer.allocate(0);
 
     private final AllocatorControl control;

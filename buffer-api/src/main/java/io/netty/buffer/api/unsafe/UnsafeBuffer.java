@@ -21,7 +21,7 @@ import io.netty.buffer.api.Buffer;
 import io.netty.buffer.api.ByteCursor;
 import io.netty.buffer.api.Drop;
 import io.netty.buffer.api.Owned;
-import io.netty.buffer.api.RcSupport;
+import io.netty.buffer.api.internal.ResourceSupport;
 import io.netty.buffer.api.ReadableComponent;
 import io.netty.buffer.api.ReadableComponentProcessor;
 import io.netty.buffer.api.WritableComponent;
@@ -39,7 +39,7 @@ import static io.netty.buffer.api.internal.Statics.bufferIsClosed;
 import static io.netty.buffer.api.internal.Statics.bufferIsReadOnly;
 import static io.netty.util.internal.PlatformDependent.BIG_ENDIAN_NATIVE_ORDER;
 
-class UnsafeBuffer extends RcSupport<Buffer, UnsafeBuffer> implements Buffer, ReadableComponent,
+class UnsafeBuffer extends ResourceSupport<Buffer, UnsafeBuffer> implements Buffer, ReadableComponent,
         WritableComponent {
     private static final int CLOSED_SIZE = -1;
     private static final boolean ACCESS_UNALIGNED = PlatformDependent.isUnaligned();

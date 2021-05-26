@@ -80,45 +80,6 @@ public class SendExample {
         private static Future<?> beginTask(
                 ExecutorService executor, BufferAllocator allocator) {
             try (Buffer buf = allocator.allocate(32)) {
-                // !!! pit-fall: Rc decrement in other thread.
-                return executor.submit(new Task(buf.acquire()));
-            }
-        }
-
-        private static class Task implements Runnable {
-            private final Buffer buf;
-
-            Task(Buffer buf) {
-                this.buf = buf;
-            }
-
-            @Override
-            public void run() {
-                try (buf) {
-                    // !!! danger: access out-side owning thread.
-                    while (buf.writableBytes() > 0) {
-                        buf.writeByte((byte) 42);
-                    }
-                }
-            }
-        }
-    }
-
-    static final class Ex3 {
-        public static void main(String[] args) throws Exception {
-            ExecutorService executor = newSingleThreadExecutor();
-            BufferAllocator allocator = BufferAllocator.heap();
-
-            var future = beginTask(executor, allocator);
-            future.get();
-
-            allocator.close();
-            executor.shutdown();
-        }
-
-        private static Future<?> beginTask(
-                ExecutorService executor, BufferAllocator allocator) {
-            try (Buffer buf = allocator.allocate(32)) {
                 return executor.submit(new Task(buf.send()));
             }
         }
@@ -141,7 +102,7 @@ public class SendExample {
         }
     }
 
-    static final class Ex4 {
+    static final class Ex3 {
         public static void main(String[] args) throws Exception {
             ExecutorService executor = newFixedThreadPool(4);
             BufferAllocator allocator = BufferAllocator.heap();
@@ -180,7 +141,7 @@ public class SendExample {
         }
     }
 
-    static final class Ex5 {
+    static final class Ex4 {
         public static void main(String[] args) throws Exception {
             ExecutorService executor = newFixedThreadPool(4);
             BufferAllocator allocator = BufferAllocator.heap();
@@ -220,7 +181,7 @@ public class SendExample {
         }
     }
 
-    static final class Ex6 {
+    static final class Ex5 {
         public static void main(String[] args) throws Exception {
             ExecutorService executor = newFixedThreadPool(4);
             BufferAllocator allocator = BufferAllocator.heap();

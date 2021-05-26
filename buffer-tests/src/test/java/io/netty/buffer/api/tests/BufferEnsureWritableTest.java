@@ -36,7 +36,7 @@ public class BufferEnsureWritableTest extends BufferTestSupport {
                 assertThrows(IllegalStateException.class, () -> slice.ensureWritable(1));
                 assertThrows(IllegalStateException.class, () -> buf.ensureWritable(1));
             }
-            try (Buffer compose = CompositeBuffer.compose(allocator, buf)) {
+            try (Buffer compose = CompositeBuffer.compose(allocator, buf.send())) {
                 assertThrows(IllegalStateException.class, () -> compose.ensureWritable(1));
                 assertThrows(IllegalStateException.class, () -> buf.ensureWritable(1));
             }

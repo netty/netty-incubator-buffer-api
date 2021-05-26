@@ -19,7 +19,7 @@ import io.netty.buffer.api.Buffer;
 import io.netty.buffer.api.BufferAllocator;
 import io.netty.buffer.api.CompositeBuffer;
 import io.netty.buffer.api.MemoryManagers;
-import io.netty.buffer.api.RcSupport;
+import io.netty.buffer.api.internal.ResourceSupport;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 
@@ -43,6 +43,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.Stream.Builder;
 
+import static io.netty.buffer.api.internal.Statics.asRS;
 import static java.nio.ByteOrder.BIG_ENDIAN;
 import static java.nio.ByteOrder.LITTLE_ENDIAN;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -176,7 +177,7 @@ public abstract class BufferTestSupport {
                             int half = size / 2;
                             try (Buffer firstHalf = a.allocate(half);
                                  Buffer secondHalf = b.allocate(size - half)) {
-                                return CompositeBuffer.compose(a, firstHalf, secondHalf);
+                                return CompositeBuffer.compose(a, firstHalf.send(), secondHalf.send());
                             }
                         }
 
@@ -207,7 +208,7 @@ public abstract class BufferTestSupport {
                     try (Buffer a = alloc.allocate(part);
                          Buffer b = alloc.allocate(part);
                          Buffer c = alloc.allocate(size - part * 2)) {
-                        return CompositeBuffer.compose(alloc, a, b, c);
+                        return CompositeBuffer.compose(alloc, a.send(), b.send(), c.send());
                     }
                 }
 
@@ -384,13 +385,13 @@ public abstract class BufferTestSupport {
             assertThrows(IllegalStateException.class, () -> buf.copyInto(0, new byte[1], 0, 1));
             assertThrows(IllegalStateException.class, () -> buf.copyInto(0, ByteBuffer.allocate(1), 0, 1));
             if (CompositeBuffer.isComposite(buf)) {
-                assertThrows(IllegalStateException.class, () -> ((CompositeBuffer) buf).extendWith(target));
+                assertThrows(IllegalStateException.class, () -> ((CompositeBuffer) buf).extendWith(target.send()));
             }
         }
 
         assertThrows(IllegalStateException.class, () -> buf.split());
-        assertThrows(IllegalStateException.class, () -> buf.send());
-        assertThrows(IllegalStateException.class, () -> buf.acquire());
+        assertThrows(IllegalStateException.class, () -> asRS(buf).send());
+        assertThrows(IllegalStateException.class, () -> asRS(buf).acquire());
         assertThrows(IllegalStateException.class, () -> buf.slice());
         assertThrows(IllegalStateException.class, () -> buf.openCursor());
         assertThrows(IllegalStateException.class, () -> buf.openCursor(0, 0));
@@ -914,7 +915,7 @@ public abstract class BufferTestSupport {
         buf.setDouble(0, 3.2);
         assertThat(buf.getDouble(0)).isEqualTo(3.2);
 
-        if (buf.isOwned()) {
+        if (asRS(buf).isOwned()) {
             buf.ensureWritable(1);
         }
         buf.fill((byte) 0);
@@ -999,7 +1000,7 @@ public abstract class BufferTestSupport {
     }
 
     public static int countBorrows(Buffer buf) {
-        return ((RcSupport<?, ?>) buf).countBorrows();
+        return ((ResourceSupport<?, ?>) buf).countBorrows();
     }
 
     public static void assertEquals(Buffer expected, Buffer actual) {

@@ -27,15 +27,13 @@ module netty.incubator.buffer {
     exports io.netty.buffer.api;
     exports io.netty.buffer.api.adaptor;
 
-    exports io.netty.buffer.api.internal to
-            netty.incubator.buffer.memseg,
-            netty.incubator.buffer.tests;
-
     uses MemoryManagers;
 
     // Permit reflective access to non-public members.
     // Also means we don't have to make all test methods etc. public for JUnit to access them.
-    opens io.netty.buffer.api;//todo remove
+    opens io.netty.buffer.api;
+    exports io.netty.buffer.api.internal;
+    opens io.netty.buffer.api.internal;//todo remove
 
     provides MemoryManagers with
             ByteBufferMemoryManagers,
