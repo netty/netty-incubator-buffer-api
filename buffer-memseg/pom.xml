@@ -61,10 +61,6 @@
                     <compilerArgument>-Xlint:-options</compilerArgument>
                     <meminitial>256m</meminitial>
                     <maxmem>1024m</maxmem>
-                    <compilerArgs>
-                        <arg>--add-modules</arg>
-                        <arg>jdk.incubator.foreign</arg>
-                    </compilerArgs>
                 </configuration>
             </plugin>
         </plugins>

@@ -75,15 +75,6 @@
     <!-- Java version actually used to perform the build; compiling and testing. -->
     <java.version>11</java.version>
     <junit.version>5.7.0</junit.version>
-    <surefire.version>3.0.0-M5</surefire.version>
-    <skipTests>false</skipTests>
-    <argLine.common>
-      -XX:+HeapDumpOnOutOfMemoryError
-      -Xmx2g
-      -Dio.netty.tryReflectionSetAccessible=true
-      --add-opens java.base/java.nio=io.netty.common
-    </argLine.common>
-    <argLine.mod/>
   </properties>
 
   <modules>
@@ -189,86 +180,6 @@
             <groupId>io.netty</groupId>
             <artifactId>netty-build-common</artifactId>
             <version>${netty.build.version}</version>
-          </dependency>
-        </dependencies>
-      </plugin>
-      <plugin>
-        <artifactId>maven-surefire-plugin</artifactId>
-        <version>${surefire.version}</version>
-        <configuration>
-          <includes>
-            <include>**/*Test*.java</include>
-          </includes>
-          <argLine>${argLine.common} ${argLine.mod}</argLine>
-          <!-- Ensure the whole stacktrace is preserved when an exception is thrown. See https://issues.apache.org/jira/browse/SUREFIRE-1457 -->
-          <trimStackTrace>false</trimStackTrace>
-          <forkedProcessExitTimeoutInSeconds>600</forkedProcessExitTimeoutInSeconds>
-          <!-- Not reusing forks lets us be more frugal with memory. We have a lot of tests, and they need a lot of metadata -->
-          <reuseForks>false</reuseForks>
-          <forkCount>1C</forkCount>
-          <systemProperties>
-            <sample>nosample</sample>
-          </systemProperties>
-        </configuration>
-        <dependencies>
-          <!-- Declare the surefire dynamic dependencies explicitly, to speed up the docker build. -->
-          <dependency>
-            <groupId>org.codehaus.plexus</groupId>
-            <artifactId>plexus-utils</artifactId>
-            <version>1.1</version>
-          </dependency>
-          <dependency>
-            <groupId>org.apache.maven.surefire</groupId>
-            <artifactId>surefire-junit-platform</artifactId>
-            <version>${surefire.version}</version>
-          </dependency>
-          <dependency>
-            <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter-engine</artifactId>
-            <version>5.3.2</version>
-            <type>pom</type>
-          </dependency>
-          <dependency>
-            <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter-params</artifactId>
-            <version>5.3.2</version>
-            <type>pom</type>
-          </dependency>
-          <dependency>
-            <groupId>org.mockito</groupId>
-            <artifactId>mockito-core</artifactId>
-            <version>2.28.2</version>
-            <type>pom</type>
-          </dependency>
-          <dependency>
-            <groupId>org.hamcrest</groupId>
-            <artifactId>hamcrest-library</artifactId>
-            <version>1.3</version>
-            <type>pom</type>
-          </dependency>
-          <dependency>
-            <groupId>junit</groupId>
-            <artifactId>junit</artifactId>
-            <version>4.13</version>
-            <type>pom</type>
-          </dependency>
-          <dependency>
-            <groupId>org.powermock</groupId>
-            <artifactId>powermock-reflect</artifactId>
-            <version>2.0.5</version>
-            <type>pom</type>
-          </dependency>
-          <dependency>
-            <groupId>org.assertj</groupId>
-            <artifactId>assertj-core</artifactId>
-            <version>3.9.1</version>
-            <type>pom</type>
-          </dependency>
-          <dependency>
-            <groupId>org.easytesting</groupId>
-            <artifactId>fest-assert</artifactId>
-            <version>1.4</version>
-            <type>pom</type>
           </dependency>
         </dependencies>
       </plugin>
