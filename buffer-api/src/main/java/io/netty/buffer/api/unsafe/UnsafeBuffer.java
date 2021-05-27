@@ -166,11 +166,7 @@ class UnsafeBuffer extends ResourceSupport<Buffer, UnsafeBuffer> implements Buff
 
     @Override
     public Buffer copy(int offset, int length) {
-        if (length < 0) {
-            throw new IllegalArgumentException("Length cannot be negative: " + length + '.');
-        }
         checkGet(offset, length);
-
         int allocSize = Math.max(length, 1); // Allocators don't support allocating zero-sized buffers.
         AllocatorControl.UntetheredMemory memory = control.allocateUntethered(this, allocSize);
         UnsafeMemory unsafeMemory = memory.memory();

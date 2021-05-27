@@ -189,12 +189,7 @@ class NioBuffer extends ResourceSupport<Buffer, NioBuffer> implements Buffer, Re
 
     @Override
     public Buffer copy(int offset, int length) {
-        if (length < 0) {
-            throw new IllegalArgumentException("Length cannot be negative: " + length + '.');
-        }
-        if (!isAccessible()) {
-            throw new IllegalStateException("This buffer is closed: " + this + '.');
-        }
+        checkGet(offset, length);
         int allocSize = Math.max(length, 1); // Allocators don't support allocating zero-sized buffers.
         AllocatorControl.UntetheredMemory memory = control.allocateUntethered(this, allocSize);
         ByteBuffer base = memory.memory();

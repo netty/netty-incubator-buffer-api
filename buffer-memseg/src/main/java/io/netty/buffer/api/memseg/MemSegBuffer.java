@@ -299,12 +299,6 @@ class MemSegBuffer extends ResourceSupport<Buffer, MemSegBuffer> implements Buff
     @Override
     public Buffer copy(int offset, int length) {
         checkGet(offset, length);
-        if (length < 0) {
-            throw new IllegalArgumentException("Length cannot be negative: " + length + '.');
-        }
-        if (!isAccessible()) {
-            throw new IllegalStateException("This buffer is closed: " + this + '.');
-        }
 
         if (length == 0) {
             // Special case zero-length segments, since allocators don't support allocating empty buffers.
