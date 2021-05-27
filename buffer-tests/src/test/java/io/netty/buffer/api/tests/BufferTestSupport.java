@@ -19,6 +19,7 @@ import io.netty.buffer.api.Buffer;
 import io.netty.buffer.api.BufferAllocator;
 import io.netty.buffer.api.CompositeBuffer;
 import io.netty.buffer.api.MemoryManagers;
+import io.netty.buffer.api.internal.ResourceSupport;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 
@@ -42,7 +43,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.Stream.Builder;
 
-import static io.netty.buffer.api.internal.Statics.asRS;
+import static io.netty.buffer.api.internal.Statics.acquire;
 import static java.nio.ByteOrder.BIG_ENDIAN;
 import static java.nio.ByteOrder.LITTLE_ENDIAN;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -335,8 +336,8 @@ public abstract class BufferTestSupport {
         }
 
         assertThrows(IllegalStateException.class, () -> buf.split());
-        assertThrows(IllegalStateException.class, () -> asRS(buf).send());
-        assertThrows(IllegalStateException.class, () -> asRS(buf).acquire());
+        assertThrows(IllegalStateException.class, () -> buf.send());
+        assertThrows(IllegalStateException.class, () -> acquire((ResourceSupport<?, ?>) buf));
         assertThrows(IllegalStateException.class, () -> buf.copy());
         assertThrows(IllegalStateException.class, () -> buf.openCursor());
         assertThrows(IllegalStateException.class, () -> buf.openCursor(0, 0));

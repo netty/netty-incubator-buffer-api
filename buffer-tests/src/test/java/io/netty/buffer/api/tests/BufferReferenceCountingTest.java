@@ -18,6 +18,7 @@ package io.netty.buffer.api.tests;
 import io.netty.buffer.api.Buffer;
 import io.netty.buffer.api.BufferAllocator;
 import io.netty.buffer.api.CompositeBuffer;
+import io.netty.buffer.api.internal.ResourceSupport;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -25,7 +26,8 @@ import org.junit.jupiter.params.provider.MethodSource;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadLocalRandom;
 
-import static io.netty.buffer.api.internal.Statics.asRS;
+import static io.netty.buffer.api.internal.Statics.acquire;
+import static io.netty.buffer.api.internal.Statics.isOwned;
 import static java.nio.ByteOrder.BIG_ENDIAN;
 import static java.nio.ByteOrder.LITTLE_ENDIAN;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -41,7 +43,7 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
              Buffer buf = allocator.allocate(8)) {
             buf.writeByte((byte) 1);
             buf.writeByte((byte) 2);
-            try (Buffer inner = asRS(buf).acquire()) {
+            try (Buffer inner = acquire((ResourceSupport<?, ?>) buf)) {
                 inner.writeByte((byte) 3);
                 inner.writeByte((byte) 4);
                 inner.writeByte((byte) 5);
@@ -75,7 +77,7 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
         try (BufferAllocator allocator = fixture.createAllocator()) {
             var buf = allocator.allocate(8);
             buf.close();
-            assertThrows(IllegalStateException.class, () -> asRS(buf).acquire());
+            assertThrows(IllegalStateException.class, () -> acquire((ResourceSupport<?, ?>) buf));
         }
     }
 
@@ -166,11 +168,11 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
             try (Buffer copy = buf.copy()) {
-                assertTrue(asRS(buf).isOwned());
-                assertTrue(asRS(copy).isOwned());
+                assertTrue(isOwned((ResourceSupport<?, ?>) buf));
+                assertTrue(isOwned((ResourceSupport<?, ?>) copy));
                 copy.send().discard();
             }
-            assertTrue(asRS(buf).isOwned());
+            assertTrue(isOwned((ResourceSupport<?, ?>) buf));
             buf.send().discard();
         }
     }
@@ -181,11 +183,11 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
             try (Buffer copy = buf.copy(0, 8)) {
-                assertTrue(asRS(buf).isOwned());
-                assertTrue(asRS(copy).isOwned());
+                assertTrue(isOwned((ResourceSupport<?, ?>) buf));
+                assertTrue(isOwned((ResourceSupport<?, ?>) copy));
                 copy.send().discard();
             }
-            assertTrue(asRS(buf).isOwned());
+            assertTrue(isOwned((ResourceSupport<?, ?>) buf));
             buf.send().discard();
         }
     }
@@ -230,11 +232,11 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
             try (Buffer copy = buf.copy()) {
-                assertTrue(asRS(buf).isOwned());
+                assertTrue(isOwned((ResourceSupport<?, ?>) buf));
                 copy.send().discard();
             }
             // Verify that the copy is closed properly afterwards.
-            assertTrue(asRS(buf).isOwned());
+            assertTrue(isOwned((ResourceSupport<?, ?>) buf));
             buf.send().receive().close();
         }
     }
@@ -245,11 +247,11 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
             try (Buffer copy = buf.copy(0, 8)) {
-                assertTrue(asRS(buf).isOwned());
+                assertTrue(isOwned((ResourceSupport<?, ?>) buf));
                 copy.send().discard();
             }
             // Verify that the copy is closed properly afterwards.
-            assertTrue(asRS(buf).isOwned());
+            assertTrue(isOwned((ResourceSupport<?, ?>) buf));
         }
     }
 
@@ -260,7 +262,7 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
              Buffer buf = allocator.allocate(8)) {
             assertThrows(IndexOutOfBoundsException.class, () -> buf.copy(-1, 1));
             // Verify that the copy is closed properly afterwards.
-            assertTrue(asRS(buf).isOwned());
+            assertTrue(isOwned((ResourceSupport<?, ?>) buf));
         }
     }
 
@@ -272,7 +274,7 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
             assertThrows(IllegalArgumentException.class, () -> buf.copy(0, -1));
             assertThrows(IllegalArgumentException.class, () -> buf.copy(2, -1));
             // Verify that the copy is closed properly afterwards.
-            assertTrue(asRS(buf).isOwned());
+            assertTrue(isOwned((ResourceSupport<?, ?>) buf));
         }
     }
 
@@ -285,7 +287,7 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
             buf.copy(0, 8).close(); // This is still fine.
             assertThrows(IndexOutOfBoundsException.class, () -> buf.copy(1, 8));
             // Verify that the copy is closed properly afterwards.
-            assertTrue(asRS(buf).isOwned());
+            assertTrue(isOwned((ResourceSupport<?, ?>) buf));
         }
     }
 
@@ -296,7 +298,7 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
              Buffer buf = allocator.allocate(8)) {
             buf.copy(0, 0).close(); // This is fine.
             // Verify that the copy is closed properly afterwards.
-            assertTrue(asRS(buf).isOwned());
+            assertTrue(isOwned((ResourceSupport<?, ?>) buf));
         }
     }
 
@@ -307,13 +309,13 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
             Buffer buf = allocator.allocate(8);
             buf.writeInt(42);
             try (Buffer copy = buf.copy()) {
-                assertTrue(asRS(copy).isOwned());
-                assertTrue(asRS(buf).isOwned());
+                assertTrue(isOwned((ResourceSupport<?, ?>) copy));
+                assertTrue(isOwned((ResourceSupport<?, ?>) buf));
                 buf.close();
                 assertFalse(buf.isAccessible());
-                assertTrue(asRS(copy).isOwned());
+                assertTrue(isOwned((ResourceSupport<?, ?>) copy));
                 try (Buffer receive = copy.send().receive()) {
-                    assertTrue(asRS(receive).isOwned());
+                    assertTrue(isOwned((ResourceSupport<?, ?>) receive));
                     assertFalse(copy.isAccessible());
                 }
             }
@@ -378,7 +380,7 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
             buf.writeInt(1);
-            try (Buffer acquired = asRS(buf).acquire()) {
+            try (Buffer acquired = acquire((ResourceSupport<?, ?>) buf)) {
                 var exc = assertThrows(IllegalStateException.class, () -> acquired.split());
                 assertThat(exc).hasMessageContaining("owned");
             }
@@ -390,7 +392,7 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
     public void splitOnOffsetOfNonOwnedBufferMustThrow(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            try (Buffer acquired = asRS(buf).acquire()) {
+            try (Buffer acquired = acquire((ResourceSupport<?, ?>) buf)) {
                 var exc = assertThrows(IllegalStateException.class, () -> acquired.split(4));
                 assertThat(exc).hasMessageContaining("owned");
             }
@@ -533,7 +535,7 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
             buf.writeLong(0x0102030405060708L);
             try (Buffer copy = buf.copy()) {
                 buf.close();
-                assertTrue(asRS(copy).isOwned());
+                assertTrue(isOwned((ResourceSupport<?, ?>) copy));
                 try (Buffer split = copy.split(4)) {
                     split.reset().ensureWritable(Long.BYTES);
                     copy.reset().ensureWritable(Long.BYTES);
@@ -663,7 +665,7 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
             buf.makeReadOnly();
-            try (Buffer acquire = asRS(buf).acquire()) {
+            try (Buffer acquire = acquire((ResourceSupport<?, ?>) buf)) {
                 assertTrue(acquire.readOnly());
             }
         }

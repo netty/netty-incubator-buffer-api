@@ -19,6 +19,7 @@ import io.netty.buffer.api.Buffer;
 import io.netty.buffer.api.BufferAllocator;
 import io.netty.buffer.api.CompositeBuffer;
 import io.netty.buffer.api.Send;
+import io.netty.buffer.api.internal.ResourceSupport;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -26,7 +27,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 import java.nio.ByteOrder;
 import java.util.function.Supplier;
 
-import static io.netty.buffer.api.internal.Statics.asRS;
+import static io.netty.buffer.api.internal.Statics.isOwned;
 import static java.nio.ByteOrder.BIG_ENDIAN;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -165,7 +166,7 @@ public class BufferReadOnlyTest extends BufferTestSupport {
             assertThat(buf.readerOffset()).isZero();
             assertThat(buf.capacity()).isEqualTo(4);
             assertThat(buf.writerOffset()).isEqualTo(4);
-            assertTrue(asRS(buf).isOwned());
+            assertTrue(isOwned((ResourceSupport<?, ?>) buf));
             assertTrue(buf.isAccessible());
             assertThat(buf.countComponents()).isOne();
             assertEquals((byte) 1, buf.readByte());
@@ -191,14 +192,14 @@ public class BufferReadOnlyTest extends BufferTestSupport {
              Buffer b = a.split(8)) {
             assertTrue(a.readOnly());
             assertTrue(b.readOnly());
-            assertTrue(asRS(a).isOwned());
-            assertTrue(asRS(b).isOwned());
+            assertTrue(isOwned((ResourceSupport<?, ?>) a));
+            assertTrue(isOwned((ResourceSupport<?, ?>) b));
             assertThat(a.capacity()).isEqualTo(8);
             assertThat(b.capacity()).isEqualTo(8);
             try (Buffer c = b.copy()) {
                 assertTrue(c.readOnly());
-                assertTrue(asRS(c).isOwned());
-                assertTrue(asRS(b).isOwned());
+                assertTrue(isOwned((ResourceSupport<?, ?>) c));
+                assertTrue(isOwned((ResourceSupport<?, ?>) b));
                 assertThat(c.capacity()).isEqualTo(8);
             }
         }

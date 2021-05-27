@@ -38,6 +38,11 @@ public abstract class ResourceSupport<I extends Resource<I>, T extends ResourceS
         tracer = LifecycleTracer.get();
     }
 
+    @SuppressWarnings("unchecked")
+    static <T> T acquire(ResourceSupport<?, ?> obj) {
+        return (T) obj.acquire();
+    }
+
     /**
      * Increment the reference count.
      * <p>
@@ -45,7 +50,7 @@ public abstract class ResourceSupport<I extends Resource<I>, T extends ResourceS
      *
      * @return This {@link Resource} instance.
      */
-    public final I acquire() {
+    protected final I acquire() {
         if (acquires < 0) {
             throw attachTrace(new IllegalStateException("This resource is closed: " + this + '.'));
         }
@@ -112,8 +117,16 @@ public abstract class ResourceSupport<I extends Resource<I>, T extends ResourceS
                 "Cannot send() a reference counted object with " + countBorrows() + " borrows: " + this + '.');
     }
 
-    public boolean isOwned() {
+    static boolean isOwned(ResourceSupport<?, ?> obj) {
+        return obj.isOwned();
+    }
+
+    protected boolean isOwned() {
         return acquires == 0;
+    }
+
+    static int countBorrows(ResourceSupport<?, ?> obj) {
+        return obj.countBorrows();
     }
 
     /**
@@ -123,7 +136,7 @@ public abstract class ResourceSupport<I extends Resource<I>, T extends ResourceS
      *
      * @return The number of borrows, if any, of this object.
      */
-    public int countBorrows() {
+    protected int countBorrows() {
         return Math.max(acquires, 0);
     }
 

@@ -16,6 +16,7 @@
 package io.netty.buffer.api;
 
 import io.netty.buffer.api.internal.ResourceSupport;
+import io.netty.buffer.api.internal.Statics;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -1378,15 +1379,14 @@ public final class CompositeBuffer extends ResourceSupport<Buffer, CompositeBuff
     }
 
     @Override
-    public boolean isOwned() {
+    protected boolean isOwned() {
         return super.isOwned() && allConstituentsAreOwned();
     }
 
     private boolean allConstituentsAreOwned() {
         boolean result = true;
         for (Buffer buf : bufs) {
-            //noinspection unchecked
-            result &= ((ResourceSupport<Buffer, ?>) buf).isOwned();
+            result &= Statics.isOwned((ResourceSupport<?, ?>) buf);
         }
         return result;
     }

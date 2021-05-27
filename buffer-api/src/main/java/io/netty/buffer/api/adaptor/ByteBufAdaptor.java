@@ -40,7 +40,8 @@ import java.nio.channels.ScatteringByteChannel;
 import java.nio.charset.Charset;
 import java.util.concurrent.atomic.AtomicReference;
 
-import static io.netty.buffer.api.internal.Statics.asRS;
+import static io.netty.buffer.api.internal.Statics.acquire;
+import static io.netty.buffer.api.internal.Statics.isOwned;
 
 public final class ByteBufAdaptor extends ByteBuf {
     private final ByteBufAllocatorAdaptor alloc;
@@ -82,7 +83,7 @@ public final class ByteBufAdaptor extends ByteBuf {
             try {
                 buffer.ensureWritable(diff);
             } catch (IllegalStateException e) {
-                if (!asRS(buffer).isOwned()) {
+                if (!isOwned((ResourceSupport<?, ?>) buffer)) {
                     throw new UnsupportedOperationException(e);
                 }
                 throw e;
@@ -217,7 +218,7 @@ public final class ByteBufAdaptor extends ByteBuf {
         checkAccess();
         if (writableBytes() < minWritableBytes) {
             try {
-                if (asRS(buffer).isOwned()) {
+                if (isOwned((ResourceSupport<?, ?>) buffer)) {
                     // Good place.
                     buffer.ensureWritable(minWritableBytes);
                 } else {
@@ -1628,7 +1629,7 @@ public final class ByteBufAdaptor extends ByteBuf {
     @Override
     public ByteBuf retain(int increment) {
         for (int i = 0; i < increment; i++) {
-            asRS(buffer).acquire();
+            acquire((ResourceSupport<?,?>) buffer);
         }
         return this;
     }
@@ -1644,9 +1645,9 @@ public final class ByteBufAdaptor extends ByteBuf {
         }
         if (buffer instanceof ResourceSupport) {
             var rc = (ResourceSupport<?, ?>) buffer;
-            return rc.countBorrows();
+            return Statics.countBorrows(rc);
         }
-        return asRS(buffer).isOwned()? 0 : 1;
+        return isOwned((ResourceSupport<?, ?>) buffer)? 0 : 1;
     }
 
     @Override

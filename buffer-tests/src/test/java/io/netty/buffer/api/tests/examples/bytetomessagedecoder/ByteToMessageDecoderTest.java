@@ -30,7 +30,6 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static io.netty.buffer.api.internal.Statics.asRS;
 import static io.netty.buffer.api.tests.BufferTestSupport.assertEquals;
 import static io.netty.buffer.api.CompositeBuffer.compose;
 import static io.netty.buffer.api.tests.BufferTestSupport.assertReadableEquals;
