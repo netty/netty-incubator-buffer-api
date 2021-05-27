@@ -74,7 +74,7 @@ import java.nio.ByteOrder;
  *      0      <=     readerOffset  <=   writerOffset    <=    capacity
  * </pre>
  *
- * <h3 name="slice-split">Splitting buffers</h3>
+ * <h3 name="split">Splitting buffers</h3>
  *
  * The {@link #split()} method break a buffer into two.
  * The two buffers will share the underlying memory, but their regions will not overlap, ensuring that the memory is
@@ -185,9 +185,8 @@ public interface Buffer extends Resource<Buffer>, BufferAccessors {
     long nativeAddress();
 
     /**
-     * Make this buffer read-only. This is irreversible.
-     * Unless a writable slice has previously been obtained from this buffer, there will no longer be any way to modify
-     * the data contained in this buffer.
+     * Make this buffer read-only.
+     * This is irreversible.
      *
      * @return this buffer.
      */
@@ -437,7 +436,9 @@ public interface Buffer extends Resource<Buffer>, BufferAccessors {
      * that contains a copy of the readable region of this buffer.
      */
     default Buffer copy() {
-        return copy(readerOffset(), readableBytes());
+        int offset = readerOffset();
+        int length = readableBytes();
+        return copy(offset, length);
     }
 
     /**
@@ -494,8 +495,7 @@ public interface Buffer extends Resource<Buffer>, BufferAccessors {
      * <p>
      * Split buffers support all operations that normal buffers do, including {@link #ensureWritable(int)}.
      * <p>
-     * See the <a href="#slice-split">Slice vs. Split</a> section for details on the difference between slice
-     * and split.
+     * See the <a href="#split">Splitting buffers</a> section for details.
      *
      * @return A new buffer with independent and exclusive ownership over the read and readable bytes from this buffer.
      */
@@ -543,8 +543,7 @@ public interface Buffer extends Resource<Buffer>, BufferAccessors {
      * <p>
      * Split buffers support all operations that normal buffers do, including {@link #ensureWritable(int)}.
      * <p>
-     * See the <a href="#slice-split">Slice vs. Split</a> section for details on the difference between slice
-     * and split.
+     * See the <a href="#split">Splitting buffers</a> section for details.
      *
      * @return A new buffer with independent and exclusive ownership over the bytes from the beginning to the given
      * offset of this buffer.

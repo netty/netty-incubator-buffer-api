@@ -314,13 +314,7 @@ public abstract class ByteToMessageDecoder extends ChannelHandlerAdapter {
 
     protected final void discardSomeReadBytes() {
         if (cumulation != null && !first) {
-            // discard some bytes if possible to make more room in the
-            // buffer but only if the refCnt == 1  as otherwise the user may have
-            // used slice().retain() or duplicate().retain().
-            //
-            // See:
-            // - https://github.com/netty/netty/issues/2327
-            // - https://github.com/netty/netty/issues/1764
+            // Discard some bytes if possible to make more room in the buffer.
             cumulation.compact();
         }
     }

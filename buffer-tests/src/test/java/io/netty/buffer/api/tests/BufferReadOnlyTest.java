@@ -197,8 +197,8 @@ public class BufferReadOnlyTest extends BufferTestSupport {
             assertThat(b.capacity()).isEqualTo(8);
             try (Buffer c = b.copy()) {
                 assertTrue(c.readOnly());
-                assertFalse(asRS(c).isOwned());
-                assertFalse(asRS(b).isOwned());
+                assertTrue(asRS(c).isOwned());
+                assertTrue(asRS(b).isOwned());
                 assertThat(c.capacity()).isEqualTo(8);
             }
         }

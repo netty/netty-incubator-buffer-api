@@ -170,9 +170,12 @@ class UnsafeBuffer extends ResourceSupport<Buffer, UnsafeBuffer> implements Buff
             throw new IllegalArgumentException("Length cannot be negative: " + length + '.');
         }
         checkGet(offset, length);
-        AllocatorControl.UntetheredMemory memory = control.allocateUntethered(this, length);
+
+        int allocSize = Math.max(length, 1); // Allocators don't support allocating zero-sized buffers.
+        AllocatorControl.UntetheredMemory memory = control.allocateUntethered(this, allocSize);
         UnsafeMemory unsafeMemory = memory.memory();
-        Buffer copy = new UnsafeBuffer(unsafeMemory, unsafeMemory.address, length, control, memory.drop());
+        Buffer copy = new UnsafeBuffer(unsafeMemory, 0, length, control, memory.drop());
+        copyInto(offset, copy, 0, length);
         copy.writerOffset(length).order(order);
         if (readOnly) {
             copy = copy.makeReadOnly();
@@ -509,8 +512,7 @@ class UnsafeBuffer extends ResourceSupport<Buffer, UnsafeBuffer> implements Buff
         if (readOnly) {
             splitBuffer.makeReadOnly();
         }
-        // Note that split, unlike slice, does not deconstify, because data changes in either buffer are not visible
-        // in the other. The split buffers can later deconstify independently if needed.
+        // Split preserves const-state.
         splitBuffer.constBuffer = constBuffer;
         rsize -= splitOffset;
         baseOffset += splitOffset;

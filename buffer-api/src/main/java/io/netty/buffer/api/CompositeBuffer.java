@@ -438,7 +438,7 @@ public final class CompositeBuffer extends ResourceSupport<Buffer, CompositeBuff
             }
             copies = Arrays.copyOf(copies, i);
         } else {
-            // Specialize for length == 0, since we must slice from at least one constituent buffer.
+            // Specialize for length == 0, since we must copy from at least one constituent buffer.
             copies = new Buffer[] { choice.copy(subOffset, 0) };
         }
 

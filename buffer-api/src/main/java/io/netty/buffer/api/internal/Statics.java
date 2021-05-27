@@ -64,6 +64,11 @@ public interface Statics {
         }
     }
 
+    @SuppressWarnings("unchecked")
+    static <T extends Buffer> Drop<T> noOpDrop() {
+        return (Drop<T>) NO_OP_DROP;
+    }
+
     static VarHandle findVarHandle(Lookup lookup, Class<?> recv, String name, Class<?> type) {
         try {
             return lookup.findVarHandle(recv, name, type);

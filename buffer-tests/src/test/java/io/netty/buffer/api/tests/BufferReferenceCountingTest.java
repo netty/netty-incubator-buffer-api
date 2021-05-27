@@ -116,19 +116,19 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
             }
             assertEquals(0x01, buf.readByte());
             buf.writerOffset(buf.writerOffset() - 1);
-            try (Buffer slice = buf.copy()) {
-                assertThat(toByteArray(slice)).containsExactly(0x02, 0x03, 0x04, 0x05, 0x06, 0x07);
-                assertEquals(0, slice.readerOffset());
-                assertEquals(6, slice.readableBytes());
-                assertEquals(6, slice.writerOffset());
-                assertEquals(6, slice.capacity());
-                assertEquals(0x02, slice.readByte());
-                assertEquals(0x03, slice.readByte());
-                assertEquals(0x04, slice.readByte());
-                assertEquals(0x05, slice.readByte());
-                assertEquals(0x06, slice.readByte());
-                assertEquals(0x07, slice.readByte());
-                assertThrows(IndexOutOfBoundsException.class, slice::readByte);
+            try (Buffer copy = buf.copy()) {
+                assertThat(toByteArray(copy)).containsExactly(0x02, 0x03, 0x04, 0x05, 0x06, 0x07);
+                assertEquals(0, copy.readerOffset());
+                assertEquals(6, copy.readableBytes());
+                assertEquals(6, copy.writerOffset());
+                assertEquals(6, copy.capacity());
+                assertEquals(0x02, copy.readByte());
+                assertEquals(0x03, copy.readByte());
+                assertEquals(0x04, copy.readByte());
+                assertEquals(0x05, copy.readByte());
+                assertEquals(0x06, copy.readByte());
+                assertEquals(0x07, copy.readByte());
+                assertThrows(IndexOutOfBoundsException.class, copy::readByte);
             }
         }
     }
@@ -143,19 +143,19 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
             }
             buf.readerOffset(3); // Reader and writer offsets must be ignored.
             buf.writerOffset(6);
-            try (Buffer slice = buf.copy(1, 6)) {
-                assertThat(toByteArray(slice)).containsExactly(0x02, 0x03, 0x04, 0x05, 0x06, 0x07);
-                assertEquals(0, slice.readerOffset());
-                assertEquals(6, slice.readableBytes());
-                assertEquals(6, slice.writerOffset());
-                assertEquals(6, slice.capacity());
-                assertEquals(0x02, slice.readByte());
-                assertEquals(0x03, slice.readByte());
-                assertEquals(0x04, slice.readByte());
-                assertEquals(0x05, slice.readByte());
-                assertEquals(0x06, slice.readByte());
-                assertEquals(0x07, slice.readByte());
-                assertThrows(IndexOutOfBoundsException.class, slice::readByte);
+            try (Buffer copy = buf.copy(1, 6)) {
+                assertThat(toByteArray(copy)).containsExactly(0x02, 0x03, 0x04, 0x05, 0x06, 0x07);
+                assertEquals(0, copy.readerOffset());
+                assertEquals(6, copy.readableBytes());
+                assertEquals(6, copy.writerOffset());
+                assertEquals(6, copy.capacity());
+                assertEquals(0x02, copy.readByte());
+                assertEquals(0x03, copy.readByte());
+                assertEquals(0x04, copy.readByte());
+                assertEquals(0x05, copy.readByte());
+                assertEquals(0x06, copy.readByte());
+                assertEquals(0x07, copy.readByte());
+                assertThrows(IndexOutOfBoundsException.class, copy::readByte);
             }
         }
     }
@@ -167,11 +167,11 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
              Buffer buf = allocator.allocate(8)) {
             try (Buffer copy = buf.copy()) {
                 assertTrue(asRS(buf).isOwned());
-                buf.send().discard();
                 assertTrue(asRS(copy).isOwned());
                 copy.send().discard();
             }
             assertTrue(asRS(buf).isOwned());
+            buf.send().discard();
         }
     }
 
@@ -182,11 +182,11 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
              Buffer buf = allocator.allocate(8)) {
             try (Buffer copy = buf.copy(0, 8)) {
                 assertTrue(asRS(buf).isOwned());
-                buf.send().discard();
                 assertTrue(asRS(copy).isOwned());
                 copy.send().discard();
             }
             assertTrue(asRS(buf).isOwned());
+            buf.send().discard();
         }
     }
 
@@ -230,10 +230,10 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
             try (Buffer copy = buf.copy()) {
-                assertFalse(asRS(buf).isOwned());
+                assertTrue(asRS(buf).isOwned());
                 copy.send().discard();
             }
-            // Verify that the slice is closed properly afterwards.
+            // Verify that the copy is closed properly afterwards.
             assertTrue(asRS(buf).isOwned());
             buf.send().receive().close();
         }
@@ -245,10 +245,10 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
             try (Buffer copy = buf.copy(0, 8)) {
-                assertFalse(asRS(buf).isOwned());
+                assertTrue(asRS(buf).isOwned());
                 copy.send().discard();
             }
-            // Verify that the slice is closed properly afterwards.
+            // Verify that the copy is closed properly afterwards.
             assertTrue(asRS(buf).isOwned());
         }
     }
@@ -259,7 +259,7 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
             assertThrows(IndexOutOfBoundsException.class, () -> buf.copy(-1, 1));
-            // Verify that the slice is closed properly afterwards.
+            // Verify that the copy is closed properly afterwards.
             assertTrue(asRS(buf).isOwned());
         }
     }
@@ -271,7 +271,7 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
              Buffer buf = allocator.allocate(8)) {
             assertThrows(IllegalArgumentException.class, () -> buf.copy(0, -1));
             assertThrows(IllegalArgumentException.class, () -> buf.copy(2, -1));
-            // Verify that the slice is closed properly afterwards.
+            // Verify that the copy is closed properly afterwards.
             assertTrue(asRS(buf).isOwned());
         }
     }
@@ -284,7 +284,7 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
             assertThrows(IndexOutOfBoundsException.class, () -> buf.copy(0, 9));
             buf.copy(0, 8).close(); // This is still fine.
             assertThrows(IndexOutOfBoundsException.class, () -> buf.copy(1, 8));
-            // Verify that the slice is closed properly afterwards.
+            // Verify that the copy is closed properly afterwards.
             assertTrue(asRS(buf).isOwned());
         }
     }
@@ -295,7 +295,7 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
             buf.copy(0, 0).close(); // This is fine.
-            // Verify that the slice is closed properly afterwards.
+            // Verify that the copy is closed properly afterwards.
             assertTrue(asRS(buf).isOwned());
         }
     }

@@ -32,13 +32,13 @@ public final class ComposingAndSplittingExample {
                 buf.writeByte((byte) tlr.nextInt());
             }
 
-            try (Buffer slice = buf.split()) {
-                slice.send();
+            try (Buffer split = buf.split()) {
+                split.send();
                 System.out.println("buf.capacity() = " + buf.capacity());
                 System.out.println("buf.readableBytes() = " + buf.readableBytes());
                 System.out.println("---");
-                System.out.println("slice.capacity() = " + slice.capacity());
-                System.out.println("slice.readableBytes() = " + slice.readableBytes());
+                System.out.println("split.capacity() = " + split.capacity());
+                System.out.println("split.readableBytes() = " + split.readableBytes());
             }
         }
     }

@@ -100,7 +100,8 @@ public class BufferEnsureWritableTest extends BufferTestSupport {
             assertThat(buf.capacity()).isGreaterThanOrEqualTo(8);
             buf.writeLong(0x0102030405060708L);
             try (Buffer copy = buf.copy()) {
-                assertEquals(0x0102030405060708L, copy.readLong());
+                long actual = copy.readLong();
+                assertEquals(0x0102030405060708L, actual);
             }
         }
     }

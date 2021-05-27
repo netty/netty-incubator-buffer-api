@@ -195,10 +195,12 @@ class NioBuffer extends ResourceSupport<Buffer, NioBuffer> implements Buffer, Re
         if (!isAccessible()) {
             throw new IllegalStateException("This buffer is closed: " + this + '.');
         }
-        AllocatorControl.UntetheredMemory memory = control.allocateUntethered(this, length);
-        ByteBuffer byteBuffer = memory.memory();
-        Buffer copy = new NioBuffer(byteBuffer, byteBuffer, control, memory.drop());
-        copyInto(0, copy, 0, length);
+        int allocSize = Math.max(length, 1); // Allocators don't support allocating zero-sized buffers.
+        AllocatorControl.UntetheredMemory memory = control.allocateUntethered(this, allocSize);
+        ByteBuffer base = memory.memory();
+        ByteBuffer buffer = length == 0? bbslice(base, 0, 0) : base;
+        Buffer copy = new NioBuffer(base, buffer, control, memory.drop());
+        copyInto(offset, copy, 0, length);
         copy.writerOffset(length).order(order());
         if (readOnly()) {
             copy = copy.makeReadOnly();
@@ -465,8 +467,7 @@ class NioBuffer extends ResourceSupport<Buffer, NioBuffer> implements Buffer, Re
         if (readOnly) {
             splitBuffer.makeReadOnly();
         }
-        // Note that split, unlike slice, does not deconstify, because data changes in either buffer are not visible
-        // in the other. The split buffers can later deconstify independently if needed.
+        // Split preserves const-state.
         splitBuffer.constBuffer = constBuffer;
         rmem = bbslice(rmem, splitOffset, rmem.capacity() - splitOffset);
         if (!readOnly) {
