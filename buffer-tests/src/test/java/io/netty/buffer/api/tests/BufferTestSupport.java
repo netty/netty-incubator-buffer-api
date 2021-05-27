@@ -94,8 +94,8 @@ public abstract class BufferTestSupport {
         if ("nosample".equalsIgnoreCase(sampleSetting)) {
             return fixture -> true;
         }
-        // Filter out 95% of tests.
-        return filterOfTheDay(5);
+        // Filter out 85% of tests.
+        return filterOfTheDay(15);
     }
 
     protected static Predicate<Fixture> filterOfTheDay(int percentage) {
