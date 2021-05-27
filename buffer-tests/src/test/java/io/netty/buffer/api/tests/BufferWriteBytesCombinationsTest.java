@@ -76,8 +76,6 @@ public class BufferWriteBytesCombinationsTest extends BufferTestSupport {
         assertThat(target.writerOffset()).isEqualTo(35);
         assertThat(source.readerOffset()).isEqualTo(35);
         assertThat(source.writerOffset()).isEqualTo(35);
-        try (Buffer readableSlice = target.slice()) {
-            assertEquals(source, readableSlice);
-        }
+        assertReadableEquals(source, target);
     }
 }

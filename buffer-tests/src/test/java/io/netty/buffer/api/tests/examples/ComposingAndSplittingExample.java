@@ -22,7 +22,7 @@ import io.netty.buffer.api.Scope;
 
 import java.util.concurrent.ThreadLocalRandom;
 
-public final class ComposingAndSlicingExample {
+public final class ComposingAndSplittingExample {
     public static void main(String[] args) {
         try (BufferAllocator allocator = BufferAllocator.pooledDirect();
              Buffer buf = createBigBuffer(allocator)) {
@@ -32,7 +32,7 @@ public final class ComposingAndSlicingExample {
                 buf.writeByte((byte) tlr.nextInt());
             }
 
-            try (Buffer slice = buf.slice()) {
+            try (Buffer slice = buf.split()) {
                 slice.send();
                 System.out.println("buf.capacity() = " + buf.capacity());
                 System.out.println("buf.readableBytes() = " + buf.readableBytes());

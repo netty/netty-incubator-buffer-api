@@ -92,15 +92,15 @@ public class BufferEnsureWritableTest extends BufferTestSupport {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    public void mustBeAbleToSliceAfterEnsureWritable(Fixture fixture) {
+    public void mustBeAbleToCopyAfterEnsureWritable(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(4)) {
             buf.ensureWritable(8);
             assertThat(buf.writableBytes()).isGreaterThanOrEqualTo(8);
             assertThat(buf.capacity()).isGreaterThanOrEqualTo(8);
             buf.writeLong(0x0102030405060708L);
-            try (Buffer slice = buf.slice()) {
-                assertEquals(0x0102030405060708L, slice.readLong());
+            try (Buffer copy = buf.copy()) {
+                assertEquals(0x0102030405060708L, copy.readLong());
             }
         }
     }

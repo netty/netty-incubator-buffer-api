@@ -188,23 +188,22 @@ class NioBuffer extends ResourceSupport<Buffer, NioBuffer> implements Buffer, Re
     }
 
     @Override
-    public Buffer slice(int offset, int length) {
+    public Buffer copy(int offset, int length) {
         if (length < 0) {
             throw new IllegalArgumentException("Length cannot be negative: " + length + '.');
         }
         if (!isAccessible()) {
             throw new IllegalStateException("This buffer is closed: " + this + '.');
         }
-        ByteBuffer slice = bbslice(rmem, offset, length);
-        ArcDrop<NioBuffer> drop = (ArcDrop<NioBuffer>) unsafeGetDrop();
-        drop.increment();
-        Buffer sliceBuffer = new NioBuffer(base, slice, control, drop)
-                .writerOffset(length)
-                .order(order());
+        AllocatorControl.UntetheredMemory memory = control.allocateUntethered(this, length);
+        ByteBuffer byteBuffer = memory.memory();
+        Buffer copy = new NioBuffer(byteBuffer, byteBuffer, control, memory.drop());
+        copyInto(0, copy, 0, length);
+        copy.writerOffset(length).order(order());
         if (readOnly()) {
-            sliceBuffer = sliceBuffer.makeReadOnly();
+            copy = copy.makeReadOnly();
         }
-        return sliceBuffer;
+        return copy;
     }
 
     @Override

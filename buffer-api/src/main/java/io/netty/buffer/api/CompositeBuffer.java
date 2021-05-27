@@ -414,7 +414,7 @@ public final class CompositeBuffer extends ResourceSupport<Buffer, CompositeBuff
     }
 
     @Override
-    public CompositeBuffer slice(int offset, int length) {
+    public CompositeBuffer copy(int offset, int length) {
         checkWriteBounds(offset, length);
         if (offset < 0 || length < 0) {
             throw new IllegalArgumentException(
@@ -422,31 +422,27 @@ public final class CompositeBuffer extends ResourceSupport<Buffer, CompositeBuff
                     offset + ", and length was " + length + '.');
         }
         Buffer choice = (Buffer) chooseBuffer(offset, 0);
-        Buffer[] slices;
+        Buffer[] copies;
 
         if (length > 0) {
-            slices = new Buffer[bufs.length];
+            copies = new Buffer[bufs.length];
             int off = subOffset;
             int cap = length;
             int i;
             for (i = searchOffsets(offset); cap > 0; i++) {
                 var buf = bufs[i];
                 int avail = buf.capacity() - off;
-                slices[i] = buf.slice(off, Math.min(cap, avail));
+                copies[i] = buf.copy(off, Math.min(cap, avail));
                 cap -= avail;
                 off = 0;
             }
-            slices = Arrays.copyOf(slices, i);
+            copies = Arrays.copyOf(copies, i);
         } else {
             // Specialize for length == 0, since we must slice from at least one constituent buffer.
-            slices = new Buffer[] { choice.slice(subOffset, 0) };
+            copies = new Buffer[] { choice.copy(subOffset, 0) };
         }
 
-        // Use the constructor that skips filtering out empty buffers, and skips acquiring on the buffers.
-        // This is important because 1) slice() already acquired the buffers, and 2) if this slice is empty
-        // then we need to keep holding on to it to prevent this originating composite buffer from getting
-        // ownership. If it did, its behaviour would be inconsistent with that of a non-composite buffer.
-        return new CompositeBuffer(allocator, slices, COMPOSITE_DROP);
+        return new CompositeBuffer(allocator, copies, COMPOSITE_DROP);
     }
 
     @Override

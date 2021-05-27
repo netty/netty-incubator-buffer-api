@@ -293,22 +293,22 @@ class MemSegBuffer extends ResourceSupport<Buffer, MemSegBuffer> implements Buff
     }
 
     @Override
-    public Buffer slice(int offset, int length) {
+    public Buffer copy(int offset, int length) {
         if (length < 0) {
             throw new IllegalArgumentException("Length cannot be negative: " + length + '.');
         }
         if (!isAccessible()) {
             throw new IllegalStateException("This buffer is closed: " + this + '.');
         }
-        var slice = seg.asSlice(offset, length);
-        Drop<MemSegBuffer> drop = ArcDrop.acquire(unsafeGetDrop());
-        Buffer sliceBuffer = new MemSegBuffer(base, slice, drop, control)
-                .writerOffset(length)
-                .order(order());
+        AllocatorControl.UntetheredMemory memory = control.allocateUntethered(this, length);
+        MemorySegment segment = memory.memory();
+        Buffer copy = new MemSegBuffer(segment, segment, memory.drop(), control);
+        copyInto(0, copy, 0, length);
+        copy.writerOffset(length).order(order());
         if (readOnly()) {
-            sliceBuffer = sliceBuffer.makeReadOnly();
+            copy = copy.makeReadOnly();
         }
-        return sliceBuffer;
+        return copy;
     }
 
     @Override

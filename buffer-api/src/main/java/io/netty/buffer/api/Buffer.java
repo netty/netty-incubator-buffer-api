@@ -74,34 +74,19 @@ import java.nio.ByteOrder;
  *      0      <=     readerOffset  <=   writerOffset    <=    capacity
  * </pre>
  *
- * <h3 name="slice-split">Slice vs. Split</h3>
+ * <h3 name="slice-split">Splitting buffers</h3>
  *
- * The {@link #slice()} and {@link #split()} methods both return new buffers on the memory of the buffer they're
- * called on.
- * However, there are also important differences between the two, as they are aimed at different use cases that were
- * previously (in the {@code ByteBuf} API) covered by {@code slice()} alone.
- *
- * <ul>
- *     <li>
- *         Slices create a new view onto the memory, that is shared between the slice and the buffer.
- *         As long as both the slice, and the originating buffer are alive, neither will have ownership of the memory.
- *         Since the memory is shared, changes to the data made through one will be visible through the other.
- *     </li>
- *     <li>
- *         Split breaks the ownership of the memory in two.
- *         Both resulting buffers retain ownership of their respective region of memory.
- *         They can do this because the regions are guaranteed to not overlap; data changes through one buffer will not
- *         be visible through the other.
- *     </li>
- * </ul>
- *
- * These differences mean that slicing is mostly suitable for when you temporarily want to share a focused area of a
- * buffer.
- * Examples of this include doing IO, or decoding a bounded part of a larger message.
- * On the other hand, split is suitable for when you want to hand over a region of a buffer to some other,
+ * The {@link #split()} method break a buffer into two.
+ * The two buffers will share the underlying memory, but their regions will not overlap, ensuring that the memory is
+ * safely shared between the two.
+ * <p>
+ * Splitting a buffer is useful for when you want to hand over a region of a buffer to some other,
  * perhaps unknown, piece of code, and relinquish your ownership of that buffer region in the process.
  * Examples include aggregating messages into an accumulator buffer, and sending messages down the pipeline for
  * further processing, as split buffer regions, once their data has been received in its entirety.
+ *
+ * If you instead wish to temporarily share a region of a buffer, you will have to pass offset and length along with the
+ * buffer, or you will have to make a copy of the region in a new buffer.
  *
  * <h3>Buffers as constants</h3>
  *
@@ -439,47 +424,35 @@ public interface Buffer extends Resource<Buffer>, BufferAccessors {
     void ensureWritable(int size, int minimumGrowth, boolean allowCompaction);
 
     /**
-     * Returns a slice of this buffer's readable bytes.
-     * Modifying the content of the returned buffer or this buffer affects each other's content,
-     * while they maintain separate offsets. This method is identical to
-     * {@code buf.slice(buf.readerOffset(), buf.readableBytes())}.
+     * Returns a copy of this buffer's readable bytes.
+     * Modifying the content of the returned buffer will not affect this buffers contents.
+     * The two buffers will maintain separate offsets. This method is identical to
+     * {@code buf.copy(buf.readerOffset(), buf.readableBytes())}.
      * This method does not modify {@link #readerOffset()} or {@link #writerOffset()} of this buffer.
      * <p>
-     * This method increments the reference count of this buffer.
-     * The reference count is decremented again when the slice is deallocated.
-     * <p>
-     * The slice is created with a {@linkplain #writerOffset() write offset} equal to the length of the slice,
-     * so that the entire contents of the slice is ready to be read.
-     * <p>
-     * See the <a href="#slice-split">Slice vs. Split</a> section for details on the difference between slice
-     * and split.
+     * The copy is created with a {@linkplain #writerOffset() write offset} equal to the length of the copied data,
+     * so that the entire contents of the copy is ready to be read.
      *
      * @return A new buffer instance, with independent {@link #readerOffset()} and {@link #writerOffset()},
-     * that is a view of the readable region of this buffer.
+     * that contains a copy of the readable region of this buffer.
      */
-    default Buffer slice() {
-        return slice(readerOffset(), readableBytes());
+    default Buffer copy() {
+        return copy(readerOffset(), readableBytes());
     }
 
     /**
-     * Returns a slice of the given region of this buffer.
-     * Modifying the content of the returned buffer or this buffer affects each other's content,
-     * while they maintain separate offsets.
+     * Returns a copy of the given region of this buffer.
+     * Modifying the content of the returned buffer will not affect this buffers contents.
+     * The two buffers will  maintain separate offsets.
      * This method does not modify {@link #readerOffset()} or {@link #writerOffset()} of this buffer.
      * <p>
-     * This method increments the reference count of this buffer.
-     * The reference count is decremented again when the slice is deallocated.
-     * <p>
-     * The slice is created with a {@linkplain #writerOffset() write offset} equal to the length of the slice,
-     * so that the entire contents of the slice is ready to be read.
-     * <p>
-     * See the <a href="#slice-split">Slice vs. Split</a> section for details on the difference between slice
-     * and split.
+     * The copy is created with a {@linkplain #writerOffset() write offset} equal to the length of the copy,
+     * so that the entire contents of the copy is ready to be read.
      *
      * @return A new buffer instance, with independent {@link #readerOffset()} and {@link #writerOffset()},
-     * that is a view of the given region of this buffer.
+     * that contains a copy of the given region of this buffer.
      */
-    Buffer slice(int offset, int length);
+    Buffer copy(int offset, int length);
 
     /**
      * Split the buffer into two, at the {@linkplain #writerOffset() write offset} position.

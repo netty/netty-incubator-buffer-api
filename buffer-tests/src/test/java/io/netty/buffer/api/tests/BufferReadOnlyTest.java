@@ -195,7 +195,7 @@ public class BufferReadOnlyTest extends BufferTestSupport {
             assertTrue(asRS(b).isOwned());
             assertThat(a.capacity()).isEqualTo(8);
             assertThat(b.capacity()).isEqualTo(8);
-            try (Buffer c = b.slice()) {
+            try (Buffer c = b.copy()) {
                 assertTrue(c.readOnly());
                 assertFalse(asRS(c).isOwned());
                 assertFalse(asRS(b).isOwned());
@@ -211,7 +211,7 @@ public class BufferReadOnlyTest extends BufferTestSupport {
             Supplier<Buffer> supplier = allocator.constBufferSupplier(new byte[] {1, 2, 3, 4});
             try (Buffer a = supplier.get();
                  Buffer b = supplier.get();
-                 Buffer c = a.slice()) {
+                 Buffer c = a.copy()) {
                 assertEquals(1, a.readByte());
                 assertEquals(2, a.readByte());
                 assertThrows(IllegalStateException.class, () -> a.compact()); // Can't compact read-only buffer.

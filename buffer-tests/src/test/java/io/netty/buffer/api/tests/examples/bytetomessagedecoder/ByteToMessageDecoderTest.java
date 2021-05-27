@@ -33,6 +33,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static io.netty.buffer.api.internal.Statics.asRS;
 import static io.netty.buffer.api.tests.BufferTestSupport.assertEquals;
 import static io.netty.buffer.api.CompositeBuffer.compose;
+import static io.netty.buffer.api.tests.BufferTestSupport.assertReadableEquals;
 import static java.nio.ByteOrder.BIG_ENDIAN;
 import static java.nio.ByteOrder.LITTLE_ENDIAN;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -61,11 +62,13 @@ public class ByteToMessageDecoderTest {
             }
         });
 
-        try (Buffer buf = BufferAllocator.heap().allocate(4).writeInt(0x01020304)) {
-            channel.writeInbound(buf.slice());
+        try (Buffer buf = BufferAllocator.heap().allocate(4, BIG_ENDIAN).writeInt(0x01020304)) {
+            channel.writeInbound(buf);
             try (Buffer b = channel.readInbound()) {
-                buf.readByte();
-                assertEquals(b, buf);
+                assertEquals(3, b.readableBytes());
+                assertEquals(0x02, b.readByte());
+                assertEquals(0x03, b.readByte());
+                assertEquals(0x04, b.readByte());
             }
         }
     }
@@ -88,12 +91,10 @@ public class ByteToMessageDecoderTest {
             }
         });
 
-        channel.writeInbound(buf.slice());
+        channel.writeInbound(buf);
         try (Buffer expected = BufferAllocator.heap().allocate(3, BIG_ENDIAN).writeShort((short) 0x0203).writeByte((byte) 0x04);
-             Buffer b = channel.readInbound();
-             Buffer actual = b.slice(); // Only compare readable bytes.
-             buf) {
-            assertEquals(expected, actual);
+             Buffer actual = channel.readInbound()) {
+            assertReadableEquals(expected, actual);
         }
     }
 
@@ -120,9 +121,8 @@ public class ByteToMessageDecoderTest {
         assertTrue(channel.writeInbound(buf));
         assertTrue(channel.finish());
         try (Buffer expected = BufferAllocator.heap().allocate(1).writeByte((byte) 0x02);
-             Buffer b = channel.readInbound();
-             Buffer actual = b.slice()) {
-            assertEquals(expected, actual);
+             Buffer actual = channel.readInbound()) {
+            assertReadableEquals(expected, actual);
             assertNull(channel.readInbound());
         }
     }
@@ -243,11 +243,10 @@ public class ByteToMessageDecoderTest {
         });
 
         try (Buffer buf = BufferAllocator.heap().allocate(4, BIG_ENDIAN).writeInt(0x01020304)) {
-            assertTrue(channel.writeInbound(buf.slice()));
-            try (Buffer expected = buf.slice(1, 3);
-                 Buffer b = channel.readInbound();
-                 Buffer actual = b.slice()) {
-                assertEquals(expected, actual);
+            assertTrue(channel.writeInbound(buf.copy()));
+            try (Buffer expected = buf.copy(1, 3);
+                 Buffer actual = channel.readInbound()) {
+                assertReadableEquals(expected, actual);
                 assertFalse(channel.finish());
             }
         }
@@ -259,9 +258,8 @@ public class ByteToMessageDecoderTest {
             @Override
             protected void decode(ChannelHandlerContext ctx, Buffer in) {
                 assertTrue(in.readableBytes() > 0);
-                Buffer slice = in.slice();
-                in.readerOffset(in.readerOffset() + in.readableBytes());
-                ctx.fireChannelRead(slice);
+                Buffer chunk = in.split();
+                ctx.fireChannelRead(chunk);
             }
         });
         byte[] bytes = new byte[1024];
@@ -271,9 +269,9 @@ public class ByteToMessageDecoderTest {
             for (byte b : bytes) {
                 buf.writeByte(b);
             }
-            assertTrue(channel.writeInbound(buf.slice()));
+            assertTrue(channel.writeInbound(buf.copy()));
             try (Buffer b = channel.readInbound()) {
-                assertEquals(buf, b);
+                assertReadableEquals(buf, b);
                 assertNull(channel.readInbound());
                 assertFalse(channel.finish());
                 assertNull(channel.readInbound());
@@ -294,9 +292,8 @@ public class ByteToMessageDecoderTest {
                     return;
                 }
                 int read = decodeLast ? readable : readable - 1;
-                Buffer slice = in.slice(in.readerOffset(), read);
-                in.readerOffset(in.readerOffset() + read);
-                ctx.fireChannelRead(slice);
+                Buffer chunk = in.split(in.readerOffset() + read);
+                ctx.fireChannelRead(chunk);
             }
 
             @Override
@@ -308,13 +305,10 @@ public class ByteToMessageDecoderTest {
         });
         byte[] bytes = new byte[1024];
         ThreadLocalRandom.current().nextBytes(bytes);
-        try (Buffer buf = BufferAllocator.heap().allocate(bytes.length, BIG_ENDIAN);
-             Buffer part1 = buf.slice(0, bytes.length - 1);
-             Buffer part2 = buf.slice(bytes.length - 1, 1)) {
-            for (byte b : bytes) {
-                buf.writeByte(b);
-            }
-            assertTrue(channel.writeInbound(buf.slice()));
+        try (Buffer buf = BufferAllocator.heap().allocate(bytes.length, BIG_ENDIAN).writeBytes(bytes);
+             Buffer part1 = buf.copy(0, bytes.length - 1);
+             Buffer part2 = buf.copy(bytes.length - 1, 1)) {
+            assertTrue(channel.writeInbound(buf));
             try (Buffer actual = channel.readInbound()) {
                 assertEquals(part1, actual);
             }
@@ -523,7 +517,6 @@ public class ByteToMessageDecoderTest {
     public void testDecodeLast() {
         final AtomicBoolean removeHandler = new AtomicBoolean();
         EmbeddedChannel channel = new EmbeddedChannel(new ByteToMessageDecoder() {
-
             @Override
             protected void decode(ChannelHandlerContext ctx, Buffer in) {
                 if (removeHandler.get()) {
@@ -533,12 +526,8 @@ public class ByteToMessageDecoderTest {
         });
         byte[] bytes = new byte[1024];
         ThreadLocalRandom.current().nextBytes(bytes);
-        try (Buffer buf = BufferAllocator.heap().allocate(bytes.length)) {
-            for (byte b : bytes) {
-                buf.writeByte(b);
-            }
-
-            assertFalse(channel.writeInbound(buf.slice()));
+        try (Buffer buf = BufferAllocator.heap().allocate(bytes.length).writeBytes(bytes)) {
+            assertFalse(channel.writeInbound(buf.copy()));
             assertNull(channel.readInbound());
             removeHandler.set(true);
             // This should trigger channelInputClosed(...)
@@ -546,7 +535,7 @@ public class ByteToMessageDecoderTest {
 
             assertTrue(channel.finish());
             try (Buffer actual = channel.readInbound()) {
-                assertEquals(buf.slice(), actual);
+                assertReadableEquals(buf, actual);
             }
             assertNull(channel.readInbound());
         }

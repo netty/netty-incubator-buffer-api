@@ -1418,11 +1418,8 @@ public final class ByteBufAdaptor extends ByteBuf {
     @Override
     public ByteBuf retainedSlice(int index, int length) {
         checkAccess();
-        try {
-            return wrap(buffer.slice(index, length));
-        } catch (IllegalStateException e) {
-            throw new IllegalReferenceCountException(e);
-        }
+        retain();
+        return new Slice(this, index, length);
     }
 
     private static final class Slice extends SlicedByteBuf {

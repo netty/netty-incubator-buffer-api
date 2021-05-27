@@ -134,7 +134,7 @@ public abstract class ByteToMessageDecoder extends ChannelHandlerAdapter {
                 if (composite.writerOffset() != composite.capacity()) {
                     // Writer index must equal capacity if we are going to "write"
                     // new components to the end.
-                    composite = cumulation.slice(0, composite.writerOffset());
+                    composite = cumulation.split(composite.writerOffset());
                     cumulation.close();
                 }
             } else {

@@ -165,20 +165,19 @@ class UnsafeBuffer extends ResourceSupport<Buffer, UnsafeBuffer> implements Buff
     }
 
     @Override
-    public Buffer slice(int offset, int length) {
+    public Buffer copy(int offset, int length) {
         if (length < 0) {
             throw new IllegalArgumentException("Length cannot be negative: " + length + '.');
         }
         checkGet(offset, length);
-        ArcDrop<UnsafeBuffer> drop = (ArcDrop<UnsafeBuffer>) unsafeGetDrop();
-        drop.increment();
-        Buffer sliceBuffer = new UnsafeBuffer(memory, baseOffset + offset, length, control, drop)
-                .writerOffset(length)
-                .order(order);
+        AllocatorControl.UntetheredMemory memory = control.allocateUntethered(this, length);
+        UnsafeMemory unsafeMemory = memory.memory();
+        Buffer copy = new UnsafeBuffer(unsafeMemory, unsafeMemory.address, length, control, memory.drop());
+        copy.writerOffset(length).order(order);
         if (readOnly) {
-            sliceBuffer = sliceBuffer.makeReadOnly();
+            copy = copy.makeReadOnly();
         }
-        return sliceBuffer;
+        return copy;
     }
 
     @Override
