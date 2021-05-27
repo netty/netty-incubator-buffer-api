@@ -297,59 +297,6 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
     }
 
     @ParameterizedTest
-    @MethodSource("nonCompositeAllocators")
-    public void acquireComposingAndSlicingMustIncrementBorrows(Fixture fixture) {
-        try (BufferAllocator allocator = fixture.createAllocator();
-             Buffer buf = allocator.allocate(8)) {
-            int borrows = countBorrows(buf);
-            try (Buffer ignored = asRS(buf).acquire()) {
-                assertEquals(borrows + 1, countBorrows(buf));
-                try (Buffer slice = buf.slice()) {
-                    assertEquals(0, slice.capacity()); // We haven't written anything, so the slice is empty.
-                    int sliceBorrows = countBorrows(slice);
-                    assertEquals(borrows + 2, countBorrows(buf));
-                    try (Buffer ignored1 = CompositeBuffer.compose(allocator, buf.send(), slice.send())) {
-                        assertEquals(borrows + 3, countBorrows(buf));
-                        // Note: Slice is empty; not acquired by the composite buffer.
-                        assertEquals(sliceBorrows, countBorrows(slice));
-                    }
-                    assertEquals(sliceBorrows, countBorrows(slice));
-                    assertEquals(borrows + 2, countBorrows(buf));
-                }
-                assertEquals(borrows + 1, countBorrows(buf));
-            }
-            assertEquals(borrows, countBorrows(buf));
-        }
-    }
-
-    @ParameterizedTest
-    @MethodSource("nonCompositeAllocators")
-    public void acquireComposingAndSlicingMustIncrementBorrowsWithData(Fixture fixture) {
-        try (BufferAllocator allocator = fixture.createAllocator();
-             Buffer buf = allocator.allocate(8)) {
-            buf.writeByte((byte) 1);
-            int borrows = countBorrows(buf);
-            try (Buffer ignored = asRS(buf).acquire()) {
-                assertEquals(borrows + 1, countBorrows(buf));
-                try (Buffer slice = buf.slice()) {
-                    assertEquals(1, slice.capacity());
-                    int sliceBorrows = countBorrows(slice);
-                    assertEquals(borrows + 2, countBorrows(buf));
-                    try (Buffer ignored1 = CompositeBuffer.compose(allocator, buf.send(), slice.send())) {
-                        assertEquals(borrows + 3, countBorrows(buf));
-                        assertEquals(sliceBorrows + 1, countBorrows(slice));
-                    }
-                    assertEquals(sliceBorrows, countBorrows(slice));
-                    assertEquals(borrows + 2, countBorrows(buf));
-                }
-                assertEquals(borrows + 1, countBorrows(buf));
-            }
-            assertEquals(borrows, countBorrows(buf));
-            assertTrue(asRS(buf).isOwned());
-        }
-    }
-
-    @ParameterizedTest
     @MethodSource("allocators")
     public void sliceMustBecomeOwnedOnSourceBufferClose(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator()) {

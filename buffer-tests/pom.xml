@@ -31,7 +31,6 @@
     <packaging>jar</packaging>
 
     <properties>
-        <surefire.version>3.0.0-M5</surefire.version>
         <skipTests>false</skipTests>
         <argLine.common>
             -XX:+HeapDumpOnOutOfMemoryError

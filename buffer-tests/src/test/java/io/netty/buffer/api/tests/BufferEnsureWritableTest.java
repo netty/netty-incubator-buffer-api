@@ -26,23 +26,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 public class BufferEnsureWritableTest extends BufferTestSupport {
-
-    @ParameterizedTest
-    @MethodSource("allocators")
-    public void ensureWritableMustThrowForBorrowedBuffers(Fixture fixture) {
-        try (BufferAllocator allocator = fixture.createAllocator();
-             Buffer buf = allocator.allocate(8)) {
-            try (Buffer slice = buf.slice()) {
-                assertThrows(IllegalStateException.class, () -> slice.ensureWritable(1));
-                assertThrows(IllegalStateException.class, () -> buf.ensureWritable(1));
-            }
-            try (Buffer compose = CompositeBuffer.compose(allocator, buf.send())) {
-                assertThrows(IllegalStateException.class, () -> compose.ensureWritable(1));
-                assertThrows(IllegalStateException.class, () -> buf.ensureWritable(1));
-            }
-        }
-    }
-
     @ParameterizedTest
     @MethodSource("allocators")
     public void ensureWritableMustThrowForNegativeSize(Fixture fixture) {
