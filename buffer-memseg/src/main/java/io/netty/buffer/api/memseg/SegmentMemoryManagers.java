@@ -30,7 +30,7 @@ public class SegmentMemoryManagers implements MemoryManagers {
     }
 
     @Override
-    public String implementationName() {
+    public String getImplementationName() {
         return "MemorySegment";
     }
 

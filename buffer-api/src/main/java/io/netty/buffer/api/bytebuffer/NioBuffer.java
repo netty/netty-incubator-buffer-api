@@ -32,6 +32,7 @@ import io.netty.buffer.api.WritableComponent;
 import io.netty.buffer.api.WritableComponentProcessor;
 import io.netty.buffer.api.internal.ArcDrop;
 import io.netty.buffer.api.internal.Statics;
+import io.netty.util.IllegalReferenceCountException;
 import io.netty.util.ReferenceCounted;
 import io.netty.util.internal.PlatformDependent;
 
@@ -1245,6 +1246,9 @@ class NioBuffer extends ResourceSupport<Buffer, NioBuffer> implements Buffer, Re
 
     @Override
     public boolean release(int decrement) {
+        if (!isAccessible() || decrement > 1 + countBorrows()) {
+            throw new IllegalReferenceCountException();
+        }
         for (int i = 0; i < decrement; i++) {
             close();
         }

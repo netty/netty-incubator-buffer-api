@@ -30,7 +30,7 @@ public class ByteBufferMemoryManagers implements MemoryManagers {
     }
 
     @Override
-    public String implementationName() {
+    public String getImplementationName() {
         return "ByteBuffer";
     }
 

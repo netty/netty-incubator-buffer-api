@@ -61,6 +61,7 @@ import static io.netty.buffer.Unpooled.directBuffer;
 import static io.netty.buffer.Unpooled.unreleasableBuffer;
 import static io.netty.buffer.Unpooled.wrappedBuffer;
 import static io.netty.util.internal.EmptyArrays.EMPTY_BYTES;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -3461,6 +3462,15 @@ public abstract class AbstractByteBufTest {
     @Test
     public void testReleaseAfterRelease() {
         assertThrows(IllegalReferenceCountException.class, () -> releasedBuffer().release());
+    }
+
+    @Test
+    public void overReleasingMustNotCloseBuffer() {
+        ByteBuf buf = newBuffer(1);
+        assertThrows(IllegalReferenceCountException.class, () -> buf.release(10));
+        assertThrows(IllegalReferenceCountException.class, () -> buf.release(2));
+        assertThat(buf.refCnt()).isNotZero();
+        assertTrue(buf.release());
     }
 
     private static void assertDuplicateFailAfterRelease(ByteBuf... bufs) {

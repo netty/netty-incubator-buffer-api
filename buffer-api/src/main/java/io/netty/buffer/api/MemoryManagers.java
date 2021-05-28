@@ -65,7 +65,7 @@ public interface MemoryManagers {
     }
 
     /**
-     * Find a {@link MemoryManagers} implementation by its {@linkplain #implementationName() implementation name}.
+     * Find a {@link MemoryManagers} implementation by its {@linkplain #getImplementationName() implementation name}.
      * <p>
      * Note: All available {@link MemoryManagers} instances are service loaded and instantiated every time this
      * method is called.
@@ -82,7 +82,7 @@ public interface MemoryManagers {
                         return Stream.empty();
                     }
                 })
-                .filter(impl -> implementationName.equals(impl.implementationName()))
+                .filter(impl -> implementationName.equals(impl.getImplementationName()))
                 .findFirst();
     }
 
@@ -106,5 +106,5 @@ public interface MemoryManagers {
      *
      * @return The name of this memory managers implementation.
      */
-    String implementationName();
+    String getImplementationName();
 }
