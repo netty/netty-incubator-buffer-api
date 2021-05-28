@@ -97,8 +97,9 @@ public abstract class BufferHolder<T extends BufferHolder<T>> implements Resourc
      * @param send The new {@link Buffer} instance that is replacing the currently held buffer.
      */
     protected final void replaceBuffer(Send<Buffer> send) {
+        Buffer received = send.receive();
         buf.close();
-        buf = send.receive();
+        buf = received;
     }
 
     /**
@@ -114,7 +115,8 @@ public abstract class BufferHolder<T extends BufferHolder<T>> implements Resourc
      * @param send The {@link Send} with the new {@link Buffer} instance that is replacing the currently held buffer.
      */
     protected final void replaceBufferVolatile(Send<Buffer> send) {
-        var prev = (Buffer) BUF.getAndSet(this, send.receive());
+        Buffer received = send.receive();
+        var prev = (Buffer) BUF.getAndSet(this, received);
         prev.close();
     }
 

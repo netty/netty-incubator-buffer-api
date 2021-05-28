@@ -76,7 +76,7 @@ import java.nio.ByteOrder;
  *
  * <h3 name="split">Splitting buffers</h3>
  *
- * The {@link #split()} method break a buffer into two.
+ * The {@link #split()} method breaks a buffer into two.
  * The two buffers will share the underlying memory, but their regions will not overlap, ensuring that the memory is
  * safely shared between the two.
  * <p>
@@ -86,7 +86,7 @@ import java.nio.ByteOrder;
  * further processing, as split buffer regions, once their data has been received in its entirety.
  *
  * If you instead wish to temporarily share a region of a buffer, you will have to pass offset and length along with the
- * buffer, or you will have to make a copy of the region in a new buffer.
+ * buffer, or you will have to make a copy of the region.
  *
  * <h3>Buffers as constants</h3>
  *
@@ -377,7 +377,7 @@ public interface Buffer extends Resource<Buffer>, BufferAccessors {
      * {@code false}.
      *
      * @param size The requested number of bytes of space that should be available for writing.
-     * @throws IllegalStateException if this buffer is not in a bad state, or is {@linkplain #readOnly() read-only}.
+     * @throws IllegalStateException if this buffer is in a bad state, or is {@linkplain #readOnly() read-only}.
      */
     default void ensureWritable(int size) {
         ensureWritable(size, 1, true);
@@ -418,7 +418,7 @@ public interface Buffer extends Resource<Buffer>, BufferAccessors {
      * @param allowCompaction {@code true} if the method is allowed to modify the
      *                                   {@linkplain #readerOffset() reader offset} and
      *                                   {@linkplain #writerOffset() writer offset}, otherwise {@code false}.
-     * @throws IllegalStateException if this buffer is not in a bad state, or is {@linkplain #readOnly() read-only}.
+     * @throws IllegalStateException if this buffer is in a bad state, or is {@linkplain #readOnly() read-only}.
      */
     void ensureWritable(int size, int minimumGrowth, boolean allowCompaction);
 
@@ -553,7 +553,7 @@ public interface Buffer extends Resource<Buffer>, BufferAccessors {
     /**
      * Discards the read bytes, and moves the buffer contents to the beginning of the buffer.
      *
-     * @throws IllegalStateException if this buffer is not in a bad state, or is {@linkplain #readOnly() read-only}.
+     * @throws IllegalStateException if this buffer is in a bad state, or is {@linkplain #readOnly() read-only}.
      */
     void compact();
 

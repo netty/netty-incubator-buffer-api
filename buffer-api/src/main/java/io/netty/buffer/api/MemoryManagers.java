@@ -54,6 +54,8 @@ public interface MemoryManagers {
 
     /**
      * Get a lazy-loading stream of all available memory managers.
+     * <p>
+     * Note: All available {@link MemoryManagers} instances are service loaded and instantiated on every call.
      *
      * @return A stream of providers of memory managers instances.
      */
@@ -64,6 +66,9 @@ public interface MemoryManagers {
 
     /**
      * Find a {@link MemoryManagers} implementation by its {@linkplain #implementationName() implementation name}.
+     * <p>
+     * Note: All available {@link MemoryManagers} instances are service loaded and instantiated every time this
+     * method is called.
      *
      * @param implementationName The named implementation to look for.
      * @return A {@link MemoryManagers} implementation, if any was found.

@@ -3458,6 +3458,11 @@ public abstract class AbstractByteBufTest {
         assertThrows(IllegalReferenceCountException.class, () -> releasedBuffer().retainedDuplicate());
     }
 
+    @Test
+    public void testReleaseAfterRelease() {
+        assertThrows(IllegalReferenceCountException.class, () -> releasedBuffer().release());
+    }
+
     private static void assertDuplicateFailAfterRelease(ByteBuf... bufs) {
         for (ByteBuf buf : bufs) {
             if (buf.refCnt() > 0) {

@@ -54,6 +54,7 @@ public interface Statics {
         }
     }
 
+    @SuppressWarnings("JavaLangInvokeHandleSignature")
     static MethodHandle getByteBufferPutOffsetsMethodHandle() {
         try {
             Lookup lookup = MethodHandles.lookup();
@@ -64,7 +65,7 @@ public interface Statics {
         }
     }
 
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings({"unchecked", "unused"})
     static <T extends Buffer> Drop<T> noOpDrop() {
         return (Drop<T>) NO_OP_DROP;
     }
