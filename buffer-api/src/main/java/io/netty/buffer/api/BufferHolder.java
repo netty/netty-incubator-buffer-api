@@ -15,6 +15,7 @@
  */
 package io.netty.buffer.api;
 
+import io.netty.buffer.api.internal.ResourceSupport;
 import io.netty.buffer.api.internal.Statics;
 
 import java.lang.invoke.VarHandle;
@@ -31,12 +32,12 @@ import static java.lang.invoke.MethodHandles.lookup;
  * as inspiration.
  * <p>
  * If you just want an object that is a reference to a buffer, then the {@link BufferRef} can be used for that purpose.
- * If you have an advanced use case where you wish to implement {@link Rc}, and tightly control lifetimes, then
- * {@link RcSupport} can be of help.
+ * If you have an advanced use case where you wish to implement {@link Resource}, and tightly control lifetimes, then
+ * {@link ResourceSupport} can be of help.
  *
  * @param <T> The concrete {@link BufferHolder} type.
  */
-public abstract class BufferHolder<T extends BufferHolder<T>> implements Rc<T> {
+public abstract class BufferHolder<T extends BufferHolder<T>> implements Resource<T> {
     private static final VarHandle BUF = Statics.findVarHandle(lookup(), BufferHolder.class, "buf", Buffer.class);
     private Buffer buf;
 
@@ -48,7 +49,7 @@ public abstract class BufferHolder<T extends BufferHolder<T>> implements Rc<T> {
      * @param buf The {@linkplain Buffer buffer} to be held by this holder.
      */
     protected BufferHolder(Buffer buf) {
-        this.buf = Objects.requireNonNull(buf, "The buffer cannot be null.").acquire();
+        this.buf = Objects.requireNonNull(buf, "The buffer cannot be null.");
     }
 
     /**
@@ -62,21 +63,9 @@ public abstract class BufferHolder<T extends BufferHolder<T>> implements Rc<T> {
         buf = Objects.requireNonNull(send, "The send cannot be null.").receive();
     }
 
-    @SuppressWarnings("unchecked")
-    @Override
-    public T acquire() {
-        buf.acquire();
-        return (T) this;
-    }
-
     @Override
     public void close() {
         buf.close();
-    }
-
-    @Override
-    public boolean isOwned() {
-        return buf.isOwned();
     }
 
     @SuppressWarnings("unchecked")
@@ -101,51 +90,15 @@ public abstract class BufferHolder<T extends BufferHolder<T>> implements Rc<T> {
      * This method is protected to permit advanced use cases of {@link BufferHolder} sub-class implementations.
      * <p>
      * <strong>Note:</strong> this method decreases the reference count of the current buffer,
-     * and increases the reference count of the new buffer.
-     * <p>
-     * The buffer assignment is performed using a plain store.
-     *
-     * @param newBuf The new {@link Buffer} instance that is replacing the currently held buffer.
-     */
-    protected final void replaceBuf(Buffer newBuf) {
-        try (var ignore = buf) {
-            buf = newBuf.acquire();
-        }
-    }
-
-    /**
-     * Replace the underlying referenced buffer with the given buffer.
-     * <p>
-     * This method is protected to permit advanced use cases of {@link BufferHolder} sub-class implementations.
-     * <p>
-     * <strong>Note:</strong> this method decreases the reference count of the current buffer,
      * and takes exclusive ownership of the sent buffer.
      * <p>
      * The buffer assignment is performed using a plain store.
      *
      * @param send The new {@link Buffer} instance that is replacing the currently held buffer.
      */
-    protected final void replaceBuf(Send<Buffer> send) {
-        try (var ignore = buf) {
-            buf = send.receive();
-        }
-    }
-
-    /**
-     * Replace the underlying referenced buffer with the given buffer.
-     * <p>
-     * This method is protected to permit advanced use cases of {@link BufferHolder} sub-class implementations.
-     * <p>
-     * <strong>Note:</strong> this method decreases the reference count of the current buffer,
-     * and increases the reference count of the new buffer.
-     * <p>
-     * The buffer assignment is performed using a volatile store.
-     *
-     * @param newBuf The new {@link Buffer} instance that is replacing the currently held buffer.
-     */
-    protected final void replaceBufVolatile(Buffer newBuf) {
-        var prev = (Buffer) BUF.getAndSet(this, newBuf.acquire());
-        prev.close();
+    protected final void replaceBuffer(Send<Buffer> send) {
+        buf.close();
+        buf = send.receive();
     }
 
     /**
@@ -160,7 +113,7 @@ public abstract class BufferHolder<T extends BufferHolder<T>> implements Rc<T> {
      *
      * @param send The {@link Send} with the new {@link Buffer} instance that is replacing the currently held buffer.
      */
-    protected final void replaceBufVolatile(Send<Buffer> send) {
+    protected final void replaceBufferVolatile(Send<Buffer> send) {
         var prev = (Buffer) BUF.getAndSet(this, send.receive());
         prev.close();
     }
@@ -172,7 +125,7 @@ public abstract class BufferHolder<T extends BufferHolder<T>> implements Rc<T> {
      *
      * @return The {@link Buffer} instance being held by this {@linkplain T buffer holder}.
      */
-    protected final Buffer getBuf() {
+    protected final Buffer getBuffer() {
         return buf;
     }
 
@@ -183,7 +136,7 @@ public abstract class BufferHolder<T extends BufferHolder<T>> implements Rc<T> {
      *
      * @return The {@link Buffer} instance being held by this {@linkplain T buffer holder}.
      */
-    protected final Buffer getBufVolatile() {
+    protected final Buffer getBufferVolatile() {
         return (Buffer) BUF.getVolatile(this);
     }
 

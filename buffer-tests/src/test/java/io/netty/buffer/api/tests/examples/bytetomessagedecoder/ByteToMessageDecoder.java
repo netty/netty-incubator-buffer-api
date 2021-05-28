@@ -104,7 +104,7 @@ public abstract class ByteToMessageDecoder extends ChannelHandlerAdapter {
         // for whatever release (for example because of OutOfMemoryError)
         try (in) {
             final int required = in.readableBytes();
-            if (required > cumulation.writableBytes() || !cumulation.isOwned() || cumulation.readOnly()) {
+            if (required > cumulation.writableBytes() || cumulation.readOnly()) {
                 // Expand cumulation (by replacing it) under the following conditions:
                 // - cumulation cannot be resized to accommodate the additional data
                 // - cumulation can be expanded with a reallocation operation to accommodate but the buffer is
@@ -129,18 +129,18 @@ public abstract class ByteToMessageDecoder extends ChannelHandlerAdapter {
         }
         Buffer composite;
         try (in) {
-            if (CompositeBuffer.isComposite(cumulation) && cumulation.isOwned()) {
+            if (CompositeBuffer.isComposite(cumulation)) {
                 composite = cumulation;
                 if (composite.writerOffset() != composite.capacity()) {
                     // Writer index must equal capacity if we are going to "write"
                     // new components to the end.
-                    composite = cumulation.slice(0, composite.writerOffset());
+                    composite = cumulation.split(composite.writerOffset());
                     cumulation.close();
                 }
             } else {
-                composite = CompositeBuffer.compose(alloc, cumulation);
+                composite = CompositeBuffer.compose(alloc, cumulation.send());
             }
-            ((CompositeBuffer) composite).extendWith(in);
+            ((CompositeBuffer) composite).extendWith(in.send());
             return composite;
         }
     };
@@ -313,14 +313,8 @@ public abstract class ByteToMessageDecoder extends ChannelHandlerAdapter {
     }
 
     protected final void discardSomeReadBytes() {
-        if (cumulation != null && !first && cumulation.isOwned()) {
-            // discard some bytes if possible to make more room in the
-            // buffer but only if the refCnt == 1  as otherwise the user may have
-            // used slice().retain() or duplicate().retain().
-            //
-            // See:
-            // - https://github.com/netty/netty/issues/2327
-            // - https://github.com/netty/netty/issues/1764
+        if (cumulation != null && !first) {
+            // Discard some bytes if possible to make more room in the buffer.
             cumulation.compact();
         }
     }

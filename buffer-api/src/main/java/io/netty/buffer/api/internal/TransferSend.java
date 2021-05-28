@@ -13,15 +13,18 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package io.netty.buffer.api;
+package io.netty.buffer.api.internal;
 
-import io.netty.buffer.api.internal.Statics;
+import io.netty.buffer.api.Drop;
+import io.netty.buffer.api.Owned;
+import io.netty.buffer.api.Resource;
+import io.netty.buffer.api.Send;
 
 import java.lang.invoke.VarHandle;
 
 import static java.lang.invoke.MethodHandles.lookup;
 
-class TransferSend<I extends Rc<I>, T extends Rc<I>> implements Send<I> {
+public class TransferSend<I extends Resource<I>, T extends ResourceSupport<I, T>> implements Send<I> {
     private static final VarHandle RECEIVED = Statics.findVarHandle(lookup(), TransferSend.class, "received", boolean.class);
     private final Owned<T> outgoing;
     private final Drop<T> drop;
@@ -29,7 +32,7 @@ class TransferSend<I extends Rc<I>, T extends Rc<I>> implements Send<I> {
     @SuppressWarnings("unused")
     private volatile boolean received; // Accessed via VarHandle
 
-    TransferSend(Owned<T> outgoing, Drop<T> drop, Class<?> concreteType) {
+    public TransferSend(Owned<T> outgoing, Drop<T> drop, Class<?> concreteType) {
         this.outgoing = outgoing;
         this.drop = drop;
         this.concreteType = concreteType;

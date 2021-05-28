@@ -18,14 +18,16 @@ package io.netty.buffer.api.tests;
 import io.netty.buffer.api.Buffer;
 import io.netty.buffer.api.BufferAllocator;
 import io.netty.buffer.api.CompositeBuffer;
+import io.netty.buffer.api.internal.ResourceSupport;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
-import java.nio.ByteOrder;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadLocalRandom;
 
+import static io.netty.buffer.api.internal.Statics.acquire;
+import static io.netty.buffer.api.internal.Statics.isOwned;
 import static java.nio.ByteOrder.BIG_ENDIAN;
 import static java.nio.ByteOrder.LITTLE_ENDIAN;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -41,7 +43,7 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
              Buffer buf = allocator.allocate(8)) {
             buf.writeByte((byte) 1);
             buf.writeByte((byte) 2);
-            try (Buffer inner = buf.acquire()) {
+            try (Buffer inner = acquire((ResourceSupport<?, ?>) buf)) {
                 inner.writeByte((byte) 3);
                 inner.writeByte((byte) 4);
                 inner.writeByte((byte) 5);
@@ -75,7 +77,7 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
         try (BufferAllocator allocator = fixture.createAllocator()) {
             var buf = allocator.allocate(8);
             buf.close();
-            assertThrows(IllegalStateException.class, buf::acquire);
+            assertThrows(IllegalStateException.class, () -> acquire((ResourceSupport<?, ?>) buf));
         }
     }
 
@@ -108,7 +110,7 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void sliceWithoutOffsetAndSizeMustReturnReadableRegion(Fixture fixture) {
+    void copyWithoutOffsetAndSizeMustReturnReadableRegion(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
             for (byte b : new byte[] { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08 }) {
@@ -116,26 +118,26 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
             }
             assertEquals(0x01, buf.readByte());
             buf.writerOffset(buf.writerOffset() - 1);
-            try (Buffer slice = buf.slice()) {
-                assertThat(toByteArray(slice)).containsExactly(0x02, 0x03, 0x04, 0x05, 0x06, 0x07);
-                assertEquals(0, slice.readerOffset());
-                assertEquals(6, slice.readableBytes());
-                assertEquals(6, slice.writerOffset());
-                assertEquals(6, slice.capacity());
-                assertEquals(0x02, slice.readByte());
-                assertEquals(0x03, slice.readByte());
-                assertEquals(0x04, slice.readByte());
-                assertEquals(0x05, slice.readByte());
-                assertEquals(0x06, slice.readByte());
-                assertEquals(0x07, slice.readByte());
-                assertThrows(IndexOutOfBoundsException.class, slice::readByte);
+            try (Buffer copy = buf.copy()) {
+                assertThat(toByteArray(copy)).containsExactly(0x02, 0x03, 0x04, 0x05, 0x06, 0x07);
+                assertEquals(0, copy.readerOffset());
+                assertEquals(6, copy.readableBytes());
+                assertEquals(6, copy.writerOffset());
+                assertEquals(6, copy.capacity());
+                assertEquals(0x02, copy.readByte());
+                assertEquals(0x03, copy.readByte());
+                assertEquals(0x04, copy.readByte());
+                assertEquals(0x05, copy.readByte());
+                assertEquals(0x06, copy.readByte());
+                assertEquals(0x07, copy.readByte());
+                assertThrows(IndexOutOfBoundsException.class, copy::readByte);
             }
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void sliceWithOffsetAndSizeMustReturnGivenRegion(Fixture fixture) {
+    void copyWithOffsetAndSizeMustReturnGivenRegion(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
             for (byte b : new byte[] { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08 }) {
@@ -143,225 +145,178 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
             }
             buf.readerOffset(3); // Reader and writer offsets must be ignored.
             buf.writerOffset(6);
-            try (Buffer slice = buf.slice(1, 6)) {
-                assertThat(toByteArray(slice)).containsExactly(0x02, 0x03, 0x04, 0x05, 0x06, 0x07);
-                assertEquals(0, slice.readerOffset());
-                assertEquals(6, slice.readableBytes());
-                assertEquals(6, slice.writerOffset());
-                assertEquals(6, slice.capacity());
-                assertEquals(0x02, slice.readByte());
-                assertEquals(0x03, slice.readByte());
-                assertEquals(0x04, slice.readByte());
-                assertEquals(0x05, slice.readByte());
-                assertEquals(0x06, slice.readByte());
-                assertEquals(0x07, slice.readByte());
-                assertThrows(IndexOutOfBoundsException.class, slice::readByte);
+            try (Buffer copy = buf.copy(1, 6)) {
+                assertThat(toByteArray(copy)).containsExactly(0x02, 0x03, 0x04, 0x05, 0x06, 0x07);
+                assertEquals(0, copy.readerOffset());
+                assertEquals(6, copy.readableBytes());
+                assertEquals(6, copy.writerOffset());
+                assertEquals(6, copy.capacity());
+                assertEquals(0x02, copy.readByte());
+                assertEquals(0x03, copy.readByte());
+                assertEquals(0x04, copy.readByte());
+                assertEquals(0x05, copy.readByte());
+                assertEquals(0x06, copy.readByte());
+                assertEquals(0x07, copy.readByte());
+                assertThrows(IndexOutOfBoundsException.class, copy::readByte);
             }
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void sliceWithoutOffsetAndSizeWillIncreaseReferenceCount(Fixture fixture) {
+    void copyWithoutOffsetAndSizeMustNotInfluenceOwnership(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            try (Buffer ignored = buf.slice()) {
-                assertFalse(buf.isOwned());
-                assertThrows(IllegalStateException.class, buf::send);
+            try (Buffer copy = buf.copy()) {
+                assertTrue(isOwned((ResourceSupport<?, ?>) buf));
+                assertTrue(isOwned((ResourceSupport<?, ?>) copy));
+                copy.send().discard();
             }
-            assertTrue(buf.isOwned());
+            assertTrue(isOwned((ResourceSupport<?, ?>) buf));
+            buf.send().discard();
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void sliceWithOffsetAndSizeWillIncreaseReferenceCount(Fixture fixture) {
+    void copyWithOffsetAndSizeMustNotInfluenceOwnership(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            try (Buffer ignored = buf.slice(0, 8)) {
-                assertFalse(buf.isOwned());
-                assertThrows(IllegalStateException.class, buf::send);
+            try (Buffer copy = buf.copy(0, 8)) {
+                assertTrue(isOwned((ResourceSupport<?, ?>) buf));
+                assertTrue(isOwned((ResourceSupport<?, ?>) copy));
+                copy.send().discard();
             }
-            assertTrue(buf.isOwned());
+            assertTrue(isOwned((ResourceSupport<?, ?>) buf));
+            buf.send().discard();
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void sliceWithoutOffsetAndSizeHasSameEndianAsParent(Fixture fixture) {
-        try (BufferAllocator allocator = fixture.createAllocator();
-             Buffer buf = allocator.allocate(8)) {
-            buf.order(BIG_ENDIAN);
-            buf.writeLong(0x0102030405060708L);
-            try (Buffer slice = buf.slice()) {
-                assertEquals(0x0102030405060708L, slice.readLong());
-            }
-            buf.order(LITTLE_ENDIAN);
-            try (Buffer slice = buf.slice()) {
-                assertEquals(0x0807060504030201L, slice.readLong());
-            }
-        }
-    }
-
-    @ParameterizedTest
-    @MethodSource("allocators")
-    void sliceWithOffsetAndSizeHasSameEndianAsParent(Fixture fixture) {
+    void copyWithoutOffsetAndSizeHasSameEndianAsParent(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
             buf.order(BIG_ENDIAN);
             buf.writeLong(0x0102030405060708L);
-            try (Buffer slice = buf.slice(0, 8)) {
-                assertEquals(0x0102030405060708L, slice.readLong());
+            try (Buffer copy = buf.copy()) {
+                assertEquals(0x0102030405060708L, copy.readLong());
             }
             buf.order(LITTLE_ENDIAN);
-            try (Buffer slice = buf.slice(0, 8)) {
-                assertEquals(0x0807060504030201L, slice.readLong());
+            try (Buffer copy = buf.copy()) {
+                assertEquals(0x0807060504030201L, copy.readLong());
             }
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void sendOnSliceWithoutOffsetAndSizeMustThrow(Fixture fixture) {
+    void copyWithOffsetAndSizeHasSameEndianAsParent(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            try (Buffer slice = buf.slice()) {
-                assertFalse(buf.isOwned());
-                assertThrows(IllegalStateException.class, slice::send);
+            buf.order(BIG_ENDIAN);
+            buf.writeLong(0x0102030405060708L);
+            try (Buffer copy = buf.copy(0, 8)) {
+                assertEquals(0x0102030405060708L, copy.readLong());
             }
-            // Verify that the slice is closed properly afterwards.
-            assertTrue(buf.isOwned());
+            buf.order(LITTLE_ENDIAN);
+            try (Buffer copy = buf.copy(0, 8)) {
+                assertEquals(0x0807060504030201L, copy.readLong());
+            }
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    void sendOnCopyWithoutOffsetAndSizeMustNotThrow(Fixture fixture) {
+        try (BufferAllocator allocator = fixture.createAllocator();
+             Buffer buf = allocator.allocate(8)) {
+            try (Buffer copy = buf.copy()) {
+                assertTrue(isOwned((ResourceSupport<?, ?>) buf));
+                copy.send().discard();
+            }
+            // Verify that the copy is closed properly afterwards.
+            assertTrue(isOwned((ResourceSupport<?, ?>) buf));
             buf.send().receive().close();
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void sendOnSliceWithOffsetAndSizeMustThrow(Fixture fixture) {
+    void sendOnCopyWithOffsetAndSizeMustThrow(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            try (Buffer slice = buf.slice(0, 8)) {
-                assertFalse(buf.isOwned());
-                assertThrows(IllegalStateException.class, slice::send);
+            try (Buffer copy = buf.copy(0, 8)) {
+                assertTrue(isOwned((ResourceSupport<?, ?>) buf));
+                copy.send().discard();
             }
-            // Verify that the slice is closed properly afterwards.
-            assertTrue(buf.isOwned());
+            // Verify that the copy is closed properly afterwards.
+            assertTrue(isOwned((ResourceSupport<?, ?>) buf));
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void sliceWithNegativeOffsetMustThrow(Fixture fixture) {
+    void copyWithNegativeOffsetMustThrow(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.slice(-1, 1));
-            // Verify that the slice is closed properly afterwards.
-            assertTrue(buf.isOwned());
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.copy(-1, 1));
+            // Verify that the copy is closed properly afterwards.
+            assertTrue(isOwned((ResourceSupport<?, ?>) buf));
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void sliceWithNegativeSizeMustThrow(Fixture fixture) {
+    void copyWithNegativeSizeMustThrow(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            assertThrows(IllegalArgumentException.class, () -> buf.slice(0, -1));
-            assertThrows(IllegalArgumentException.class, () -> buf.slice(2, -1));
-            // Verify that the slice is closed properly afterwards.
-            assertTrue(buf.isOwned());
+            assertThrows(IllegalArgumentException.class, () -> buf.copy(0, -1));
+            assertThrows(IllegalArgumentException.class, () -> buf.copy(2, -1));
+            // Verify that the copy is closed properly afterwards.
+            assertTrue(isOwned((ResourceSupport<?, ?>) buf));
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void sliceWithSizeGreaterThanCapacityMustThrow(Fixture fixture) {
+    void copyWithSizeGreaterThanCapacityMustThrow(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.slice(0, 9));
-            buf.slice(0, 8).close(); // This is still fine.
-            assertThrows(IndexOutOfBoundsException.class, () -> buf.slice(1, 8));
-            // Verify that the slice is closed properly afterwards.
-            assertTrue(buf.isOwned());
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.copy(0, 9));
+            buf.copy(0, 8).close(); // This is still fine.
+            assertThrows(IndexOutOfBoundsException.class, () -> buf.copy(1, 8));
+            // Verify that the copy is closed properly afterwards.
+            assertTrue(isOwned((ResourceSupport<?, ?>) buf));
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void sliceWithZeroSizeMustBeAllowed(Fixture fixture) {
+    void copyWithZeroSizeMustBeAllowed(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            buf.slice(0, 0).close(); // This is fine.
-            // Verify that the slice is closed properly afterwards.
-            assertTrue(buf.isOwned());
-        }
-    }
-
-    @ParameterizedTest
-    @MethodSource("nonCompositeAllocators")
-    public void acquireComposingAndSlicingMustIncrementBorrows(Fixture fixture) {
-        try (BufferAllocator allocator = fixture.createAllocator();
-             Buffer buf = allocator.allocate(8)) {
-            int borrows = countBorrows(buf);
-            try (Buffer ignored = buf.acquire()) {
-                assertEquals(borrows + 1, countBorrows(buf));
-                try (Buffer slice = buf.slice()) {
-                    assertEquals(0, slice.capacity()); // We haven't written anything, so the slice is empty.
-                    int sliceBorrows = countBorrows(slice);
-                    assertEquals(borrows + 2, countBorrows(buf));
-                    try (Buffer ignored1 = CompositeBuffer.compose(allocator, buf, slice)) {
-                        assertEquals(borrows + 3, countBorrows(buf));
-                        // Note: Slice is empty; not acquired by the composite buffer.
-                        assertEquals(sliceBorrows, countBorrows(slice));
-                    }
-                    assertEquals(sliceBorrows, countBorrows(slice));
-                    assertEquals(borrows + 2, countBorrows(buf));
-                }
-                assertEquals(borrows + 1, countBorrows(buf));
-            }
-            assertEquals(borrows, countBorrows(buf));
-        }
-    }
-
-    @ParameterizedTest
-    @MethodSource("nonCompositeAllocators")
-    public void acquireComposingAndSlicingMustIncrementBorrowsWithData(Fixture fixture) {
-        try (BufferAllocator allocator = fixture.createAllocator();
-             Buffer buf = allocator.allocate(8)) {
-            buf.writeByte((byte) 1);
-            int borrows = countBorrows(buf);
-            try (Buffer ignored = buf.acquire()) {
-                assertEquals(borrows + 1, countBorrows(buf));
-                try (Buffer slice = buf.slice()) {
-                    assertEquals(1, slice.capacity());
-                    int sliceBorrows = countBorrows(slice);
-                    assertEquals(borrows + 2, countBorrows(buf));
-                    try (Buffer ignored1 = CompositeBuffer.compose(allocator, buf, slice)) {
-                        assertEquals(borrows + 3, countBorrows(buf));
-                        assertEquals(sliceBorrows + 1, countBorrows(slice));
-                    }
-                    assertEquals(sliceBorrows, countBorrows(slice));
-                    assertEquals(borrows + 2, countBorrows(buf));
-                }
-                assertEquals(borrows + 1, countBorrows(buf));
-            }
-            assertEquals(borrows, countBorrows(buf));
-            assertTrue(buf.isOwned());
+            buf.copy(0, 0).close(); // This is fine.
+            // Verify that the copy is closed properly afterwards.
+            assertTrue(isOwned((ResourceSupport<?, ?>) buf));
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    public void sliceMustBecomeOwnedOnSourceBufferClose(Fixture fixture) {
+    public void copyMustBeOwned(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator()) {
             Buffer buf = allocator.allocate(8);
             buf.writeInt(42);
-            try (Buffer slice = buf.slice()) {
+            try (Buffer copy = buf.copy()) {
+                assertTrue(isOwned((ResourceSupport<?, ?>) copy));
+                assertTrue(isOwned((ResourceSupport<?, ?>) buf));
                 buf.close();
                 assertFalse(buf.isAccessible());
-                assertTrue(slice.isOwned());
-                try (Buffer receive = slice.send().receive()) {
-                    assertTrue(receive.isOwned());
-                    assertFalse(slice.isAccessible());
+                assertTrue(isOwned((ResourceSupport<?, ?>) copy));
+                try (Buffer receive = copy.send().receive()) {
+                    assertTrue(isOwned((ResourceSupport<?, ?>) receive));
+                    assertFalse(copy.isAccessible());
                 }
             }
         }
@@ -425,7 +380,7 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
             buf.writeInt(1);
-            try (Buffer acquired = buf.acquire()) {
+            try (Buffer acquired = acquire((ResourceSupport<?, ?>) buf)) {
                 var exc = assertThrows(IllegalStateException.class, () -> acquired.split());
                 assertThat(exc).hasMessageContaining("owned");
             }
@@ -437,7 +392,7 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
     public void splitOnOffsetOfNonOwnedBufferMustThrow(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            try (Buffer acquired = buf.acquire()) {
+            try (Buffer acquired = acquire((ResourceSupport<?, ?>) buf)) {
                 var exc = assertThrows(IllegalStateException.class, () -> acquired.split(4));
                 assertThat(exc).hasMessageContaining("owned");
             }
@@ -574,20 +529,20 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    public void mustBePossibleToSplitOwnedSlices(Fixture fixture) {
+    public void mustBePossibleToSplitCopies(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator()) {
             Buffer buf = allocator.allocate(16).order(BIG_ENDIAN);
             buf.writeLong(0x0102030405060708L);
-            try (Buffer slice = buf.slice()) {
+            try (Buffer copy = buf.copy()) {
                 buf.close();
-                assertTrue(slice.isOwned());
-                try (Buffer split = slice.split(4)) {
+                assertTrue(isOwned((ResourceSupport<?, ?>) copy));
+                try (Buffer split = copy.split(4)) {
                     split.reset().ensureWritable(Long.BYTES);
-                    slice.reset().ensureWritable(Long.BYTES);
+                    copy.reset().ensureWritable(Long.BYTES);
                     assertThat(split.capacity()).isEqualTo(Long.BYTES);
-                    assertThat(slice.capacity()).isEqualTo(Long.BYTES);
+                    assertThat(copy.capacity()).isEqualTo(Long.BYTES);
                     assertThat(split.getLong(0)).isEqualTo(0x01020304_00000000L);
-                    assertThat(slice.getLong(0)).isEqualTo(0x05060708_00000000L);
+                    assertThat(copy.getLong(0)).isEqualTo(0x05060708_00000000L);
                 }
             }
         }
@@ -710,7 +665,7 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
             buf.makeReadOnly();
-            try (Buffer acquire = buf.acquire()) {
+            try (Buffer acquire = acquire((ResourceSupport<?, ?>) buf)) {
                 assertTrue(acquire.readOnly());
             }
         }
@@ -718,13 +673,13 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    public void sliceOfReadOnlyBufferMustBeReadOnly(Fixture fixture) {
+    public void copyOfReadOnlyBufferMustBeReadOnly(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
             buf.writeLong(0x0102030405060708L);
             buf.makeReadOnly();
-            try (Buffer slice = buf.slice()) {
-                assertTrue(slice.readOnly());
+            try (Buffer copy = buf.copy()) {
+                assertTrue(copy.readOnly());
             }
         }
     }

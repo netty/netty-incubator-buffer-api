@@ -34,7 +34,7 @@ We have been collaborating with the panama-foreign project, providing feedback t
 Our new buffer API is being designed with a future in mind, where access to Unsafe and JNI, is no longer possible.
 This is, however, not the implementation we are going to provide at first.
 The APIs from panama-foreign are still not finished, and likely won’t be in time for the release of JDK 17.
-With this in mind, Netty 5 will likely baseline on Java 11 anyway.
+With this in mind, Netty 5 will baseline on Java 11.
 
 == Where we are going
 
@@ -71,32 +71,15 @@ Hopefully you’ll be able to see these principles reflected in the new API.
 
 In this section we’ll outline the major changes, and most prominent points of interest in the new API.
 
-=== An explicit concept of ownership
-
-In the new API we make it explicit that a buffer can have an “owner”.
-This is the case when the buffer isn’t borrowed out anywhere else; the reference count is one.
-In this state the buffer is said to be “owned”.
-This is important because certain operations can only be called when the buffer is in an owned state, as they could otherwise violate our safety requirements.
-All of these operations will call this out in their javadocs.
-These operations either change the ownership of the buffer, or they change the internal memory allocation of the buffer, in some way.
-For instance, `ensureWritable()` requires ownership because it may replace the internal memory allocation with a new larger one.
-The `split()` method requires ownership because it changes how the buffer ownership itself is set up.
-The `send()` method is used for transferring ownership between threads, which obviously requires ownership to begin with.
-
-[source,java]
-----
-if (buf.isOwned()) {
-    buf.compact(); // compact() requires ownership because it moves data.
-}
-----
-
 === Reference counting
 
 Buffers are now `AutoCloseable` and can be used in try-with-resources clauses.
-Every allocation and acquire call on a buffer (any `Rc` object, really) must be paired with a `close()`, and every `receive()` call on a `Send` must also be paired with a `close()`.
-Every method that increments the reference count will document this fact.
-When the reference count is not incremented, then there is obviously no need to decrement it either.
-Buffers can thus be passed through a pipeline without having to do much reference counting work.
+Every allocation and acquire call on a buffer (any `Resource` object, really) must be paired with a `close()`, and every `receive()` call on a `Send` must also be paired with a `close()`.
+
+While reference counting is a useful thing for tracking resource life-cycles internally, it is not itself exposed in the public API.
+Instead, the public API effectively has a boolean open/closed state.
+This simplifies the API a great deal; buffers are created, and in the end they are closed.
+The code in between needs to be arranged such that it just avoids ever holding on to buffers that might be closed.
 
 [source,java]
 ----
@@ -105,14 +88,12 @@ try (Buffer buf = allocator.allocate(8)) {
 } // buf is deallocated here.
 ----
 
-The updates to the reference counts are not thread-safe, because the buffers themselves - their contents and their offsets - are not thread-safe.
+The change of the open/closed state is not thread-safe, because the buffers themselves - their contents and their offsets - are not thread-safe.
 This is a deviation from how ByteBuf works, where the updates are atomic, and the reference count checks on memory accesses are “optimistic” in that they permit data races to occur.
 This codifies that buffers cannot be modified by more than one thread at a time, and that buffers should be shared via safe publication.
 Using the `send()` mechanism helps with the thread-safe transfer of buffer ownership.
 A buffers contents can still be access from multiple threads via the `get*` methods.
 However, the buffer should be effectively read-only while it is exposed like that, as accesses would otherwise be racy.
-
-See https://github.com/netty/netty-incubator-buffer-api/blob/main/src/main/java/io/netty/buffer/api/Rc.java
 
 If these simple rules and patterns are followed strictly, then memory leaks should not occur.
 
@@ -126,20 +107,13 @@ Note, however, that the buffers are still reference counted, because this has mo
 Off-heap (or direct) buffers can give the GC an inaccurate picture of memory usage, which in turn can lead to abrupt bouts of poor performance when the system is under load.
 The cleaner is a fall back that will likely also be used as part of leak detection.
 
-=== Slices are always retained
+=== Slices are gone
 
-The existing ByteBuf API has both slice() and retainedSlice() methods, where the latter increments the reference count of the parent buffer, and the former does not.
-In the new API the slice() method always increments the reference count of the buffer being sliced.
-The slice itself has its own independent positions, and its own reference count.
-
-[source,java]
-----
-try (Buffer slice = buf.slice()) {
-    // process slice of readable data.
-}
-----
-
-There is currently no duplicate() methods on the API, because it is not clear if they are really needed, but if we were to add them, they would work in the same way as slice() does.
+The existing ByteBuf API has a number of methods that allow multiple buffers to share access to the same memory.
+It turns out that this capability is at the heart of why reference counting is a necessary part of the ByteBuf API.
+By removing the various `slice()` and `duplicate()` methods, along with the `retain()`/`release()` family of methods, we also remove the ability for buffers to share memory.
+This allows us to simplify the reference counting concept to a simple boolean open/closed state.
+Buffers are created, and at the end of their life, they are closed, which releases their memory back to where it came from.
 
 === Buffer interface
 
@@ -229,24 +203,14 @@ That’s why the method to compose buffers takes a `BufferAllocator` as a first 
 ----
 try (Buffer x = allocator.allocate(128);
      Buffer y = allocator.allocate(128)) {
-    return CompositeBuffer.compose(allocator, x, y);
+    return CompositeBuffer.compose(allocator, x.send(), y.send());
 }
 ----
 
 The static `compose()` method will create a composite buffer, even when only given a single buffer, or no buffers.
 
-The composite buffer acquires a reference on each of its constituent component buffers.
-This means that, for instance, newly allocated buffers will not be owned by the composite buffer unless the reference outside of the composite buffer is closed.
-In the above example, the reference counts for the buffers x and y are initially 1, then gets incremented to 2 by creating the composite buffer, and it drops back down to 1 at the end of the try-with-resources clause.
-When the method returns, the composite buffer will be the only thing holding on to the two buffers, and it will thus have ownership over them.
-
-A composite buffer can only be owned if all of its constituent buffers are owned.
-Conversely, by acquiring a reference to each constituent component buffer, the composite buffer prevents them from being owned elsewhere.
-This is important because buffers cannot change their size, or transfer their ownership elsewhere, unless they are already owned.
-If the constituent component buffers of a composite buffer could change their size, they would be able to break the offset computations inside of the composite buffer, and break the illusion that the composite buffer is just like one large buffer.
-
-A composite buffer can also be composed out of `Send<Buffer>` instances.
-This ensures the composite buffer gets an exclusive reference to the sent components.
+The composite buffer takes ownership of each of its constituent component buffers, via the `Send<Buffer>` arguments.
+This guarantees that the composite cannot be brought into a state that is invalid, through direct manipulation of its components.
 
 Although there is in principle is no need for integrating code to know whether a buffer is composite, it is still possible to query, in case it is helpful for some optimisations.
 This is done with the `countComponents()`, `countReadableComponents()`, and `countWritableComponents()` family of methods.
@@ -259,10 +223,6 @@ Composite buffers can be nested, but they will flatten themselves internally.
 That is, you can pass composite buffers to the `CompositeBuffer.compose()` method, and the resulting composite buffer will appear to contain all their data just as if the components had been non-composite.
 However, the new composite buffer will end up with the flattened concatenation of all constituent components.
 This means the number of indirections will not increase in the new buffer.
-
-Because the new composite buffer increases the reference counts on all of its components, and because a composite buffer can only be owned when all of its constituent components are owned, the ownership model ends up working just fine with this flattening.
-This also means that a composite buffer that is composed of other composite buffers, do not increase the reference counts of those other composite buffers – only their components have their reference counts increased.
-This won’t make any difference in how the buffers behave, but it may cause some surprises to the few who are inspecting the `countBorrows()`.
 
 === Iterating components
 
@@ -354,15 +314,15 @@ The MemorySegment APIs that are being developed in the OpenJDK project will use 
 The `get`/`set`/`read`/`writeBoolean` accessor methods are being removed with no replacement planned.
 They have ambiguous meaning when working with buffers that are fundamentally byte-granular.
 
-=== Splitting buffer ownership with split()
+=== Splitting buffers with split()
 
-The more explicit concept of ownership, and how ownership is now a requirement for calling some Buffer methods, may get in the way in some cases.
-For instance, in Netty, the `ByteToMessageDecoder` collects data into a collecting buffer, from which data frames are sliced off and then sent off to be processed in parallel in other threads.
+With the removal of the `slice()` family of methods, we are in need of an alternative way to process a buffer in parts.
+For instance, in Netty, the `ByteToMessageDecoder` collects data into a collecting buffer, from which data frames are produced and then sent off to be processed further down a pipeline, potentially in parallel in other threads.
 
-Since slices are now always retaining, they would effectively lock out all methods that require ownership.
+Since slices would cause memory to be shared, they would effectively lock out all methods that require ownership.
 This would be a problem for such a collecting buffer, since it needs to grow dynamically to accommodate the largest message or frame size.
 
-To address this, the new API introduces a `Buffer.split()` (https://github.com/netty/netty-incubator-buffer-api/blob/main/src/main/java/io/netty/buffer/api/Buffer.java#L481) method.
+To address this, the new API introduces a `Buffer.split()` (https://github.com/netty/netty-incubator-buffer-api/blob/main/src/main/java/io/netty/buffer/api/Buffer.java#L529) method.
 This method splits the ownership of a buffer in two.
 All the read and readable bytes are returned in a new, independent buffer, and the existing buffer gets truncated at the head by a corresponding amount.
 The capacities and offsets of both buffers are adjusted such that they cannot access each others memory.

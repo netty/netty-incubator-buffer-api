@@ -27,10 +27,10 @@ public interface ReadableComponentProcessor<E extends Exception> {
      * {@link Buffer#forEachReadable(int, ReadableComponentProcessor) iteration}.
      * <p>
      * The component object itself is only valid during this call, but the {@link ByteBuffer byte buffers}, arrays, and
-     * native address pointers obtained from it, will be valid until any {@link Buffer#isOwned() ownership} requiring
-     * operation is performed on the buffer.
+     * native address pointers obtained from it, will be valid until any operation is performed on the buffer, which
+     * changes the internal memory.
      *
-     * @param index     The current index of the given buffer component, based on the initial index passed to the
+     * @param index The current index of the given buffer component, based on the initial index passed to the
      * {@link Buffer#forEachReadable(int, ReadableComponentProcessor)} method.
      * @param component The current buffer component being processed.
      * @return {@code true} if the iteration should continue and more components should be processed, otherwise

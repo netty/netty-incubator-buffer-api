@@ -21,7 +21,7 @@ import io.netty.buffer.api.Buffer;
 import io.netty.buffer.api.ByteCursor;
 import io.netty.buffer.api.Drop;
 import io.netty.buffer.api.Owned;
-import io.netty.buffer.api.RcSupport;
+import io.netty.buffer.api.internal.ResourceSupport;
 import io.netty.buffer.api.ReadableComponent;
 import io.netty.buffer.api.ReadableComponentProcessor;
 import io.netty.buffer.api.WritableComponent;
@@ -39,7 +39,7 @@ import static io.netty.buffer.api.internal.Statics.bufferIsClosed;
 import static io.netty.buffer.api.internal.Statics.bufferIsReadOnly;
 import static io.netty.util.internal.PlatformDependent.BIG_ENDIAN_NATIVE_ORDER;
 
-class UnsafeBuffer extends RcSupport<Buffer, UnsafeBuffer> implements Buffer, ReadableComponent,
+class UnsafeBuffer extends ResourceSupport<Buffer, UnsafeBuffer> implements Buffer, ReadableComponent,
         WritableComponent {
     private static final int CLOSED_SIZE = -1;
     private static final boolean ACCESS_UNALIGNED = PlatformDependent.isUnaligned();
@@ -165,20 +165,18 @@ class UnsafeBuffer extends RcSupport<Buffer, UnsafeBuffer> implements Buffer, Re
     }
 
     @Override
-    public Buffer slice(int offset, int length) {
-        if (length < 0) {
-            throw new IllegalArgumentException("Length cannot be negative: " + length + '.');
-        }
+    public Buffer copy(int offset, int length) {
         checkGet(offset, length);
-        ArcDrop<UnsafeBuffer> drop = (ArcDrop<UnsafeBuffer>) unsafeGetDrop();
-        drop.increment();
-        Buffer sliceBuffer = new UnsafeBuffer(memory, baseOffset + offset, length, control, drop)
-                .writerOffset(length)
-                .order(order);
+        int allocSize = Math.max(length, 1); // Allocators don't support allocating zero-sized buffers.
+        AllocatorControl.UntetheredMemory memory = control.allocateUntethered(this, allocSize);
+        UnsafeMemory unsafeMemory = memory.memory();
+        Buffer copy = new UnsafeBuffer(unsafeMemory, 0, length, control, memory.drop());
+        copyInto(offset, copy, 0, length);
+        copy.writerOffset(length).order(order);
         if (readOnly) {
-            sliceBuffer = sliceBuffer.makeReadOnly();
+            copy = copy.makeReadOnly();
         }
-        return sliceBuffer;
+        return copy;
     }
 
     @Override
@@ -510,8 +508,7 @@ class UnsafeBuffer extends RcSupport<Buffer, UnsafeBuffer> implements Buffer, Re
         if (readOnly) {
             splitBuffer.makeReadOnly();
         }
-        // Note that split, unlike slice, does not deconstify, because data changes in either buffer are not visible
-        // in the other. The split buffers can later deconstify independently if needed.
+        // Split preserves const-state.
         splitBuffer.constBuffer = constBuffer;
         rsize -= splitOffset;
         baseOffset += splitOffset;

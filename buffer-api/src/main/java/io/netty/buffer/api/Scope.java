@@ -19,7 +19,7 @@ import java.util.ArrayDeque;
 
 /**
  * A scope is a convenient mechanism for capturing the life cycles of multiple reference counted objects. Once the scope
- * is closed, all of the added objects will also be closed in reverse insert order. That is, the most recently added
+ * is closed, all the added objects will also be closed in reverse insert order. That is, the most recently added
  * object will be closed first.
  * <p>
  * Scopes can be reused. After a scope has been closed, new objects can be added to it, and they will be closed when the
@@ -31,18 +31,18 @@ import java.util.ArrayDeque;
  * Note that scopes are not thread-safe. They are intended to be used from a single thread.
  */
 public final class Scope implements AutoCloseable {
-    private final ArrayDeque<Rc<?>> deque = new ArrayDeque<>();
+    private final ArrayDeque<Resource<?>> deque = new ArrayDeque<>();
 
     /**
-     * Add the given reference counted object to this scope, so that it will be {@linkplain Rc#close() closed} when this
-     * scope is {@linkplain #close() closed}.
+     * Add the given reference counted object to this scope, so that it will be {@linkplain Resource#close() closed}
+     * when this scope is {@linkplain #close() closed}.
      *
      * @param obj The reference counted object to add to this scope.
      * @param <T> The type of the reference counted object.
      * @return The same exact object that was added; further operations can be chained on the object after this method
      * call.
      */
-    public <T extends Rc<T>> T add(T obj) {
+    public <T extends Resource<T>> T add(T obj) {
         deque.addLast(obj);
         return obj;
     }
@@ -52,7 +52,7 @@ public final class Scope implements AutoCloseable {
      */
     @Override
     public void close() {
-        Rc<?> obj;
+        Resource<?> obj;
         while ((obj = deque.pollLast()) != null) {
             obj.close();
         }

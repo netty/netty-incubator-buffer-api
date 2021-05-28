@@ -54,11 +54,7 @@ public class FixedLengthFrameDecoder extends ByteToMessageDecoder {
         if (in.readableBytes() < frameLength) {
             return null;
         } else {
-            try {
-                return in.slice(in.readerOffset(), frameLength);
-            } finally {
-                in.readerOffset(in.readerOffset() + frameLength);
-            }
+            return in.split(in.readerOffset() + frameLength);
         }
     }
 }

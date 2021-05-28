@@ -19,6 +19,7 @@ import io.netty.buffer.api.Buffer;
 import io.netty.buffer.api.BufferAllocator;
 import io.netty.buffer.api.BufferRef;
 import io.netty.buffer.api.Send;
+import io.netty.buffer.api.internal.ResourceSupport;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -27,6 +28,8 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.Future;
 import java.util.concurrent.SynchronousQueue;
 
+import static io.netty.buffer.api.internal.Statics.acquire;
+import static io.netty.buffer.api.internal.Statics.isOwned;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -77,12 +80,12 @@ public class BufferSendTest extends BufferTestSupport {
     void sendMustThrowWhenBufIsAcquired(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            try (Buffer ignored = buf.acquire()) {
-                assertFalse(buf.isOwned());
+            try (Buffer ignored = acquire((ResourceSupport<?, ?>) buf)) {
+                assertFalse(isOwned((ResourceSupport<?, ?>) buf));
                 assertThrows(IllegalStateException.class, buf::send);
             }
             // Now send() should work again.
-            assertTrue(buf.isOwned());
+            assertTrue(isOwned((ResourceSupport<?, ?>) buf));
             buf.send().receive().close();
         }
     }

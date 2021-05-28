@@ -17,7 +17,7 @@ package io.netty.buffer.api.tests;
 
 import io.netty.buffer.api.Drop;
 import io.netty.buffer.api.Owned;
-import io.netty.buffer.api.RcSupport;
+import io.netty.buffer.api.internal.ResourceSupport;
 import io.netty.buffer.api.Scope;
 import org.junit.jupiter.api.Test;
 
@@ -29,12 +29,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class ScopeTest {
     @Test
-    void scopeMustCloseContainedRcsInReverseInsertOrder() {
+    void scopeMustCloseContainedRecouresInReverseInsertOrder() {
         ArrayList<Integer> closeOrder = new ArrayList<>();
         try (Scope scope = new Scope()) {
-            scope.add(new SomeRc(new OrderingDrop(1, closeOrder)));
-            scope.add(new SomeRc(new OrderingDrop(2, closeOrder)));
-            scope.add(new SomeRc(new OrderingDrop(3, closeOrder)));
+            scope.add(new SomeResource(new OrderingDrop(1, closeOrder)));
+            scope.add(new SomeResource(new OrderingDrop(2, closeOrder)));
+            scope.add(new SomeResource(new OrderingDrop(3, closeOrder)));
         }
         var itr = closeOrder.iterator();
         assertTrue(itr.hasNext());
@@ -46,18 +46,18 @@ public class ScopeTest {
         assertFalse(itr.hasNext());
     }
 
-    private static final class SomeRc extends RcSupport<SomeRc, SomeRc> {
-        SomeRc(Drop<SomeRc> drop) {
+    private static final class SomeResource extends ResourceSupport<SomeResource, SomeResource> {
+        SomeResource(Drop<SomeResource> drop) {
             super(drop);
         }
 
         @Override
-        protected Owned<SomeRc> prepareSend() {
+        protected Owned<SomeResource> prepareSend() {
             return null;
         }
     }
 
-    private static final class OrderingDrop implements Drop<SomeRc> {
+    private static final class OrderingDrop implements Drop<SomeResource> {
         private final int order;
         private final ArrayList<Integer> list;
 
@@ -67,7 +67,7 @@ public class ScopeTest {
         }
 
         @Override
-        public void drop(SomeRc obj) {
+        public void drop(SomeResource obj) {
             list.add(order);
         }
     }

@@ -22,7 +22,7 @@ import io.netty.buffer.api.Scope;
 
 import java.util.concurrent.ThreadLocalRandom;
 
-public final class ComposingAndSlicingExample {
+public final class ComposingAndSplittingExample {
     public static void main(String[] args) {
         try (BufferAllocator allocator = BufferAllocator.pooledDirect();
              Buffer buf = createBigBuffer(allocator)) {
@@ -32,24 +32,22 @@ public final class ComposingAndSlicingExample {
                 buf.writeByte((byte) tlr.nextInt());
             }
 
-            try (Buffer slice = buf.slice()) {
-                slice.send();
+            try (Buffer split = buf.split()) {
+                split.send();
                 System.out.println("buf.capacity() = " + buf.capacity());
                 System.out.println("buf.readableBytes() = " + buf.readableBytes());
                 System.out.println("---");
-                System.out.println("slice.capacity() = " + slice.capacity());
-                System.out.println("slice.readableBytes() = " + slice.readableBytes());
+                System.out.println("split.capacity() = " + split.capacity());
+                System.out.println("split.readableBytes() = " + split.readableBytes());
             }
         }
     }
 
     private static Buffer createBigBuffer(BufferAllocator allocator) {
-        try (Scope scope = new Scope()) {
-            return CompositeBuffer.compose(allocator,
-                    scope.add(allocator.allocate(64)),
-                    scope.add(allocator.allocate(64)),
-                    scope.add(allocator.allocate(64)),
-                    scope.add(allocator.allocate(64)));
-        }
+        return CompositeBuffer.compose(allocator,
+                allocator.allocate(64).send(),
+                allocator.allocate(64).send(),
+                allocator.allocate(64).send(),
+                allocator.allocate(64).send());
     }
 }

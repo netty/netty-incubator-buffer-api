@@ -80,45 +80,6 @@ public class SendExample {
         private static Future<?> beginTask(
                 ExecutorService executor, BufferAllocator allocator) {
             try (Buffer buf = allocator.allocate(32)) {
-                // !!! pit-fall: Rc decrement in other thread.
-                return executor.submit(new Task(buf.acquire()));
-            }
-        }
-
-        private static class Task implements Runnable {
-            private final Buffer buf;
-
-            Task(Buffer buf) {
-                this.buf = buf;
-            }
-
-            @Override
-            public void run() {
-                try (buf) {
-                    // !!! danger: access out-side owning thread.
-                    while (buf.writableBytes() > 0) {
-                        buf.writeByte((byte) 42);
-                    }
-                }
-            }
-        }
-    }
-
-    static final class Ex3 {
-        public static void main(String[] args) throws Exception {
-            ExecutorService executor = newSingleThreadExecutor();
-            BufferAllocator allocator = BufferAllocator.heap();
-
-            var future = beginTask(executor, allocator);
-            future.get();
-
-            allocator.close();
-            executor.shutdown();
-        }
-
-        private static Future<?> beginTask(
-                ExecutorService executor, BufferAllocator allocator) {
-            try (Buffer buf = allocator.allocate(32)) {
                 return executor.submit(new Task(buf.send()));
             }
         }
@@ -141,86 +102,7 @@ public class SendExample {
         }
     }
 
-    static final class Ex4 {
-        public static void main(String[] args) throws Exception {
-            ExecutorService executor = newFixedThreadPool(4);
-            BufferAllocator allocator = BufferAllocator.heap();
-
-            try (Buffer buf = allocator.allocate(4096)) {
-                // !!! pit-fall: Rc decrement in other thread.
-                var futA = executor.submit(new Task(buf.slice(0, 1024)));
-                var futB = executor.submit(new Task(buf.slice(1024, 1024)));
-                var futC = executor.submit(new Task(buf.slice(2048, 1024)));
-                var futD = executor.submit(new Task(buf.slice(3072, 1024)));
-                futA.get();
-                futB.get();
-                futC.get();
-                futD.get();
-            }
-
-            allocator.close();
-            executor.shutdown();
-        }
-
-        private static class Task implements Runnable {
-            private final Buffer slice;
-
-            Task(Buffer slice) {
-                this.slice = slice;
-            }
-
-            @Override
-            public void run() {
-                try (slice) {
-                    while (slice.writableBytes() > 0) {
-                        slice.writeByte((byte) 42);
-                    }
-                }
-            }
-        }
-    }
-
-    static final class Ex5 {
-        public static void main(String[] args) throws Exception {
-            ExecutorService executor = newFixedThreadPool(4);
-            BufferAllocator allocator = BufferAllocator.heap();
-
-            try (Buffer buf = allocator.allocate(4096);
-                 Buffer sliceA = buf.slice(0, 1024);
-                 Buffer sliceB = buf.slice(1024, 1024);
-                 Buffer sliceC = buf.slice(2048, 1024);
-                 Buffer sliceD = buf.slice(3072, 1024)) {
-                var futA = executor.submit(new Task(sliceA));
-                var futB = executor.submit(new Task(sliceB));
-                var futC = executor.submit(new Task(sliceC));
-                var futD = executor.submit(new Task(sliceD));
-                futA.get();
-                futB.get();
-                futC.get();
-                futD.get();
-            }
-
-            allocator.close();
-            executor.shutdown();
-        }
-
-        private static class Task implements Runnable {
-            private final Buffer slice;
-
-            Task(Buffer slice) {
-                this.slice = slice;
-            }
-
-            @Override
-            public void run() {
-                while (slice.writableBytes() > 0) {
-                    slice.writeByte((byte) 42);
-                }
-            }
-        }
-    }
-
-    static final class Ex6 {
+    static final class Ex3 {
         public static void main(String[] args) throws Exception {
             ExecutorService executor = newFixedThreadPool(4);
             BufferAllocator allocator = BufferAllocator.heap();

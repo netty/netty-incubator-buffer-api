@@ -21,7 +21,7 @@ import io.netty.buffer.api.BufferAllocator;
 import io.netty.buffer.api.ByteCursor;
 import io.netty.buffer.api.Drop;
 import io.netty.buffer.api.Owned;
-import io.netty.buffer.api.RcSupport;
+import io.netty.buffer.api.internal.ResourceSupport;
 import io.netty.buffer.api.ReadableComponent;
 import io.netty.buffer.api.ReadableComponentProcessor;
 import io.netty.buffer.api.WritableComponent;
@@ -39,7 +39,7 @@ import static io.netty.buffer.api.internal.Statics.bbslice;
 import static io.netty.buffer.api.internal.Statics.bufferIsClosed;
 import static io.netty.buffer.api.internal.Statics.bufferIsReadOnly;
 
-class NioBuffer extends RcSupport<Buffer, NioBuffer> implements Buffer, ReadableComponent, WritableComponent {
+class NioBuffer extends ResourceSupport<Buffer, NioBuffer> implements Buffer, ReadableComponent, WritableComponent {
     private static final ByteBuffer CLOSED_BUFFER = ByteBuffer.allocate(0);
 
     private final AllocatorControl control;
@@ -188,23 +188,19 @@ class NioBuffer extends RcSupport<Buffer, NioBuffer> implements Buffer, Readable
     }
 
     @Override
-    public Buffer slice(int offset, int length) {
-        if (length < 0) {
-            throw new IllegalArgumentException("Length cannot be negative: " + length + '.');
-        }
-        if (!isAccessible()) {
-            throw new IllegalStateException("This buffer is closed: " + this + '.');
-        }
-        ByteBuffer slice = bbslice(rmem, offset, length);
-        ArcDrop<NioBuffer> drop = (ArcDrop<NioBuffer>) unsafeGetDrop();
-        drop.increment();
-        Buffer sliceBuffer = new NioBuffer(base, slice, control, drop)
-                .writerOffset(length)
-                .order(order());
+    public Buffer copy(int offset, int length) {
+        checkGet(offset, length);
+        int allocSize = Math.max(length, 1); // Allocators don't support allocating zero-sized buffers.
+        AllocatorControl.UntetheredMemory memory = control.allocateUntethered(this, allocSize);
+        ByteBuffer base = memory.memory();
+        ByteBuffer buffer = length == 0? bbslice(base, 0, 0) : base;
+        Buffer copy = new NioBuffer(base, buffer, control, memory.drop());
+        copyInto(offset, copy, 0, length);
+        copy.writerOffset(length).order(order());
         if (readOnly()) {
-            sliceBuffer = sliceBuffer.makeReadOnly();
+            copy = copy.makeReadOnly();
         }
-        return sliceBuffer;
+        return copy;
     }
 
     @Override
@@ -466,8 +462,7 @@ class NioBuffer extends RcSupport<Buffer, NioBuffer> implements Buffer, Readable
         if (readOnly) {
             splitBuffer.makeReadOnly();
         }
-        // Note that split, unlike slice, does not deconstify, because data changes in either buffer are not visible
-        // in the other. The split buffers can later deconstify independently if needed.
+        // Split preserves const-state.
         splitBuffer.constBuffer = constBuffer;
         rmem = bbslice(rmem, splitOffset, rmem.capacity() - splitOffset);
         if (!readOnly) {

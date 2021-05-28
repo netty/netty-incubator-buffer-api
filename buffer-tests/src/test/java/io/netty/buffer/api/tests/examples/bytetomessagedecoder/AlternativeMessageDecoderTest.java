@@ -26,6 +26,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.SplittableRandom;
 
+import static io.netty.buffer.api.tests.BufferTestSupport.readByteArray;
 import static io.netty.buffer.api.tests.BufferTestSupport.toByteArray;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -89,9 +90,7 @@ public class AlternativeMessageDecoderTest {
         while ((actualMessage = channel.readInbound()) != null) {
             try (Buffer ignore = actualMessage) {
                 assertTrue(expectedItr.hasNext());
-                try (Buffer actual = actualMessage.slice()) {
-                    assertThat(toByteArray(actual)).containsExactly(expectedItr.next());
-                }
+                assertThat(readByteArray(actualMessage)).containsExactly(expectedItr.next());
             }
         }
         assertFalse(expectedItr.hasNext());

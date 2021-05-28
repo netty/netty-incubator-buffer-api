@@ -17,9 +17,11 @@ package io.netty.buffer.api.tests;
 
 import io.netty.buffer.api.Buffer;
 import io.netty.buffer.api.BufferAllocator;
+import io.netty.buffer.api.internal.ResourceSupport;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
+import static io.netty.buffer.api.internal.Statics.acquire;
 import static java.nio.ByteOrder.BIG_ENDIAN;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -54,7 +56,7 @@ public class BufferCompactTest extends BufferTestSupport {
              Buffer buf = allocator.allocate(8, BIG_ENDIAN)) {
             buf.writeLong(0x0102030405060708L);
             assertEquals((byte) 0x01, buf.readByte());
-            try (Buffer ignore = buf.acquire()) {
+            try (Buffer ignore = acquire((ResourceSupport<?, ?>) buf)) {
                 assertThrows(IllegalStateException.class, () -> buf.compact());
                 assertEquals(1, buf.readerOffset());
             }

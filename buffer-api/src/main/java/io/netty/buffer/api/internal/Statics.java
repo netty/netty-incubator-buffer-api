@@ -64,6 +64,11 @@ public interface Statics {
         }
     }
 
+    @SuppressWarnings("unchecked")
+    static <T extends Buffer> Drop<T> noOpDrop() {
+        return (Drop<T>) NO_OP_DROP;
+    }
+
     static VarHandle findVarHandle(Lookup lookup, Class<?> recv, String name, Class<?> type) {
         try {
             return lookup.findVarHandle(recv, name, type);
@@ -166,5 +171,17 @@ public interface Statics {
 
     static IllegalStateException bufferIsReadOnly() {
         return new IllegalStateException("This buffer is read-only.");
+    }
+
+    static <T> T acquire(ResourceSupport<?, ?> obj) {
+        return ResourceSupport.acquire(obj);
+    }
+
+    static boolean isOwned(ResourceSupport<?, ?> obj) {
+        return ResourceSupport.isOwned(obj);
+    }
+
+    static int countBorrows(ResourceSupport<?, ?> obj) {
+        return ResourceSupport.countBorrows(obj);
     }
 }

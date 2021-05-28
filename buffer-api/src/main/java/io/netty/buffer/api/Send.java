@@ -20,33 +20,34 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 
 /**
- * A Send object is a temporary holder of an {@link Rc}, used for transferring the ownership of the Rc from one thread
- * to another.
+ * A {@code Send} object is a temporary holder of a {@link Resource}, used for transferring the ownership of the
+ * resource from one thread to another.
  * <p>
- * Prior to the Send being created, the originating Rc is invalidated, to prevent access while it is being sent. This
- * means it cannot be accessed, closed, or disposed of, while it is in-flight. Once the Rc is {@linkplain #receive()
- * received}, the new ownership is established.
+ * Prior to the {@code Send} being created, the originating resource is invalidated, to prevent access while it is being
+ * sent. This means it cannot be accessed, closed, or disposed of, while it is in-flight. Once the resource is
+ * {@linkplain #receive() received}, the new ownership is established.
  * <p>
- * Care must be taken to ensure that the Rc is always received by some thread. Failure to do so can result in a resource
- * leak.
+ * Care must be taken to ensure that the resource is always received by some thread.
+ * Failure to do so can result in a resource leak.
  *
  * @param <T>
  */
-public interface Send<T extends Rc<T>> {
+public interface Send<T extends Resource<T>> {
     /**
      * Construct a {@link Send} based on the given {@link Supplier}.
      * The supplier will be called only once, in the receiving thread.
      *
      * @param concreteObjectType The concrete type of the object being sent. Specifically, the object returned from the
      *                           {@link Supplier#get()} method must be an instance of this class.
-     * @param supplier The supplier of the object being sent, which will be called when the object is ready to be
-     *                received.
-     * @param <T> The type of object being sent.
+     * @param supplier           The supplier of the object being sent, which will be called when the object is ready to be
+     *                           received.
+     * @param <T>                The type of object being sent.
      * @return A {@link Send} which will deliver an object of the given type, from the supplier.
      */
-    static <T extends Rc<T>> Send<T> sending(Class<T> concreteObjectType, Supplier<? extends T> supplier) {
+    static <T extends Resource<T>> Send<T> sending(Class<T> concreteObjectType, Supplier<? extends T> supplier) {
         return new Send<T>() {
             private final AtomicBoolean gate = new AtomicBoolean();
+
             @Override
             public T receive() {
                 if (gate.getAndSet(true)) {
@@ -73,7 +74,7 @@ public interface Send<T extends Rc<T>> {
      * Determine if the given candidate object is an instance of a {@link Send} from which an object of the given type
      * can be received.
      *
-     * @param type The type of object we wish to receive.
+     * @param type      The type of object we wish to receive.
      * @param candidate The candidate object that might be a {@link Send} of an object of the given type.
      * @return {@code true} if the candidate object is a {@link Send} that would deliver an object of the given type,
      * otherwise {@code false}.
@@ -83,12 +84,12 @@ public interface Send<T extends Rc<T>> {
     }
 
     /**
-     * Receive the {@link Rc} instance being sent, and bind its ownership to the calling thread. The invalidation of the
-     * sent Rc in the sending thread happens-before the return of this method.
+     * Receive the {@link Resource} instance being sent, and bind its ownership to the calling thread.
+     * The invalidation of the sent resource in the sending thread happens-before the return of this method.
      * <p>
      * This method can only be called once, and will throw otherwise.
      *
-     * @return The sent Rc instance.
+     * @return The sent resource instance.
      * @throws IllegalStateException If this method is called more than once.
      */
     T receive();
@@ -96,24 +97,24 @@ public interface Send<T extends Rc<T>> {
     /**
      * Apply a mapping function to the object being sent. The mapping will occur when the object is received.
      *
-     * @param type The result type of the mapping function.
+     * @param type   The result type of the mapping function.
      * @param mapper The mapping function to apply to the object being sent.
-     * @param <R> The result type of the mapping function.
+     * @param <R>    The result type of the mapping function.
      * @return A new {@link Send} instance that will deliver an object that is the result of the mapping.
      */
-    default <R extends Rc<R>> Send<R> map(Class<R> type, Function<T, R> mapper) {
+    default <R extends Resource<R>> Send<R> map(Class<R> type, Function<T, R> mapper) {
         return sending(type, () -> mapper.apply(receive()));
     }
 
     /**
      * Discard this {@link Send} and the object it contains.
-     * This has no effect if the send has already been received.
+     * This has no effect if the send object has already been received.
      */
     default void discard() {
         try {
             receive().close();
         } catch (IllegalStateException ignore) {
-            // Don't do anything if the send has already been consumed.
+            // Don't do anything if the "Send" has already been consumed.
         }
     }
 

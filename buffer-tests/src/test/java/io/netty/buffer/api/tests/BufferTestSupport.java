@@ -19,7 +19,7 @@ import io.netty.buffer.api.Buffer;
 import io.netty.buffer.api.BufferAllocator;
 import io.netty.buffer.api.CompositeBuffer;
 import io.netty.buffer.api.MemoryManagers;
-import io.netty.buffer.api.RcSupport;
+import io.netty.buffer.api.internal.ResourceSupport;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 
@@ -43,6 +43,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.Stream.Builder;
 
+import static io.netty.buffer.api.internal.Statics.acquire;
 import static java.nio.ByteOrder.BIG_ENDIAN;
 import static java.nio.ByteOrder.LITTLE_ENDIAN;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -93,8 +94,8 @@ public abstract class BufferTestSupport {
         if ("nosample".equalsIgnoreCase(sampleSetting)) {
             return fixture -> true;
         }
-        // Filter out 95% of tests.
-        return filterOfTheDay(5);
+        // Filter out 85% of tests.
+        return filterOfTheDay(15);
     }
 
     protected static Predicate<Fixture> filterOfTheDay(int percentage) {
@@ -176,7 +177,7 @@ public abstract class BufferTestSupport {
                             int half = size / 2;
                             try (Buffer firstHalf = a.allocate(half);
                                  Buffer secondHalf = b.allocate(size - half)) {
-                                return CompositeBuffer.compose(a, firstHalf, secondHalf);
+                                return CompositeBuffer.compose(a, firstHalf.send(), secondHalf.send());
                             }
                         }
 
@@ -207,7 +208,7 @@ public abstract class BufferTestSupport {
                     try (Buffer a = alloc.allocate(part);
                          Buffer b = alloc.allocate(part);
                          Buffer c = alloc.allocate(size - part * 2)) {
-                        return CompositeBuffer.compose(alloc, a, b, c);
+                        return CompositeBuffer.compose(alloc, a.send(), b.send(), c.send());
                     }
                 }
 
@@ -271,8 +272,7 @@ public abstract class BufferTestSupport {
         }
 
         var stream = builder.build();
-        return stream.flatMap(BufferTestSupport::injectSplits)
-                     .flatMap(BufferTestSupport::injectSlices);
+        return stream.flatMap(BufferTestSupport::injectSplits);
     }
 
     private static Stream<Fixture> injectSplits(Fixture f) {
@@ -300,59 +300,6 @@ public abstract class BufferTestSupport {
             };
         }, f.getProperties()));
         return builder.build();
-    }
-
-    private static Stream<Fixture> injectSlices(Fixture f) {
-        Builder<Fixture> builder = Stream.builder();
-        builder.add(f);
-        var props = concat(f.getProperties(), Fixture.Properties.SLICE);
-        builder.add(new Fixture(f + ".slice(0, capacity())", () -> {
-            return new BufferAllocator() {
-                BufferAllocator allocatorBase;
-                @Override
-                public Buffer allocate(int size) {
-                    allocatorBase = f.get();
-                    try (Buffer base = allocatorBase.allocate(size)) {
-                        return base.slice(0, base.capacity()).writerOffset(0);
-                    }
-                }
-
-                @Override
-                public void close() {
-                    if (allocatorBase != null) {
-                        allocatorBase.close();
-                        allocatorBase = null;
-                    }
-                }
-            };
-        }, props));
-        builder.add(new Fixture(f + ".slice(1, capacity() - 2)", () -> {
-            return new BufferAllocator() {
-                BufferAllocator allocatorBase;
-                @Override
-                public Buffer allocate(int size) {
-                    allocatorBase = f.get();
-                    try (Buffer base = allocatorBase.allocate(size + 2)) {
-                        return base.slice(1, size).writerOffset(0);
-                    }
-                }
-
-                @Override
-                public void close() {
-                    if (allocatorBase != null) {
-                        allocatorBase.close();
-                        allocatorBase = null;
-                    }
-                }
-            };
-        }, props));
-        return builder.build();
-    }
-
-    private static Fixture.Properties[] concat(Fixture.Properties[] props, Fixture.Properties prop) {
-        props = Arrays.copyOf(props, props.length + 1);
-        props[props.length - 1] = prop;
-        return props;
     }
 
     @BeforeAll
@@ -384,14 +331,14 @@ public abstract class BufferTestSupport {
             assertThrows(IllegalStateException.class, () -> buf.copyInto(0, new byte[1], 0, 1));
             assertThrows(IllegalStateException.class, () -> buf.copyInto(0, ByteBuffer.allocate(1), 0, 1));
             if (CompositeBuffer.isComposite(buf)) {
-                assertThrows(IllegalStateException.class, () -> ((CompositeBuffer) buf).extendWith(target));
+                assertThrows(IllegalStateException.class, () -> ((CompositeBuffer) buf).extendWith(target.send()));
             }
         }
 
         assertThrows(IllegalStateException.class, () -> buf.split());
         assertThrows(IllegalStateException.class, () -> buf.send());
-        assertThrows(IllegalStateException.class, () -> buf.acquire());
-        assertThrows(IllegalStateException.class, () -> buf.slice());
+        assertThrows(IllegalStateException.class, () -> acquire((ResourceSupport<?, ?>) buf));
+        assertThrows(IllegalStateException.class, () -> buf.copy());
         assertThrows(IllegalStateException.class, () -> buf.openCursor());
         assertThrows(IllegalStateException.class, () -> buf.openCursor(0, 0));
         assertThrows(IllegalStateException.class, () -> buf.openReverseCursor());
@@ -863,67 +810,6 @@ public abstract class BufferTestSupport {
         }
     }
 
-    public static void verifyWriteAccessible(Buffer buf) {
-        buf.reset().writeByte((byte) 32);
-        assertThat(buf.readByte()).isEqualTo((byte) 32);
-        buf.reset().writerOffset(0).writeUnsignedByte(32);
-        assertThat(buf.readUnsignedByte()).isEqualTo(32);
-        buf.reset().writerOffset(0).writeChar('3');
-        assertThat(buf.readChar()).isEqualTo('3');
-        buf.reset().writerOffset(0).writeShort((short) 32);
-        assertThat(buf.readShort()).isEqualTo((short) 32);
-        buf.reset().writerOffset(0).writeUnsignedShort(32);
-        assertThat(buf.readUnsignedShort()).isEqualTo(32);
-        buf.reset().writerOffset(0).writeMedium(32);
-        assertThat(buf.readMedium()).isEqualTo(32);
-        buf.reset().writerOffset(0).writeUnsignedMedium(32);
-        assertThat(buf.readUnsignedMedium()).isEqualTo(32);
-        buf.reset().writerOffset(0).writeInt(32);
-        assertThat(buf.readInt()).isEqualTo(32);
-        buf.reset().writerOffset(0).writeUnsignedInt(32);
-        assertThat(buf.readUnsignedInt()).isEqualTo(32L);
-        buf.reset().writerOffset(0).writeFloat(3.2f);
-        assertThat(buf.readFloat()).isEqualTo(3.2f);
-        buf.reset().writerOffset(0).writeLong(32);
-        assertThat(buf.readLong()).isEqualTo(32L);
-        buf.reset().writerOffset(0).writeDouble(3.2);
-        assertThat(buf.readDouble()).isEqualTo(3.2);
-
-        buf.setByte(0, (byte) 32);
-        assertThat(buf.getByte(0)).isEqualTo((byte) 32);
-        buf.setUnsignedByte(0, 32);
-        assertThat(buf.getUnsignedByte(0)).isEqualTo(32);
-        buf.setChar(0, '3');
-        assertThat(buf.getChar(0)).isEqualTo('3');
-        buf.setShort(0, (short) 32);
-        assertThat(buf.getShort(0)).isEqualTo((short) 32);
-        buf.setUnsignedShort(0, 32);
-        assertThat(buf.getUnsignedShort(0)).isEqualTo(32);
-        buf.setMedium(0, 32);
-        assertThat(buf.getMedium(0)).isEqualTo(32);
-        buf.setUnsignedMedium(0, 32);
-        assertThat(buf.getUnsignedMedium(0)).isEqualTo(32);
-        buf.setInt(0, 32);
-        assertThat(buf.getInt(0)).isEqualTo(32);
-        buf.setUnsignedInt(0, 32);
-        assertThat(buf.getUnsignedInt(0)).isEqualTo(32L);
-        buf.setFloat(0, 3.2f);
-        assertThat(buf.getFloat(0)).isEqualTo(3.2f);
-        buf.setLong(0, 32);
-        assertThat(buf.getLong(0)).isEqualTo(32L);
-        buf.setDouble(0, 3.2);
-        assertThat(buf.getDouble(0)).isEqualTo(3.2);
-
-        if (buf.isOwned()) {
-            buf.ensureWritable(1);
-        }
-        buf.fill((byte) 0);
-        try (BufferAllocator allocator = BufferAllocator.heap();
-             Buffer source = allocator.allocate(8)) {
-            source.copyInto(0, buf, 0, 1);
-        }
-    }
-
     public static void verifyForEachReadableSingleComponent(Fixture fixture, Buffer buf) {
         buf.forEachReadable(0, (index, component) -> {
             var buffer = component.readableBuffer();
@@ -998,12 +884,19 @@ public abstract class BufferTestSupport {
         return bs;
     }
 
-    public static int countBorrows(Buffer buf) {
-        return ((RcSupport<?, ?>) buf).countBorrows();
+    public static byte[] readByteArray(Buffer buf) {
+        byte[] bs = new byte[buf.readableBytes()];
+        buf.copyInto(buf.readerOffset(), bs, 0, bs.length);
+        buf.readerOffset(buf.writerOffset());
+        return bs;
     }
 
     public static void assertEquals(Buffer expected, Buffer actual) {
         assertThat(toByteArray(actual)).containsExactly(toByteArray(expected));
+    }
+
+    public static void assertReadableEquals(Buffer expected, Buffer actual) {
+        assertThat(readByteArray(actual)).containsExactly(readByteArray(expected));
     }
 
     public static void assertEquals(byte expected, byte actual) {

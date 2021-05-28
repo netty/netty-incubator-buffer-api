@@ -31,7 +31,7 @@ import io.netty.buffer.api.WritableComponent;
 import io.netty.buffer.api.WritableComponentProcessor;
 import io.netty.buffer.api.Drop;
 import io.netty.buffer.api.Owned;
-import io.netty.buffer.api.RcSupport;
+import io.netty.buffer.api.internal.ResourceSupport;
 import jdk.incubator.foreign.MemorySegment;
 import jdk.incubator.foreign.ResourceScope;
 
@@ -53,9 +53,11 @@ import static jdk.incubator.foreign.MemoryAccess.setIntAtOffset;
 import static jdk.incubator.foreign.MemoryAccess.setLongAtOffset;
 import static jdk.incubator.foreign.MemoryAccess.setShortAtOffset;
 
-class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, ReadableComponent, WritableComponent,
-        BufferIntegratable {
+class MemSegBuffer extends ResourceSupport<Buffer, MemSegBuffer> implements Buffer, ReadableComponent,
+        WritableComponent, BufferIntegratable {
     private static final MemorySegment CLOSED_SEGMENT;
+    private static final MemorySegment ZERO_OFFHEAP_SEGMENT;
+    private static final MemorySegment ZERO_ONHEAP_SEGMENT;
     static final Drop<MemSegBuffer> SEGMENT_CLOSE;
 
     static {
@@ -66,6 +68,8 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
             MemorySegment segment = MemorySegment.allocateNative(1, scope);
             CLOSED_SEGMENT = segment.asSlice(0, 0);
         }
+        ZERO_OFFHEAP_SEGMENT = MemorySegment.allocateNative(1, ResourceScope.newImplicitScope()).asSlice(0, 0);
+        ZERO_ONHEAP_SEGMENT = MemorySegment.ofArray(new byte[0]);
         SEGMENT_CLOSE = new Drop<MemSegBuffer>() {
             @Override
             public void drop(MemSegBuffer buf) {
@@ -293,22 +297,32 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
     }
 
     @Override
-    public Buffer slice(int offset, int length) {
+    public Buffer copy(int offset, int length) {
+        checkGet(offset, length);
         if (length < 0) {
             throw new IllegalArgumentException("Length cannot be negative: " + length + '.');
         }
-        if (!isAccessible()) {
-            throw new IllegalStateException("This buffer is closed: " + this + '.');
+
+        if (length == 0) {
+            // Special case zero-length segments, since allocators don't support allocating empty buffers.
+            final MemorySegment zero;
+            if (nativeAddress() == 0) {
+                zero = ZERO_ONHEAP_SEGMENT;
+            } else {
+                zero = ZERO_OFFHEAP_SEGMENT;
+            }
+            return new MemSegBuffer(zero, zero, Statics.noOpDrop(), control);
         }
-        var slice = seg.asSlice(offset, length);
-        Drop<MemSegBuffer> drop = ArcDrop.acquire(unsafeGetDrop());
-        Buffer sliceBuffer = new MemSegBuffer(base, slice, drop, control)
-                .writerOffset(length)
-                .order(order());
+
+        AllocatorControl.UntetheredMemory memory = control.allocateUntethered(this, length);
+        MemorySegment segment = memory.memory();
+        Buffer copy = new MemSegBuffer(segment, segment, memory.drop(), control);
+        copyInto(offset, copy, 0, length);
+        copy.writerOffset(length).order(order());
         if (readOnly()) {
-            sliceBuffer = sliceBuffer.makeReadOnly();
+            copy = copy.makeReadOnly();
         }
-        return sliceBuffer;
+        return copy;
     }
 
     @Override
@@ -576,8 +590,7 @@ class MemSegBuffer extends RcSupport<Buffer, MemSegBuffer> implements Buffer, Re
         if (readOnly) {
             splitBuffer.makeReadOnly();
         }
-        // Note that split, unlike slice, does not deconstify, because data changes in either buffer are not visible
-        // in the other. The split buffers can later deconstify independently if needed.
+        // Split preserves const-state.
         splitBuffer.constBuffer = constBuffer;
         seg = seg.asSlice(splitOffset, seg.byteSize() - splitOffset);
         if (!readOnly) {

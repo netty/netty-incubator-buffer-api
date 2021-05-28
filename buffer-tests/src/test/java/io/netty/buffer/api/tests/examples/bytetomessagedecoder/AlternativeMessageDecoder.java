@@ -83,25 +83,15 @@ public abstract class AlternativeMessageDecoder extends ChannelHandlerAdapter {
     }
 
     private void processRead(ChannelHandlerContext ctx, Buffer input) {
-        if (collector.isOwned() && CompositeBuffer.isComposite(collector) && input.isOwned()
+        if (CompositeBuffer.isComposite(collector)
                 && (collector.writableBytes() == 0 || input.writerOffset() == 0)
                 && (collector.readableBytes() == 0 || input.readerOffset() == 0)
                 && collector.order() == input.order()) {
-            ((CompositeBuffer) collector).extendWith(input);
+            ((CompositeBuffer) collector).extendWith(input.send());
             drainCollector(ctx);
             return;
         }
-        if (collector.isOwned()) {
-            collector.ensureWritable(input.readableBytes(), DEFAULT_CHUNK_SIZE, true);
-        } else {
-            int requiredCapacity = input.readableBytes() + collector.readableBytes();
-            int allocationSize = Math.max(requiredCapacity, DEFAULT_CHUNK_SIZE);
-            try (Buffer newBuffer = allocator.allocate(allocationSize, input.order())) {
-                newBuffer.writeBytes(collector);
-                collector.close();
-                collector = newBuffer.acquire();
-            }
-        }
+        collector.ensureWritable(input.readableBytes(), DEFAULT_CHUNK_SIZE, true);
         collector.writeBytes(input);
         drainCollector(ctx);
     }

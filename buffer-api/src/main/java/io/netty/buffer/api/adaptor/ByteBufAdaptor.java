@@ -25,7 +25,7 @@ import io.netty.buffer.Unpooled;
 import io.netty.buffer.api.BufferAllocator;
 import io.netty.buffer.api.internal.Statics;
 import io.netty.buffer.api.Buffer;
-import io.netty.buffer.api.RcSupport;
+import io.netty.buffer.api.internal.ResourceSupport;
 import io.netty.util.ByteProcessor;
 import io.netty.util.IllegalReferenceCountException;
 
@@ -39,6 +39,9 @@ import java.nio.channels.GatheringByteChannel;
 import java.nio.channels.ScatteringByteChannel;
 import java.nio.charset.Charset;
 import java.util.concurrent.atomic.AtomicReference;
+
+import static io.netty.buffer.api.internal.Statics.acquire;
+import static io.netty.buffer.api.internal.Statics.isOwned;
 
 public final class ByteBufAdaptor extends ByteBuf {
     private final ByteBufAllocatorAdaptor alloc;
@@ -80,7 +83,7 @@ public final class ByteBufAdaptor extends ByteBuf {
             try {
                 buffer.ensureWritable(diff);
             } catch (IllegalStateException e) {
-                if (!buffer.isOwned()) {
+                if (!isOwned((ResourceSupport<?, ?>) buffer)) {
                     throw new UnsupportedOperationException(e);
                 }
                 throw e;
@@ -215,7 +218,7 @@ public final class ByteBufAdaptor extends ByteBuf {
         checkAccess();
         if (writableBytes() < minWritableBytes) {
             try {
-                if (buffer.isOwned()) {
+                if (isOwned((ResourceSupport<?, ?>) buffer)) {
                     // Good place.
                     buffer.ensureWritable(minWritableBytes);
                 } else {
@@ -1416,11 +1419,8 @@ public final class ByteBufAdaptor extends ByteBuf {
     @Override
     public ByteBuf retainedSlice(int index, int length) {
         checkAccess();
-        try {
-            return wrap(buffer.slice(index, length));
-        } catch (IllegalStateException e) {
-            throw new IllegalReferenceCountException(e);
-        }
+        retain();
+        return new Slice(this, index, length);
     }
 
     private static final class Slice extends SlicedByteBuf {
@@ -1435,7 +1435,8 @@ public final class ByteBufAdaptor extends ByteBuf {
 
         @Override
         public ByteBuf retainedDuplicate() {
-            return new Slice(unwrap().retainedDuplicate(), indexAdjustment, lengthAdjustment);
+            return new Slice(unwrap().retainedDuplicate(), indexAdjustment, lengthAdjustment)
+                    .setIndex(readerIndex(), writerIndex());
         }
 
         @Override
@@ -1453,7 +1454,8 @@ public final class ByteBufAdaptor extends ByteBuf {
         @Override
         public ByteBuf duplicate() {
             ((ByteBufAdaptor) unwrap()).checkAccess();
-            return new Duplicate((ByteBufAdaptor) unwrap());
+            return new Duplicate((ByteBufAdaptor) unwrap())
+                    .setIndex(readerIndex(), writerIndex());
         }
 
         @Override
@@ -1476,7 +1478,10 @@ public final class ByteBufAdaptor extends ByteBuf {
 
     @Override
     public ByteBuf retainedDuplicate() {
-        return retainedSlice(0, capacity()).setIndex(readerIndex(), writerIndex());
+        checkAccess();
+        retain();
+        Duplicate duplicatedByteBuf = new Duplicate(this);
+        return duplicatedByteBuf.setIndex(readerIndex(), writerIndex());
     }
 
     @Override
@@ -1629,7 +1634,7 @@ public final class ByteBufAdaptor extends ByteBuf {
     @Override
     public ByteBuf retain(int increment) {
         for (int i = 0; i < increment; i++) {
-            buffer.acquire();
+            acquire((ResourceSupport<?,?>) buffer);
         }
         return this;
     }
@@ -1643,11 +1648,11 @@ public final class ByteBufAdaptor extends ByteBuf {
         if (!buffer.isAccessible()) {
             return -1;
         }
-        if (buffer instanceof RcSupport) {
-            var rc = (RcSupport<?, ?>) buffer;
-            return rc.countBorrows();
+        if (buffer instanceof ResourceSupport) {
+            var rc = (ResourceSupport<?, ?>) buffer;
+            return Statics.countBorrows(rc);
         }
-        return buffer.isOwned()? 0 : 1;
+        return isOwned((ResourceSupport<?, ?>) buffer)? 0 : 1;
     }
 
     @Override

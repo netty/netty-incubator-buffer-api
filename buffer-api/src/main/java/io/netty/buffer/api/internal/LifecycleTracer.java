@@ -13,14 +13,18 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package io.netty.buffer.api;
+package io.netty.buffer.api.internal;
+
+import io.netty.buffer.api.Drop;
+import io.netty.buffer.api.Owned;
+import io.netty.buffer.api.Resource;
 
 import java.util.ArrayDeque;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Stream;
 
-abstract class LifecycleTracer {
+public abstract class LifecycleTracer {
     public static LifecycleTracer get() {
         if (Trace.TRACE_LIFECYCLE_DEPTH == 0) {
             return new NoOpTracer();
@@ -30,36 +34,36 @@ abstract class LifecycleTracer {
         return stackTracer;
     }
 
-    abstract void acquire(int acquires);
+    public abstract void acquire(int acquires);
 
-    abstract void drop(int acquires);
+    public abstract void drop(int acquires);
 
-    abstract void close(int acquires);
+    public abstract void close(int acquires);
 
-    abstract <I extends Rc<I>, T extends RcSupport<I, T>> Owned<T> send(Owned<T> send, int acquires);
+    public abstract <I extends Resource<I>, T extends ResourceSupport<I, T>> Owned<T> send(Owned<T> send, int acquires);
 
-    abstract <E extends Throwable> E attachTrace(E throwable);
+    public abstract <E extends Throwable> E attachTrace(E throwable);
 
     private static final class NoOpTracer extends LifecycleTracer {
         @Override
-        void acquire(int acquires) {
+        public void acquire(int acquires) {
         }
 
         @Override
-        void drop(int acquires) {
+        public void drop(int acquires) {
         }
 
         @Override
-        void close(int acquires) {
+        public void close(int acquires) {
         }
 
         @Override
-        <I extends Rc<I>, T extends RcSupport<I, T>> Owned<T> send(Owned<T> send, int acquires) {
+        public <I extends Resource<I>, T extends ResourceSupport<I, T>> Owned<T> send(Owned<T> send, int acquires) {
             return send;
         }
 
         @Override
-        <E extends Throwable> E attachTrace(E throwable) {
+        public <E extends Throwable> E attachTrace(E throwable) {
             return throwable;
         }
     }
@@ -76,7 +80,7 @@ abstract class LifecycleTracer {
         private boolean dropped;
 
         @Override
-        void acquire(int acquires) {
+        public void acquire(int acquires) {
             Trace trace = WALKER.walk(new Trace("acquire", acquires));
             addTrace(trace);
         }
@@ -91,20 +95,20 @@ abstract class LifecycleTracer {
         }
 
         @Override
-        void drop(int acquires) {
+        public void drop(int acquires) {
             dropped = true;
             addTrace(WALKER.walk(new Trace("drop", acquires)));
         }
 
         @Override
-        void close(int acquires) {
+        public void close(int acquires) {
             if (!dropped) {
                 addTrace(WALKER.walk(new Trace("close", acquires)));
             }
         }
 
         @Override
-        <I extends Rc<I>, T extends RcSupport<I, T>> Owned<T> send(Owned<T> send, int acquires) {
+        public <I extends Resource<I>, T extends ResourceSupport<I, T>> Owned<T> send(Owned<T> send, int acquires) {
             Trace sendTrace = new Trace("send", acquires);
             sendTrace.sent = true;
             addTrace(WALKER.walk(sendTrace));
@@ -118,7 +122,7 @@ abstract class LifecycleTracer {
         }
 
         @Override
-        <E extends Throwable> E attachTrace(E throwable) {
+        public <E extends Throwable> E attachTrace(E throwable) {
             synchronized (traces) {
                 long timestamp = System.nanoTime();
                 for (Trace trace : traces) {

@@ -21,6 +21,8 @@ import io.netty.buffer.api.BufferRef;
 import io.netty.buffer.api.Send;
 import org.junit.jupiter.api.Test;
 
+import java.util.concurrent.atomic.AtomicReference;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -30,7 +32,7 @@ class BufferRefTest {
         try (BufferAllocator allocator = BufferAllocator.heap()) {
             BufferRef ref;
             try (Buffer b = allocator.allocate(8)) {
-                ref = new BufferRef(b);
+                ref = new BufferRef(b.send());
             }
             ref.contents().writeInt(42);
             assertThat(ref.contents().readInt()).isEqualTo(42);
@@ -54,20 +56,23 @@ class BufferRefTest {
     @Test
     public void mustCloseOwnedBufferWhenReplaced() {
         try (BufferAllocator allocator = BufferAllocator.heap()) {
-            Buffer orig;
+            AtomicReference<Buffer> orig = new AtomicReference<>();
             BufferRef ref;
-            try (Buffer buf = allocator.allocate(8)) {
-                ref = new BufferRef(orig = buf);
-            }
+            Send<Buffer> s = allocator.allocate(8).send();
+            ref = new BufferRef(Send.sending(Buffer.class, () -> {
+                Buffer b = s.receive();
+                orig.set(b);
+                return b;
+            }));
 
-            orig.writeInt(42);
+            orig.get().writeInt(42);
             assertThat(ref.contents().readInt()).isEqualTo(42);
 
             try (Buffer buf = allocator.allocate(8)) {
-                ref.replace(buf); // Pass replacement directly.
+                ref.replace(buf.send()); // Pass replacement directly.
             }
 
-            assertThrows(IllegalStateException.class, () -> orig.writeInt(32));
+            assertThrows(IllegalStateException.class, () -> orig.get().writeInt(32));
             ref.contents().writeInt(42);
             assertThat(ref.contents().readInt()).isEqualTo(42);
             ref.close();
@@ -78,20 +83,23 @@ class BufferRefTest {
     @Test
     public void mustCloseOwnedBufferWhenReplacedFromSend() {
         try (BufferAllocator allocator = BufferAllocator.heap()) {
-            Buffer orig;
+            AtomicReference<Buffer> orig = new AtomicReference<>();
             BufferRef ref;
-            try (Buffer buf = allocator.allocate(8)) {
-                ref = new BufferRef(orig = buf);
-            }
+            Send<Buffer> s = allocator.allocate(8).send();
+            ref = new BufferRef(Send.sending(Buffer.class, () -> {
+                Buffer b = s.receive();
+                orig.set(b);
+                return b;
+            }));
 
-            orig.writeInt(42);
+            orig.get().writeInt(42);
             assertThat(ref.contents().readInt()).isEqualTo(42);
 
             try (Buffer buf = allocator.allocate(8)) {
                 ref.replace(buf.send()); // Pass replacement via send().
             }
 
-            assertThrows(IllegalStateException.class, () -> orig.writeInt(32));
+            assertThrows(IllegalStateException.class, () -> orig.get().writeInt(32));
             ref.contents().writeInt(42);
             assertThat(ref.contents().readInt()).isEqualTo(42);
             ref.close();
