@@ -40,6 +40,11 @@ public class UnsafeMemoryManagers implements MemoryManagers {
     }
 
     @Override
+    public String implementationName() {
+        return "Unsafe";
+    }
+
+    @Override
     public String toString() {
         return "US";
     }

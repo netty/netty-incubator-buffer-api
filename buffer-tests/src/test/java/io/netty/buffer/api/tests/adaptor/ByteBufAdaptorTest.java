@@ -16,17 +16,25 @@
 package io.netty.buffer.api.tests.adaptor;
 
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.api.BufferAllocator;
+import io.netty.buffer.api.MemoryManagers;
 import io.netty.buffer.api.adaptor.ByteBufAllocatorAdaptor;
 import org.junit.AfterClass;
-import org.junit.BeforeClass;
 import org.junit.Ignore;
 
-public class ByteBufAdaptorTest extends AbstractByteBufTest {
+import java.util.Optional;
+
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
+
+public abstract class ByteBufAdaptorTest extends AbstractByteBufTest {
     static ByteBufAllocatorAdaptor alloc;
 
-    @BeforeClass
-    public static void setUpAllocator() {
-        alloc = new ByteBufAllocatorAdaptor();
+    static void setUpAllocator(String name) {
+        Optional<MemoryManagers> managers = MemoryManagers.lookupImplementation(name);
+        assumeTrue(managers.isPresent());
+        BufferAllocator onheap = MemoryManagers.using(managers.get(), BufferAllocator::pooledHeap);
+        BufferAllocator offheap = MemoryManagers.using(managers.get(), BufferAllocator::pooledHeap);
+        alloc = new ByteBufAllocatorAdaptor(onheap, offheap);
     }
 
     @AfterClass

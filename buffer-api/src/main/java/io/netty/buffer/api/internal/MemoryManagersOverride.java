@@ -13,8 +13,9 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package io.netty.buffer.api;
+package io.netty.buffer.api.internal;
 
+import io.netty.buffer.api.MemoryManagers;
 import io.netty.buffer.api.bytebuffer.ByteBufferMemoryManagers;
 
 import java.util.Collections;
@@ -23,7 +24,7 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 
-final class MemoryManagersOverride {
+public final class MemoryManagersOverride {
     private static final MemoryManagers DEFAULT = new ByteBufferMemoryManagers();
     private static final AtomicInteger OVERRIDES_AVAILABLE = new AtomicInteger();
     private static final Map<Thread, MemoryManagers> OVERRIDES = Collections.synchronizedMap(new IdentityHashMap<>());
@@ -31,14 +32,14 @@ final class MemoryManagersOverride {
     private MemoryManagersOverride() {
     }
 
-    static MemoryManagers getManagers() {
+    public static MemoryManagers getManagers() {
         if (OVERRIDES_AVAILABLE.get() > 0) {
             return OVERRIDES.getOrDefault(Thread.currentThread(), DEFAULT);
         }
         return DEFAULT;
     }
 
-    static <T> T using(MemoryManagers managers, Supplier<T> supplier) {
+    public static <T> T using(MemoryManagers managers, Supplier<T> supplier) {
         Thread thread = Thread.currentThread();
         OVERRIDES.put(thread, managers);
         OVERRIDES_AVAILABLE.incrementAndGet();

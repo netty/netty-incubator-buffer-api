@@ -15,6 +15,9 @@
  */
 package io.netty.buffer.api;
 
+import io.netty.buffer.api.internal.MemoryManagersOverride;
+
+import java.util.Optional;
 import java.util.ServiceLoader;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
@@ -60,6 +63,25 @@ public interface MemoryManagers {
     }
 
     /**
+     * Find a {@link MemoryManagers} implementation by its {@linkplain #implementationName() implementation name}.
+     *
+     * @param implementationName The named implementation to look for.
+     * @return A {@link MemoryManagers} implementation, if any was found.
+     */
+    static Optional<MemoryManagers> lookupImplementation(String implementationName) {
+        return getAllManagers()
+                .flatMap(provider -> {
+                    try {
+                        return Stream.ofNullable(provider.get());
+                    } catch (Exception e) {
+                        return Stream.empty();
+                    }
+                })
+                .filter(impl -> implementationName.equals(impl.implementationName()))
+                .findFirst();
+    }
+
+    /**
      * Get a {@link MemoryManager} instance that is suitable for allocating on-heap {@link Buffer} instances.
      *
      * @return An on-heap {@link MemoryManager}.
@@ -72,4 +94,12 @@ public interface MemoryManagers {
      * @return An off-heap {@link MemoryManager}.
      */
     MemoryManager getNativeMemoryManager();
+
+    /**
+     * Get the name for this implementation, which can be used for finding this particular implementation via the
+     * {@link #lookupImplementation(String)} method.
+     *
+     * @return The name of this memory managers implementation.
+     */
+    String implementationName();
 }
