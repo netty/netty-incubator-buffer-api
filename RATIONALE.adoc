@@ -76,7 +76,7 @@ In this section we’ll outline the major changes, and most prominent points of 
 Buffers are now `AutoCloseable` and can be used in try-with-resources clauses.
 Every allocation and acquire call on a buffer (any `Resource` object, really) must be paired with a `close()`, and every `receive()` call on a `Send` must also be paired with a `close()`.
 
-While referene counting is a useful thing for tracking resource life-cycles internally, it is not itself exposed in the public API.
+While reference counting is a useful thing for tracking resource life-cycles internally, it is not itself exposed in the public API.
 Instead, the public API effectively has a boolean open/closed state.
 This simplifies the API a great deal; buffers are created, and in the end they are closed.
 The code in between needs to be arranged such that it just avoids ever holding on to buffers that might be closed.
