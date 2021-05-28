@@ -1,0 +1,45 @@
+# ----------------------------------------------------------------------------
+# Copyright 2021 The Netty Project
+#
+# The Netty Project licenses this file to you under the Apache License,
+# version 2.0 (the "License"); you may not use this file except in compliance
+# with the License. You may obtain a copy of the License at:
+#
+#   https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+# WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+# License for the specific language governing permissions and limitations
+# under the License.
+# ----------------------------------------------------------------------------
+name: Upload Test Results
+on:
+  workflow_run:
+    workflows: [ "Build" ]
+    types:
+      - completed
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        version: [ "java17", "java11" ]
+    steps:
+      - name: Download Artifacts
+        uses: dawidd6/action-download-artifact@v2.11.0
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          workflow: ${{ github.event.workflow_run.workflow_id }}
+          workflow_conclusion: completed
+          commit: ${{ github.event.workflow_run.head_commit.id }}
+          # The artefact name must be coordinated with the "Upload * Test Results" steps in ci-workflow.yml.
+          name: test-results-${{ matrix.version }}
+      - name: Publish Test Report
+        uses: scacap/action-surefire-report@v1.0.9
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          report_paths: '**/target/surefire-reports/TEST-*.xml'
+          commit: ${{ github.event.workflow_run.head_commit.id }}
+          check_name: Test results ${{ matrix.version }}
