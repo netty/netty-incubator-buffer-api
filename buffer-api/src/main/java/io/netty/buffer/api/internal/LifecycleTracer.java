@@ -27,7 +27,7 @@ import java.util.stream.Stream;
 public abstract class LifecycleTracer {
     public static LifecycleTracer get() {
         if (Trace.TRACE_LIFECYCLE_DEPTH == 0) {
-            return new NoOpTracer();
+            return NoOpTracer.INSTANCE;
         }
         StackTracer stackTracer = new StackTracer();
         stackTracer.addTrace(StackTracer.WALKER.walk(new Trace("allocate", 0)));
@@ -45,6 +45,8 @@ public abstract class LifecycleTracer {
     public abstract <E extends Throwable> E attachTrace(E throwable);
 
     private static final class NoOpTracer extends LifecycleTracer {
+        private static final NoOpTracer INSTANCE = new NoOpTracer();
+
         @Override
         public void acquire(int acquires) {
         }
