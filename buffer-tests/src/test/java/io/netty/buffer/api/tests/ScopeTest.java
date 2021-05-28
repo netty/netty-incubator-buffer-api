@@ -52,6 +52,11 @@ public class ScopeTest {
         }
 
         @Override
+        protected RuntimeException createResourceClosedException() {
+            return new IllegalStateException("This resource is closed: " + this);
+        }
+
+        @Override
         protected Owned<SomeResource> prepareSend() {
             return null;
         }

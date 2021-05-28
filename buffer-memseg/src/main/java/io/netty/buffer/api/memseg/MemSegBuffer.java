@@ -39,6 +39,8 @@ import jdk.incubator.foreign.ResourceScope;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
+import static io.netty.buffer.api.internal.Statics.bufferIsClosed;
+import static io.netty.buffer.api.internal.Statics.bufferIsReadOnly;
 import static jdk.incubator.foreign.MemoryAccess.getByteAtOffset;
 import static jdk.incubator.foreign.MemoryAccess.getCharAtOffset;
 import static jdk.incubator.foreign.MemoryAccess.getDoubleAtOffset;
@@ -162,6 +164,11 @@ class MemSegBuffer extends ResourceSupport<Buffer, MemSegBuffer> implements Buff
     @Override
     public String toString() {
         return "Buffer[roff:" + roff + ", woff:" + woff + ", cap:" + seg.byteSize() + ']';
+    }
+
+    @Override
+    protected RuntimeException createResourceClosedException() {
+        return bufferIsClosed(this);
     }
 
     @Override
@@ -338,7 +345,7 @@ class MemSegBuffer extends ResourceSupport<Buffer, MemSegBuffer> implements Buff
 
     private void copyInto(int srcPos, MemorySegment dest, int destPos, int length) {
         if (seg == CLOSED_SEGMENT) {
-            throw Statics.bufferIsClosed();
+            throw bufferIsClosed(this);
         }
         if (srcPos < 0) {
             throw new IllegalArgumentException("The srcPos cannot be negative: " + srcPos + '.');
@@ -373,7 +380,7 @@ class MemSegBuffer extends ResourceSupport<Buffer, MemSegBuffer> implements Buff
     @Override
     public ByteCursor openCursor(int fromOffset, int length) {
         if (seg == CLOSED_SEGMENT) {
-            throw Statics.bufferIsClosed();
+            throw bufferIsClosed(this);
         }
         if (fromOffset < 0) {
             throw new IllegalArgumentException("The fromOffset cannot be negative: " + fromOffset + '.');
@@ -443,7 +450,7 @@ class MemSegBuffer extends ResourceSupport<Buffer, MemSegBuffer> implements Buff
     @Override
     public ByteCursor openReverseCursor(int fromOffset, int length) {
         if (seg == CLOSED_SEGMENT) {
-            throw Statics.bufferIsClosed();
+            throw bufferIsClosed(this);
         }
         if (fromOffset < 0) {
             throw new IllegalArgumentException("The fromOffset cannot be negative: " + fromOffset + '.');
@@ -521,7 +528,7 @@ class MemSegBuffer extends ResourceSupport<Buffer, MemSegBuffer> implements Buff
             throw new IllegalArgumentException("The minimum growth cannot be negative: " + minimumGrowth + '.');
         }
         if (seg != wseg) {
-            throw Statics.bufferIsReadOnly();
+            throw bufferIsReadOnly(this);
         }
         if (writableBytes() >= size) {
             // We already have enough space.
@@ -1184,27 +1191,27 @@ class MemSegBuffer extends ResourceSupport<Buffer, MemSegBuffer> implements Buff
 
     private RuntimeException checkWriteState(IndexOutOfBoundsException ioobe) {
         if (seg == CLOSED_SEGMENT) {
-            return Statics.bufferIsClosed();
+            return bufferIsClosed(this);
         }
         if (wseg != seg) {
-            return Statics.bufferIsReadOnly();
+            return bufferIsReadOnly(this);
         }
         return ioobe;
     }
 
     private RuntimeException readAccessCheckException(int index) {
         if (seg == CLOSED_SEGMENT) {
-            throw Statics.bufferIsClosed();
+            throw bufferIsClosed(this);
         }
         return outOfBounds(index);
     }
 
     private RuntimeException writeAccessCheckException(int index) {
         if (seg == CLOSED_SEGMENT) {
-            throw Statics.bufferIsClosed();
+            throw bufferIsClosed(this);
         }
         if (wseg != seg) {
-            return Statics.bufferIsReadOnly();
+            return bufferIsReadOnly(this);
         }
         return outOfBounds(index);
     }

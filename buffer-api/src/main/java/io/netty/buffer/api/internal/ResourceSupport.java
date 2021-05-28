@@ -63,7 +63,7 @@ public abstract class ResourceSupport<I extends Resource<I>, T extends ResourceS
      */
     protected final I acquire() {
         if (acquires < 0) {
-            throw attachTrace(new IllegalStateException("This resource is closed: " + this + '.'));
+            throw attachTrace(createResourceClosedException());
         }
         if (acquires == Integer.MAX_VALUE) {
             throw new IllegalStateException("Cannot acquire more references; counter would overflow.");
@@ -72,6 +72,8 @@ public abstract class ResourceSupport<I extends Resource<I>, T extends ResourceS
         tracer.acquire(acquires);
         return self();
     }
+
+    protected abstract RuntimeException createResourceClosedException();
 
     /**
      * Decrement the reference count, and despose of the resource if the last reference is closed.

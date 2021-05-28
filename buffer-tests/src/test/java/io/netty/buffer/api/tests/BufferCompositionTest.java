@@ -17,6 +17,7 @@ package io.netty.buffer.api.tests;
 
 import io.netty.buffer.api.Buffer;
 import io.netty.buffer.api.BufferAllocator;
+import io.netty.buffer.api.BufferReadOnlyException;
 import io.netty.buffer.api.CompositeBuffer;
 import io.netty.buffer.api.Send;
 import io.netty.buffer.api.internal.ResourceSupport;
@@ -391,7 +392,7 @@ public class BufferCompositionTest extends BufferTestSupport {
              Buffer b = allocator.allocate(4).makeReadOnly();
              Buffer composite = CompositeBuffer.compose(allocator, a.send(), b.send())) {
             assertTrue(composite.readOnly());
-            verifyWriteInaccessible(composite);
+            verifyWriteInaccessible(composite, BufferReadOnlyException.class, BufferReadOnlyException.class);
         }
     }
 

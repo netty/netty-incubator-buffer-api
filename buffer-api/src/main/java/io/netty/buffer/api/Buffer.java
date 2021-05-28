@@ -149,7 +149,8 @@ public interface Buffer extends Resource<Buffer>, BufferAccessors {
      * @return This Buffer.
      * @throws IndexOutOfBoundsException if the specified {@code offset} is less than the current
      * {@link #readerOffset()} or greater than {@link #capacity()}.
-     * @throws IllegalStateException if this buffer is {@linkplain #readOnly() read-only}.
+     * @throws BufferClosedException if this buffer is closed.
+     * @throws BufferReadOnlyException if this buffer is {@linkplain #readOnly() read-only}.
      */
     Buffer writerOffset(int offset);
 
@@ -174,7 +175,7 @@ public interface Buffer extends Resource<Buffer>, BufferAccessors {
      *
      * @param value The byte value to write at every position in the buffer.
      * @return This Buffer.
-     * @throws IllegalStateException if this buffer is {@linkplain #readOnly() read-only}.
+     * @throws BufferReadOnlyException if this buffer is {@linkplain #readOnly() read-only}.
      */
     Buffer fill(byte value);
 
@@ -377,7 +378,9 @@ public interface Buffer extends Resource<Buffer>, BufferAccessors {
      * {@code false}.
      *
      * @param size The requested number of bytes of space that should be available for writing.
-     * @throws IllegalStateException if this buffer is in a bad state, or is {@linkplain #readOnly() read-only}.
+     * @throws IllegalStateException if this buffer is in a bad state.
+     * @throws BufferClosedException if this buffer is closed.
+     * @throws BufferReadOnlyException if this buffer is {@linkplain #readOnly() read-only}.
      */
     default void ensureWritable(int size) {
         ensureWritable(size, 1, true);
@@ -418,7 +421,9 @@ public interface Buffer extends Resource<Buffer>, BufferAccessors {
      * @param allowCompaction {@code true} if the method is allowed to modify the
      *                                   {@linkplain #readerOffset() reader offset} and
      *                                   {@linkplain #writerOffset() writer offset}, otherwise {@code false}.
-     * @throws IllegalStateException if this buffer is in a bad state, or is {@linkplain #readOnly() read-only}.
+     * @throws BufferReadOnlyException if this buffer is {@linkplain #readOnly() read-only}.
+     * @throws IllegalArgumentException if {@code size} or {@code minimumGrowth} are negative.
+     * @throws IllegalStateException if this buffer is in a bad state.
      */
     void ensureWritable(int size, int minimumGrowth, boolean allowCompaction);
 
@@ -553,7 +558,8 @@ public interface Buffer extends Resource<Buffer>, BufferAccessors {
     /**
      * Discards the read bytes, and moves the buffer contents to the beginning of the buffer.
      *
-     * @throws IllegalStateException if this buffer is in a bad state, or is {@linkplain #readOnly() read-only}.
+     * @throws BufferReadOnlyException if this buffer is {@linkplain #readOnly() read-only}.
+     * @throws IllegalStateException if this buffer is in a bad state.
      */
     void compact();
 

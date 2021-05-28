@@ -16,6 +16,8 @@
 package io.netty.buffer.api.internal;
 
 import io.netty.buffer.api.Buffer;
+import io.netty.buffer.api.BufferClosedException;
+import io.netty.buffer.api.BufferReadOnlyException;
 import io.netty.buffer.api.Drop;
 
 import java.lang.invoke.MethodHandle;
@@ -166,12 +168,12 @@ public interface Statics {
         dest.position(destPos).put(bbslice(src, srcPos, length));
     }
 
-    static IllegalStateException bufferIsClosed() {
-        return new IllegalStateException("This buffer is closed.");
+    static BufferClosedException bufferIsClosed(Buffer buffer) {
+        return new BufferClosedException("This buffer is closed: " + buffer);
     }
 
-    static IllegalStateException bufferIsReadOnly() {
-        return new IllegalStateException("This buffer is read-only.");
+    static BufferReadOnlyException bufferIsReadOnly(Buffer buffer) {
+        return new BufferReadOnlyException("This buffer is read-only: " + buffer);
     }
 
     static <T> T acquire(ResourceSupport<?, ?> obj) {

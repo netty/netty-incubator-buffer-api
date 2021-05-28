@@ -17,6 +17,7 @@ package io.netty.buffer.api.tests;
 
 import io.netty.buffer.api.Buffer;
 import io.netty.buffer.api.BufferAllocator;
+import io.netty.buffer.api.BufferReadOnlyException;
 import io.netty.buffer.api.CompositeBuffer;
 import io.netty.buffer.api.Send;
 import io.netty.buffer.api.internal.ResourceSupport;
@@ -43,7 +44,7 @@ public class BufferReadOnlyTest extends BufferTestSupport {
              Buffer buf = allocator.allocate(8)) {
             var b = buf.makeReadOnly();
             assertThat(b).isSameAs(buf);
-            verifyWriteInaccessible(buf);
+            verifyWriteInaccessible(buf, BufferReadOnlyException.class, BufferReadOnlyException.class);
         }
     }
 
@@ -66,12 +67,12 @@ public class BufferReadOnlyTest extends BufferTestSupport {
             assertFalse(buf.readOnly());
             buf.makeReadOnly();
             assertTrue(buf.readOnly());
-            verifyWriteInaccessible(buf);
+            verifyWriteInaccessible(buf, BufferReadOnlyException.class, BufferReadOnlyException.class);
 
             buf.makeReadOnly();
             assertTrue(buf.readOnly());
 
-            verifyWriteInaccessible(buf);
+            verifyWriteInaccessible(buf, BufferReadOnlyException.class, BufferReadOnlyException.class);
         }
     }
 
@@ -84,7 +85,7 @@ public class BufferReadOnlyTest extends BufferTestSupport {
             var send = buf.send();
             try (Buffer receive = send.receive()) {
                 assertTrue(receive.readOnly());
-                verifyWriteInaccessible(receive);
+                verifyWriteInaccessible(receive, BufferReadOnlyException.class, BufferReadOnlyException.class);
             }
         }
     }
@@ -121,7 +122,7 @@ public class BufferReadOnlyTest extends BufferTestSupport {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
             buf.makeReadOnly();
-            assertThrows(IllegalStateException.class, () -> buf.compact());
+            assertThrows(BufferReadOnlyException.class, () -> buf.compact());
         }
     }
 
@@ -131,7 +132,7 @@ public class BufferReadOnlyTest extends BufferTestSupport {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
             buf.makeReadOnly();
-            assertThrows(IllegalStateException.class, () -> buf.ensureWritable(1));
+            assertThrows(BufferReadOnlyException.class, () -> buf.ensureWritable(1));
         }
     }
 
@@ -142,7 +143,7 @@ public class BufferReadOnlyTest extends BufferTestSupport {
              Buffer dest = allocator.allocate(8)) {
             dest.makeReadOnly();
             try (Buffer src = allocator.allocate(8)) {
-                assertThrows(IllegalStateException.class, () -> src.copyInto(0, dest, 0, 1));
+                assertThrows(BufferReadOnlyException.class, () -> src.copyInto(0, dest, 0, 1));
             }
         }
     }
@@ -152,7 +153,7 @@ public class BufferReadOnlyTest extends BufferTestSupport {
     public void readOnlyBuffersCannotChangeWriteOffset(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8).makeReadOnly()) {
-            assertThrows(IllegalStateException.class, () -> buf.writerOffset(4));
+            assertThrows(BufferReadOnlyException.class, () -> buf.writerOffset(4));
         }
     }
 
@@ -215,19 +216,19 @@ public class BufferReadOnlyTest extends BufferTestSupport {
                  Buffer c = a.copy()) {
                 assertEquals(1, a.readByte());
                 assertEquals(2, a.readByte());
-                assertThrows(IllegalStateException.class, () -> a.compact()); // Can't compact read-only buffer.
+                assertThrows(BufferReadOnlyException.class, () -> a.compact()); // Can't compact read-only buffer.
                 assertEquals(3, a.readByte());
                 assertEquals(4, a.readByte());
 
                 assertEquals(1, b.readByte());
                 assertEquals(2, b.readByte());
-                assertThrows(IllegalStateException.class, () -> b.compact()); // Can't compact read-only buffer.
+                assertThrows(BufferReadOnlyException.class, () -> b.compact()); // Can't compact read-only buffer.
                 assertEquals(3, b.readByte());
                 assertEquals(4, b.readByte());
 
                 assertEquals(1, c.readByte());
                 assertEquals(2, c.readByte());
-                assertThrows(IllegalStateException.class, () -> c.compact()); // Can't compact read-only buffer.
+                assertThrows(BufferReadOnlyException.class, () -> c.compact()); // Can't compact read-only buffer.
                 assertEquals(3, c.readByte());
                 assertEquals(4, c.readByte());
             }
