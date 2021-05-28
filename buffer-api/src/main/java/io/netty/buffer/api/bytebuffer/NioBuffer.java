@@ -52,7 +52,7 @@ class NioBuffer extends ResourceSupport<Buffer, NioBuffer> implements Buffer, Re
     private boolean constBuffer;
 
     NioBuffer(ByteBuffer base, ByteBuffer memory, AllocatorControl control, Drop<NioBuffer> drop) {
-        super(new MakeInaccisbleOnDrop(ArcDrop.wrap(drop)));
+        super(new MakeInaccessibleOnDrop(ArcDrop.wrap(drop)));
         this.base = base;
         rmem = memory;
         wmem = memory;
@@ -63,7 +63,7 @@ class NioBuffer extends ResourceSupport<Buffer, NioBuffer> implements Buffer, Re
      * Constructor for {@linkplain BufferAllocator#constBufferSupplier(byte[]) const buffers}.
      */
     NioBuffer(NioBuffer parent) {
-        super(new MakeInaccisbleOnDrop(new ArcDrop<>(ArcDrop.acquire(parent.unsafeGetDrop()))));
+        super(new MakeInaccessibleOnDrop(new ArcDrop<>(ArcDrop.acquire(parent.unsafeGetDrop()))));
         control = parent.control;
         base = parent.base;
         rmem = bbslice(parent.rmem, 0, parent.rmem.capacity()); // Need to slice to get independent byte orders.
@@ -75,10 +75,10 @@ class NioBuffer extends ResourceSupport<Buffer, NioBuffer> implements Buffer, Re
         constBuffer = true;
     }
 
-    private static final class MakeInaccisbleOnDrop implements Drop<NioBuffer> {
+    private static final class MakeInaccessibleOnDrop implements Drop<NioBuffer> {
         final Drop<NioBuffer> delegate;
 
-        private MakeInaccisbleOnDrop(Drop<NioBuffer> delegate) {
+        private MakeInaccessibleOnDrop(Drop<NioBuffer> delegate) {
             this.delegate = delegate;
         }
 
@@ -98,19 +98,19 @@ class NioBuffer extends ResourceSupport<Buffer, NioBuffer> implements Buffer, Re
 
         @Override
         public String toString() {
-            return "MemSegDrop(" + delegate + ')';
+            return "MakeInaccessibleOnDrop(" + delegate + ')';
         }
     }
 
     @Override
     protected Drop<NioBuffer> unsafeGetDrop() {
-        MakeInaccisbleOnDrop drop = (MakeInaccisbleOnDrop) super.unsafeGetDrop();
+        MakeInaccessibleOnDrop drop = (MakeInaccessibleOnDrop) super.unsafeGetDrop();
         return drop.delegate;
     }
 
     @Override
     protected void unsafeSetDrop(Drop<NioBuffer> replacement) {
-        super.unsafeSetDrop(new MakeInaccisbleOnDrop(replacement));
+        super.unsafeSetDrop(new MakeInaccessibleOnDrop(replacement));
     }
 
     @Override

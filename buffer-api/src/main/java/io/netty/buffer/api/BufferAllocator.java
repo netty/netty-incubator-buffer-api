@@ -28,8 +28,8 @@ public interface BufferAllocator extends AutoCloseable {
      * Check that the given {@code size} argument is a valid buffer size, or throw an {@link IllegalArgumentException}.
      *
      * @param size The size to check.
-     * @throws IllegalArgumentException if the size is not possitive, or if the size is too big (over ~2 GB) for a
-     * buffer to accomodate.
+     * @throws IllegalArgumentException if the size is not positive, or if the size is too big (over ~2 GB) for a
+     * buffer to accommodate.
      */
     static void checkSize(long size) {
         if (size < 1) {

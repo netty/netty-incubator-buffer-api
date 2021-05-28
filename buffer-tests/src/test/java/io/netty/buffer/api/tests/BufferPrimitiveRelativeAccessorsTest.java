@@ -1194,7 +1194,7 @@ public class BufferPrimitiveRelativeAccessorsTest extends BufferTestSupport {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void relativeReadOfDoubleReadOnllyMustBoundsCheckWhenReadOffsetAndSizeIsBeyondWriteOffset(Fixture fixture) {
+    void relativeReadOfDoubleReadOnlyMustBoundsCheckWhenReadOffsetAndSizeIsBeyondWriteOffset(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
             assertEquals(0, buf.readableBytes());
