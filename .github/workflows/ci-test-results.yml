@@ -14,32 +14,32 @@
 # under the License.
 # ----------------------------------------------------------------------------
 name: Upload Test Results
+
 on:
   workflow_run:
-    workflows: [ "Build" ]
-    types:
-      - completed
+    workflows: ["Build"]
+    types: [completed]
 
 jobs:
-  tests:
+  test_reports:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        version: [ "java17", "java11" ]
+        java: [java17, java11]
     steps:
       - name: Download Artifacts
-        uses: dawidd6/action-download-artifact@v2.11.0
+        uses: dawidd6/action-download-artifact@v2.14.0
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           workflow: ${{ github.event.workflow_run.workflow_id }}
           workflow_conclusion: completed
           commit: ${{ github.event.workflow_run.head_commit.id }}
           # The artefact name must be coordinated with the "Upload * Test Results" steps in ci-workflow.yml.
-          name: test-results-${{ matrix.version }}
+          name: test-results-${{ matrix.java }}
       - name: Publish Test Report
-        uses: scacap/action-surefire-report@v1.0.9
+        uses: scacap/action-surefire-report@v1.0.10
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           report_paths: '**/target/surefire-reports/TEST-*.xml'
           commit: ${{ github.event.workflow_run.head_commit.id }}
-          check_name: Test results ${{ matrix.version }}
+          check_name: Test results ${{ matrix.java }}
