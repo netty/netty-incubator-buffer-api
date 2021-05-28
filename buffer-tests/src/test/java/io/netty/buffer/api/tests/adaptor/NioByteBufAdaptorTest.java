@@ -15,10 +15,10 @@
  */
 package io.netty.buffer.api.tests.adaptor;
 
-import org.junit.BeforeClass;
+import org.junit.jupiter.api.BeforeAll;
 
 public class NioByteBufAdaptorTest extends ByteBufAdaptorTest {
-    @BeforeClass
+    @BeforeAll
     public static void setUpAllocator() {
         setUpAllocator("ByteBuffer");
     }
