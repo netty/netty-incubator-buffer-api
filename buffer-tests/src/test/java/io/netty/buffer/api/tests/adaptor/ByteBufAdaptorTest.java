@@ -24,7 +24,7 @@ import org.junit.Ignore;
 
 import java.util.Optional;
 
-import static org.junit.jupiter.api.Assumptions.assumeTrue;
+import static org.junit.Assume.assumeTrue;
 
 public abstract class ByteBufAdaptorTest extends AbstractByteBufTest {
     static ByteBufAllocatorAdaptor alloc;
