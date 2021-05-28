@@ -1435,7 +1435,8 @@ public final class ByteBufAdaptor extends ByteBuf {
 
         @Override
         public ByteBuf retainedDuplicate() {
-            return new Slice(unwrap().retainedDuplicate(), indexAdjustment, lengthAdjustment);
+            return new Slice(unwrap().retainedDuplicate(), indexAdjustment, lengthAdjustment)
+                    .setIndex(readerIndex(), writerIndex());
         }
 
         @Override
@@ -1453,7 +1454,8 @@ public final class ByteBufAdaptor extends ByteBuf {
         @Override
         public ByteBuf duplicate() {
             ((ByteBufAdaptor) unwrap()).checkAccess();
-            return new Duplicate((ByteBufAdaptor) unwrap());
+            return new Duplicate((ByteBufAdaptor) unwrap())
+                    .setIndex(readerIndex(), writerIndex());
         }
 
         @Override
@@ -1476,7 +1478,10 @@ public final class ByteBufAdaptor extends ByteBuf {
 
     @Override
     public ByteBuf retainedDuplicate() {
-        return retainedSlice(0, capacity()).setIndex(readerIndex(), writerIndex());
+        checkAccess();
+        retain();
+        Duplicate duplicatedByteBuf = new Duplicate(this);
+        return duplicatedByteBuf.setIndex(readerIndex(), writerIndex());
     }
 
     @Override
