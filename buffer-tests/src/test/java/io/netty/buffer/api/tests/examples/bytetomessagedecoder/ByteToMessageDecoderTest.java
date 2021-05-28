@@ -61,20 +61,44 @@ public class ByteToMessageDecoderTest {
             }
         });
 
-        try (Buffer buf = BufferAllocator.heap().allocate(4, BIG_ENDIAN).writeInt(0x01020304)) {
-            channel.writeInbound(buf);
-            try (Buffer b = channel.readInbound()) {
-                assertEquals(3, b.readableBytes());
-                assertEquals(0x02, b.readByte());
-                assertEquals(0x03, b.readByte());
-                assertEquals(0x04, b.readByte());
-            }
+        channel.writeInbound(BufferAllocator.heap().allocate(4, BIG_ENDIAN).writeInt(0x01020304));
+        try (Buffer b = channel.readInbound()) {
+            assertEquals(3, b.readableBytes());
+            assertEquals(0x02, b.readByte());
+            assertEquals(0x03, b.readByte());
+            assertEquals(0x04, b.readByte());
         }
     }
 
     @Test
     public void testRemoveItselfWriteBuffer() {
-        final Buffer buf = BufferAllocator.heap().allocate(5, BIG_ENDIAN).writeInt(0x01020304);
+        try (Buffer buf = BufferAllocator.heap().allocate(5, BIG_ENDIAN).writeInt(0x01020304)) {
+            EmbeddedChannel channel = new EmbeddedChannel(new ByteToMessageDecoder() {
+                private boolean removed;
+
+                @Override
+                protected void decode(ChannelHandlerContext ctx, Buffer in) {
+                    assertFalse(removed);
+                    in.readByte();
+                    ctx.pipeline().remove(this);
+
+                    // This should not let it keep call decode
+                    buf.writeByte((byte) 0x05);
+                    removed = true;
+                }
+            });
+
+            channel.writeInbound(buf.copy());
+            try (Buffer expected = BufferAllocator.heap().allocate(3, BIG_ENDIAN).writeShort((short) 0x0203).writeByte((byte) 0x04);
+                 Buffer actual = channel.readInbound()) {
+                assertReadableEquals(expected, actual);
+            }
+        }
+    }
+
+    @Test
+    public void testRemoveItselfWriteBuffer2() {
+        Buffer buf = BufferAllocator.heap().allocate(5, BIG_ENDIAN).writeInt(0x01020304);
         EmbeddedChannel channel = new EmbeddedChannel(new ByteToMessageDecoder() {
             private boolean removed;
 
@@ -91,7 +115,7 @@ public class ByteToMessageDecoderTest {
         });
 
         channel.writeInbound(buf);
-        try (Buffer expected = BufferAllocator.heap().allocate(3, BIG_ENDIAN).writeShort((short) 0x0203).writeByte((byte) 0x04);
+        try (Buffer expected = BufferAllocator.heap().allocate(4, BIG_ENDIAN).writeInt(0x02030405);
              Buffer actual = channel.readInbound()) {
             assertReadableEquals(expected, actual);
         }
@@ -304,8 +328,8 @@ public class ByteToMessageDecoderTest {
         });
         byte[] bytes = new byte[1024];
         ThreadLocalRandom.current().nextBytes(bytes);
-        try (Buffer buf = BufferAllocator.heap().allocate(bytes.length, BIG_ENDIAN).writeBytes(bytes);
-             Buffer part1 = buf.copy(0, bytes.length - 1);
+        Buffer buf = BufferAllocator.heap().allocate(bytes.length, BIG_ENDIAN).writeBytes(bytes);
+        try (Buffer part1 = buf.copy(0, bytes.length - 1);
              Buffer part2 = buf.copy(bytes.length - 1, 1)) {
             assertTrue(channel.writeInbound(buf));
             try (Buffer actual = channel.readInbound()) {
