@@ -59,7 +59,7 @@ class UnsafeBuffer extends ResourceSupport<Buffer, UnsafeBuffer> implements Buff
 
     UnsafeBuffer(UnsafeMemory memory, long offset, int size, AllocatorControl allocatorControl,
                         Drop<UnsafeBuffer> drop) {
-        super(new MakeInaccisbleOnDrop(ArcDrop.wrap(drop)));
+        super(new MakeInaccessibleOnDrop(ArcDrop.wrap(drop)));
         this.memory = memory;
         base = memory.base;
         baseOffset = offset;
@@ -71,7 +71,7 @@ class UnsafeBuffer extends ResourceSupport<Buffer, UnsafeBuffer> implements Buff
     }
 
     UnsafeBuffer(UnsafeBuffer parent) {
-        super(new MakeInaccisbleOnDrop(new ArcDrop<>(ArcDrop.acquire(parent.unsafeGetDrop()))));
+        super(new MakeInaccessibleOnDrop(new ArcDrop<>(ArcDrop.acquire(parent.unsafeGetDrop()))));
         control = parent.control;
         memory = parent.memory;
         base = parent.base;
@@ -1254,19 +1254,19 @@ class UnsafeBuffer extends ResourceSupport<Buffer, UnsafeBuffer> implements Buff
 
     @Override
     protected Drop<UnsafeBuffer> unsafeGetDrop() {
-        MakeInaccisbleOnDrop drop = (MakeInaccisbleOnDrop) super.unsafeGetDrop();
+        MakeInaccessibleOnDrop drop = (MakeInaccessibleOnDrop) super.unsafeGetDrop();
         return drop.delegate;
     }
 
     @Override
     protected void unsafeSetDrop(Drop<UnsafeBuffer> replacement) {
-        super.unsafeSetDrop(new MakeInaccisbleOnDrop(replacement));
+        super.unsafeSetDrop(new MakeInaccessibleOnDrop(replacement));
     }
 
-    private static final class MakeInaccisbleOnDrop implements Drop<UnsafeBuffer> {
+    private static final class MakeInaccessibleOnDrop implements Drop<UnsafeBuffer> {
         final Drop<UnsafeBuffer> delegate;
 
-        private MakeInaccisbleOnDrop(Drop<UnsafeBuffer> delegate) {
+        private MakeInaccessibleOnDrop(Drop<UnsafeBuffer> delegate) {
             this.delegate = delegate;
         }
 
@@ -1286,7 +1286,7 @@ class UnsafeBuffer extends ResourceSupport<Buffer, UnsafeBuffer> implements Buff
 
         @Override
         public String toString() {
-            return "UnsafeDrop(" + delegate + ')';
+            return "MakeInaccessibleOnDrop(" + delegate + ')';
         }
     }
 

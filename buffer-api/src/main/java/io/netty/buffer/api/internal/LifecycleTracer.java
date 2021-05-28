@@ -163,7 +163,7 @@ public abstract class LifecycleTracer {
 
         public <E extends Throwable> void attach(E throwable, long timestamp) {
             Trace recv = received;
-            String message = sent && recv == null? name + " (sent but not received)" : name;
+            String message = sent && recv == null ? name + " (sent but not received)" : name;
             message += " (current acquires = " + acquires + ") T" + (this.timestamp - timestamp) / 1000 + "µs.";
             Traceback exception = new Traceback(message);
             StackTraceElement[] stackTrace = new StackTraceElement[frames.length];

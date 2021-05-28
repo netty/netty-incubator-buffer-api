@@ -550,7 +550,7 @@ public class BufferCompositionTest extends BufferTestSupport {
     }
 
     @Test
-    public void splitComponentsCeilMustGiveBufferWithFirstComponenForOffsetInFirstComponent() {
+    public void splitComponentsCeilMustGiveBufferWithFirstComponentForOffsetInFirstComponent() {
         try (BufferAllocator allocator = BufferAllocator.heap();
              CompositeBuffer composite = CompositeBuffer.compose(allocator,
                      allocator.allocate(8).send(),

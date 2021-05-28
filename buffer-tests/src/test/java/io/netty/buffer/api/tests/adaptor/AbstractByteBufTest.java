@@ -2119,7 +2119,7 @@ public abstract class AbstractByteBufTest {
     public void testSWARIndexOf() {
         ByteBuf buffer = newBuffer(16);
         buffer.clear();
-        // Ensure the buffer is completely zero'ed.
+        // Ensure the buffer is completely zeroed.
         buffer.setZero(0, buffer.capacity());
         buffer.writeByte((byte) 0); // 0
         buffer.writeByte((byte) 0);
@@ -2148,7 +2148,7 @@ public abstract class AbstractByteBufTest {
     @Test
     public void testIndexOf() {
         buffer.clear();
-        // Ensure the buffer is completely zero'ed.
+        // Ensure the buffer is completely zeroed.
         buffer.setZero(0, buffer.capacity());
 
         buffer.writeByte((byte) 1);

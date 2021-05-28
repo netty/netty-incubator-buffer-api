@@ -145,7 +145,7 @@ public final class CompositeBuffer extends ResourceSupport<Buffer, CompositeBuff
      * @throws IllegalArgumentException if the given buffers have an inconsistent
      * {@linkplain Buffer#order() byte order}.
      * @throws IllegalStateException if one of the sends have already been received. The remaining buffers and sends
-     * will be closed and descarded, respectively.
+     * will be closed and discarded, respectively.
      */
     @SafeVarargs
     public static CompositeBuffer compose(BufferAllocator allocator, Send<Buffer>... sends) {
@@ -321,7 +321,7 @@ public final class CompositeBuffer extends ResourceSupport<Buffer, CompositeBuff
         if (cap > MAX_CAPACITY) {
             throw new IllegalArgumentException(
                     "Combined size of the constituent buffers is too big. " +
-                    "The maximum buffer capacity is " + MAX_CAPACITY + " (Interger.MAX_VALUE - 8), " +
+                    "The maximum buffer capacity is " + MAX_CAPACITY + " (Integer.MAX_VALUE - 8), " +
                     "but the sum of the constituent buffer capacities was " + cap + '.');
         }
         capacity = (int) cap;
