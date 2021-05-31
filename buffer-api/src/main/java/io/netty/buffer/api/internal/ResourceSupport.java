@@ -38,6 +38,17 @@ public abstract class ResourceSupport<I extends Resource<I>, T extends ResourceS
         tracer = LifecycleTracer.get();
     }
 
+    /**
+     * Encapsulation bypass for calling {@link #acquire()} on the given object.
+     * <p>
+     * Note: this {@code acquire} method does not check the type of the return value from acquire at compile time.
+     * The type is instead checked at runtime, and will cause a {@link ClassCastException} to be thrown if done
+     * incorrectly.
+     *
+     * @param obj The object we wish to acquire (increment reference count) on.
+     * @param <T> The type of the acquired object, given by target-typing.
+     * @return The acquired object.
+     */
     @SuppressWarnings("unchecked")
     static <T> T acquire(ResourceSupport<?, ?> obj) {
         return (T) obj.acquire();
@@ -103,6 +114,13 @@ public abstract class ResourceSupport<I extends Resource<I>, T extends ResourceS
         return new TransferSend<I, T>(owned, drop, getClass());
     }
 
+    /**
+     * Attach a trace of the life-cycle of this object as suppressed exceptions to the given throwable.
+     *
+     * @param throwable The throwable to attach a life-cycle trace to.
+     * @param <E> The concrete exception type.
+     * @return The given exception, which can then be thrown.
+     */
     protected <E extends Throwable> E attachTrace(E throwable) {
         return tracer.attachTrace(throwable);
     }
@@ -117,14 +135,34 @@ public abstract class ResourceSupport<I extends Resource<I>, T extends ResourceS
                 "Cannot send() a reference counted object with " + countBorrows() + " borrows: " + this + '.');
     }
 
+    /**
+     * Encapsulation bypass to call {@link #isOwned()} on the given object.
+     *
+     * @param obj The object to query the ownership state on.
+     * @return {@code true} if the given object is owned, otherwise {@code false}.
+     */
     static boolean isOwned(ResourceSupport<?, ?> obj) {
         return obj.isOwned();
     }
 
+    /**
+     * Query if this object is in an "owned" state, which means no other references have been
+     * {@linkplain #acquire() acquired} to it.
+     *
+     * This would usually be the case, since there are no public methods for acquiring references to these objects.
+     *
+     * @return {@code true} if this object is in an owned state, otherwise {@code false}.
+     */
     protected boolean isOwned() {
         return acquires == 0;
     }
 
+    /**
+     * Encapsulation bypass to call {@link #countBorrows()} on the given object.
+     *
+     * @param obj The object to count borrows on.
+     * @return The number of borrows, or outstanding {@linkplain #acquire() acquires}, if any, of the given object.
+     */
     static int countBorrows(ResourceSupport<?, ?> obj) {
         return obj.countBorrows();
     }

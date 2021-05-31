@@ -13,29 +13,13 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package io.netty.buffer.api.bytebuffer;
+package io.netty.buffer.api.tests.adaptor;
 
-import io.netty.buffer.api.MemoryManager;
-import io.netty.buffer.api.MemoryManagers;
+import org.junit.jupiter.api.BeforeAll;
 
-public class ByteBufferMemoryManagers implements MemoryManagers {
-    @Override
-    public MemoryManager getHeapMemoryManager() {
-        return new ByteBufferMemoryManager(false);
-    }
-
-    @Override
-    public MemoryManager getNativeMemoryManager() {
-        return new ByteBufferMemoryManager(true);
-    }
-
-    @Override
-    public String getImplementationName() {
-        return "ByteBuffer";
-    }
-
-    @Override
-    public String toString() {
-        return "BB";
+public class NioByteBufAdaptorTest extends ByteBufAdaptorTest {
+    @BeforeAll
+    public static void setUpAllocator() {
+        setUpAllocator("ByteBuffer");
     }
 }

@@ -16,22 +16,32 @@
 package io.netty.buffer.api.tests.adaptor;
 
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.api.BufferAllocator;
+import io.netty.buffer.api.MemoryManagers;
 import io.netty.buffer.api.adaptor.ByteBufAllocatorAdaptor;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Ignore;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Disabled;
 
-public class ByteBufAdaptorTest extends AbstractByteBufTest {
+import java.util.Optional;
+
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
+
+public abstract class ByteBufAdaptorTest extends AbstractByteBufTest {
     static ByteBufAllocatorAdaptor alloc;
 
-    @BeforeClass
-    public static void setUpAllocator() {
-        alloc = new ByteBufAllocatorAdaptor();
+    static void setUpAllocator(String name) {
+        Optional<MemoryManagers> managers = MemoryManagers.lookupImplementation(name);
+        assumeTrue(managers.isPresent(), () -> "Memory implementation '" + name + "' not found.");
+        BufferAllocator onheap = MemoryManagers.using(managers.get(), BufferAllocator::pooledHeap);
+        BufferAllocator offheap = MemoryManagers.using(managers.get(), BufferAllocator::pooledHeap);
+        alloc = new ByteBufAllocatorAdaptor(onheap, offheap);
     }
 
-    @AfterClass
+    @AfterAll
     public static void tearDownAllocator() throws Exception {
-        alloc.close();
+        if (alloc != null) {
+            alloc.close();
+        }
     }
 
     @Override
@@ -39,50 +49,50 @@ public class ByteBufAdaptorTest extends AbstractByteBufTest {
         return alloc.buffer(capacity, capacity);
     }
 
-    @Ignore("This test codifies that asking to reading 0 bytes from an empty but unclosed stream should return -1, " +
+    @Disabled("This test codifies that asking to reading 0 bytes from an empty but unclosed stream should return -1, " +
             "which is just weird.")
     @Override
     public void testStreamTransfer1() throws Exception {
     }
 
-    @Ignore("Relies on capacity and max capacity being separate things.")
+    @Disabled("Relies on capacity and max capacity being separate things.")
     @Override
     public void testCapacityIncrease() {
     }
 
-    @Ignore("Decreasing capacity not supported in new API.")
+    @Disabled("Decreasing capacity not supported in new API.")
     @Override
     public void testCapacityDecrease() {
     }
 
-    @Ignore("Decreasing capacity not supported in new API.")
+    @Disabled("Decreasing capacity not supported in new API.")
     @Override
     public void testCapacityNegative() {
         throw new IllegalArgumentException(); // Can't ignore tests annotated with throws expectation?
     }
 
-    @Ignore("Decreasing capacity not supported in new API.")
+    @Disabled("Decreasing capacity not supported in new API.")
     @Override
     public void testCapacityEnforceMaxCapacity() {
         throw new IllegalArgumentException(); // Can't ignore tests annotated with throws expectation?
     }
 
-    @Ignore("Decreasing capacity not supported in new API.")
+    @Disabled("Decreasing capacity not supported in new API.")
     @Override
     public void testMaxFastWritableBytes() {
     }
 
-    @Ignore("Impossible to expose entire memory as a ByteBuffer using new API.")
+    @Disabled("Impossible to expose entire memory as a ByteBuffer using new API.")
     @Override
     public void testNioBufferExposeOnlyRegion() {
     }
 
-    @Ignore("Impossible to expose entire memory as a ByteBuffer using new API.")
+    @Disabled("Impossible to expose entire memory as a ByteBuffer using new API.")
     @Override
     public void testToByteBuffer2() {
     }
 
-    @Ignore("No longer allowed to allocate 0 sized buffers, except for composite buffers with no components.")
+    @Disabled("No longer allowed to allocate 0 sized buffers, except for composite buffers with no components.")
     @Override
     public void testLittleEndianWithExpand() {
     }

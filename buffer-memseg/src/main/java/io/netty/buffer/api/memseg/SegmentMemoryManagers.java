@@ -30,6 +30,11 @@ public class SegmentMemoryManagers implements MemoryManagers {
     }
 
     @Override
+    public String getImplementationName() {
+        return "MemorySegment";
+    }
+
+    @Override
     public String toString() {
         return "MS";
     }

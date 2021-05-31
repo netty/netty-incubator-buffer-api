@@ -1419,8 +1419,9 @@ public final class ByteBufAdaptor extends ByteBuf {
     @Override
     public ByteBuf retainedSlice(int index, int length) {
         checkAccess();
+        Slice slice = new Slice(this, index, length);
         retain();
-        return new Slice(this, index, length);
+        return slice;
     }
 
     private static final class Slice extends SlicedByteBuf {
@@ -1677,8 +1678,16 @@ public final class ByteBufAdaptor extends ByteBuf {
 
     @Override
     public boolean release(int decrement) {
+        int refCount = 1 + Statics.countBorrows((ResourceSupport<?, ?>) buffer);
+        if (!buffer.isAccessible() || decrement > refCount) {
+            throw new IllegalReferenceCountException(refCount, -decrement);
+        }
         for (int i = 0; i < decrement; i++) {
-            buffer.close();
+            try {
+                buffer.close();
+            } catch (RuntimeException e) {
+                throw new IllegalReferenceCountException(e);
+            }
         }
         return !buffer.isAccessible();
     }

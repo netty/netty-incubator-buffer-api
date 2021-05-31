@@ -15,6 +15,9 @@
  */
 package io.netty.buffer.api;
 
+import io.netty.buffer.api.internal.MemoryManagersOverride;
+
+import java.util.Optional;
 import java.util.ServiceLoader;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
@@ -51,12 +54,36 @@ public interface MemoryManagers {
 
     /**
      * Get a lazy-loading stream of all available memory managers.
+     * <p>
+     * Note: All available {@link MemoryManagers} instances are service loaded and instantiated on every call.
      *
      * @return A stream of providers of memory managers instances.
      */
     static Stream<ServiceLoader.Provider<MemoryManagers>> getAllManagers() {
         var loader = ServiceLoader.load(MemoryManagers.class);
         return loader.stream();
+    }
+
+    /**
+     * Find a {@link MemoryManagers} implementation by its {@linkplain #getImplementationName() implementation name}.
+     * <p>
+     * Note: All available {@link MemoryManagers} instances are service loaded and instantiated every time this
+     * method is called.
+     *
+     * @param implementationName The named implementation to look for.
+     * @return A {@link MemoryManagers} implementation, if any was found.
+     */
+    static Optional<MemoryManagers> lookupImplementation(String implementationName) {
+        return getAllManagers()
+                .flatMap(provider -> {
+                    try {
+                        return Stream.ofNullable(provider.get());
+                    } catch (Exception e) {
+                        return Stream.empty();
+                    }
+                })
+                .filter(impl -> implementationName.equals(impl.getImplementationName()))
+                .findFirst();
     }
 
     /**
@@ -72,4 +99,12 @@ public interface MemoryManagers {
      * @return An off-heap {@link MemoryManager}.
      */
     MemoryManager getNativeMemoryManager();
+
+    /**
+     * Get the name for this implementation, which can be used for finding this particular implementation via the
+     * {@link #lookupImplementation(String)} method.
+     *
+     * @return The name of this memory managers implementation.
+     */
+    String getImplementationName();
 }

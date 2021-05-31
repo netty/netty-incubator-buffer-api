@@ -32,6 +32,7 @@ import io.netty.buffer.api.WritableComponentProcessor;
 import io.netty.buffer.api.Drop;
 import io.netty.buffer.api.Owned;
 import io.netty.buffer.api.internal.ResourceSupport;
+import io.netty.util.IllegalReferenceCountException;
 import jdk.incubator.foreign.MemorySegment;
 import jdk.incubator.foreign.ResourceScope;
 
@@ -1266,8 +1267,16 @@ class MemSegBuffer extends ResourceSupport<Buffer, MemSegBuffer> implements Buff
 
     @Override
     public boolean release(int decrement) {
+        int refCount = 1 + countBorrows();
+        if (!isAccessible() || decrement > refCount) {
+            throw new IllegalReferenceCountException(refCount, -decrement);
+        }
         for (int i = 0; i < decrement; i++) {
-            close();
+            try {
+                close();
+            } catch (RuntimeException e) {
+                throw new IllegalReferenceCountException(e);
+            }
         }
         return !isAccessible();
     }
