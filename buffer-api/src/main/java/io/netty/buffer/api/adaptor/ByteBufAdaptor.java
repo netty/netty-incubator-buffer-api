@@ -1678,13 +1678,14 @@ public final class ByteBufAdaptor extends ByteBuf {
 
     @Override
     public boolean release(int decrement) {
-        if (!buffer.isAccessible() || decrement > 1 + Statics.countBorrows((ResourceSupport<?, ?>) buffer)) {
-            throw new IllegalReferenceCountException();
+        int refCount = 1 + Statics.countBorrows((ResourceSupport<?, ?>) buffer);
+        if (!buffer.isAccessible() || decrement > refCount) {
+            throw new IllegalReferenceCountException(refCount, -decrement);
         }
         for (int i = 0; i < decrement; i++) {
             try {
                 buffer.close();
-            } catch (IllegalStateException e) {
+            } catch (RuntimeException e) {
                 throw new IllegalReferenceCountException(e);
             }
         }

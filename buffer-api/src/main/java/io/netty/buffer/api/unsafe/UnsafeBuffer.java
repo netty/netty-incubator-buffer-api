@@ -1661,11 +1661,16 @@ class UnsafeBuffer extends ResourceSupport<Buffer, UnsafeBuffer> implements Buff
 
     @Override
     public boolean release(int decrement) {
-        if (!isAccessible() || decrement > 1 + countBorrows()) {
-            throw new IllegalReferenceCountException();
+        int refCount = 1 + countBorrows();
+        if (!isAccessible() || decrement > refCount) {
+            throw new IllegalReferenceCountException(refCount, -decrement);
         }
         for (int i = 0; i < decrement; i++) {
-            close();
+            try {
+                close();
+            } catch (RuntimeException e) {
+                throw new IllegalReferenceCountException(e);
+            }
         }
         return !isAccessible();
     }
