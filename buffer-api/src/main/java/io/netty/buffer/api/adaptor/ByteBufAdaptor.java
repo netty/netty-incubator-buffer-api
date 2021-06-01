@@ -23,6 +23,7 @@ import io.netty.buffer.DuplicatedByteBuf;
 import io.netty.buffer.SlicedByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.buffer.api.BufferAllocator;
+import io.netty.buffer.api.BufferClosedException;
 import io.netty.buffer.api.BufferReadOnlyException;
 import io.netty.buffer.api.internal.Statics;
 import io.netty.buffer.api.Buffer;
@@ -254,7 +255,7 @@ public final class ByteBufAdaptor extends ByteBuf {
     public byte getByte(int index) {
         try {
             return buffer.getByte(index);
-        } catch (BufferReadOnlyException e) {
+        } catch (IllegalStateException | BufferClosedException e) {
             throw new IllegalReferenceCountException(e);
         }
     }
@@ -263,7 +264,7 @@ public final class ByteBufAdaptor extends ByteBuf {
     public short getUnsignedByte(int index) {
         try {
             return (short) buffer.getUnsignedByte(index);
-        } catch (BufferReadOnlyException e) {
+        } catch (IllegalStateException | BufferClosedException e) {
             throw new IllegalReferenceCountException(e);
         }
     }
@@ -272,7 +273,7 @@ public final class ByteBufAdaptor extends ByteBuf {
     public short getShort(int index) {
         try {
             return buffer.getShort(index);
-        } catch (BufferReadOnlyException e) {
+        } catch (IllegalStateException | BufferClosedException e) {
             throw new IllegalReferenceCountException(e);
         }
     }
@@ -282,7 +283,7 @@ public final class ByteBufAdaptor extends ByteBuf {
         ByteOrder originalOrder = buffer.order();
         try {
             return buffer.order(ByteOrder.LITTLE_ENDIAN).getShort(index);
-        } catch (BufferReadOnlyException e) {
+        } catch (IllegalStateException | BufferClosedException e) {
             throw new IllegalReferenceCountException(e);
         } finally {
             buffer.order(originalOrder);
@@ -293,7 +294,7 @@ public final class ByteBufAdaptor extends ByteBuf {
     public int getUnsignedShort(int index) {
         try {
             return buffer.getUnsignedShort(index);
-        } catch (BufferReadOnlyException e) {
+        } catch (IllegalStateException | BufferClosedException e) {
             throw new IllegalReferenceCountException(e);
         }
     }
@@ -303,7 +304,7 @@ public final class ByteBufAdaptor extends ByteBuf {
         ByteOrder originalOrder = buffer.order();
         try {
             return buffer.order(ByteOrder.LITTLE_ENDIAN).getUnsignedShort(index);
-        } catch (BufferReadOnlyException e) {
+        } catch (IllegalStateException | BufferClosedException e) {
             throw new IllegalReferenceCountException(e);
         } finally {
             buffer.order(originalOrder);
@@ -314,7 +315,7 @@ public final class ByteBufAdaptor extends ByteBuf {
     public int getMedium(int index) {
         try {
             return buffer.getMedium(index);
-        } catch (BufferReadOnlyException e) {
+        } catch (IllegalStateException | BufferClosedException e) {
             throw new IllegalReferenceCountException(e);
         }
     }
@@ -324,7 +325,7 @@ public final class ByteBufAdaptor extends ByteBuf {
         ByteOrder originalOrder = buffer.order();
         try {
             return buffer.order(ByteOrder.LITTLE_ENDIAN).getMedium(index);
-        } catch (BufferReadOnlyException e) {
+        } catch (IllegalStateException | BufferClosedException e) {
             throw new IllegalReferenceCountException(e);
         } finally {
             buffer.order(originalOrder);
@@ -335,7 +336,7 @@ public final class ByteBufAdaptor extends ByteBuf {
     public int getUnsignedMedium(int index) {
         try {
             return buffer.getUnsignedMedium(index);
-        } catch (BufferReadOnlyException e) {
+        } catch (IllegalStateException | BufferClosedException e) {
             throw new IllegalReferenceCountException(e);
         }
     }
@@ -345,7 +346,7 @@ public final class ByteBufAdaptor extends ByteBuf {
         ByteOrder originalOrder = buffer.order();
         try {
             return buffer.order(ByteOrder.LITTLE_ENDIAN).getUnsignedMedium(index);
-        } catch (BufferReadOnlyException e) {
+        } catch (IllegalStateException | BufferClosedException e) {
             throw new IllegalReferenceCountException(e);
         } finally {
             buffer.order(originalOrder);
@@ -356,7 +357,7 @@ public final class ByteBufAdaptor extends ByteBuf {
     public int getInt(int index) {
         try {
             return buffer.getInt(index);
-        } catch (BufferReadOnlyException e) {
+        } catch (IllegalStateException | BufferClosedException e) {
             throw new IllegalReferenceCountException(e);
         }
     }
@@ -366,7 +367,7 @@ public final class ByteBufAdaptor extends ByteBuf {
         ByteOrder originalOrder = buffer.order();
         try {
             return buffer.order(ByteOrder.LITTLE_ENDIAN).getInt(index);
-        } catch (BufferReadOnlyException e) {
+        } catch (IllegalStateException | BufferClosedException e) {
             throw new IllegalReferenceCountException(e);
         } finally {
             buffer.order(originalOrder);
@@ -377,7 +378,7 @@ public final class ByteBufAdaptor extends ByteBuf {
     public long getUnsignedInt(int index) {
         try {
             return buffer.getUnsignedInt(index);
-        } catch (BufferReadOnlyException e) {
+        } catch (IllegalStateException | BufferClosedException e) {
             throw new IllegalReferenceCountException(e);
         }
     }
@@ -387,7 +388,7 @@ public final class ByteBufAdaptor extends ByteBuf {
         ByteOrder originalOrder = buffer.order();
         try {
             return buffer.order(ByteOrder.LITTLE_ENDIAN).getUnsignedInt(index);
-        } catch (BufferReadOnlyException e) {
+        } catch (IllegalStateException | BufferClosedException e) {
             throw new IllegalReferenceCountException(e);
         } finally {
             buffer.order(originalOrder);
@@ -398,7 +399,7 @@ public final class ByteBufAdaptor extends ByteBuf {
     public long getLong(int index) {
         try {
             return buffer.getLong(index);
-        } catch (BufferReadOnlyException e) {
+        } catch (IllegalStateException | BufferClosedException e) {
             throw new IllegalReferenceCountException(e);
         }
     }
@@ -408,7 +409,7 @@ public final class ByteBufAdaptor extends ByteBuf {
         ByteOrder originalOrder = buffer.order();
         try {
             return buffer.order(ByteOrder.LITTLE_ENDIAN).getLong(index);
-        } catch (BufferReadOnlyException e) {
+        } catch (IllegalStateException | BufferClosedException e) {
             throw new IllegalReferenceCountException(e);
         } finally {
             buffer.order(originalOrder);
@@ -419,7 +420,7 @@ public final class ByteBufAdaptor extends ByteBuf {
     public char getChar(int index) {
         try {
             return buffer.getChar(index);
-        } catch (BufferReadOnlyException e) {
+        } catch (IllegalStateException | BufferClosedException e) {
             throw new IllegalReferenceCountException(e);
         }
     }
@@ -428,7 +429,7 @@ public final class ByteBufAdaptor extends ByteBuf {
     public float getFloat(int index) {
         try {
             return buffer.getFloat(index);
-        } catch (BufferReadOnlyException e) {
+        } catch (IllegalStateException | BufferClosedException e) {
             throw new IllegalReferenceCountException(e);
         }
     }
@@ -437,7 +438,7 @@ public final class ByteBufAdaptor extends ByteBuf {
     public double getDouble(int index) {
         try {
             return buffer.getDouble(index);
-        } catch (BufferReadOnlyException e) {
+        } catch (IllegalStateException | BufferClosedException e) {
             throw new IllegalReferenceCountException(e);
         }
     }
@@ -536,7 +537,7 @@ public final class ByteBufAdaptor extends ByteBuf {
     public ByteBuf setByte(int index, int value) {
         try {
             buffer.setByte(index, (byte) value);
-        } catch (BufferReadOnlyException e) {
+        } catch (IllegalStateException | BufferClosedException e) {
             throw new IllegalReferenceCountException(e);
         }
         return this;
@@ -547,7 +548,7 @@ public final class ByteBufAdaptor extends ByteBuf {
         try {
             buffer.setShort(index, (short) value);
             return this;
-        } catch (BufferReadOnlyException e) {
+        } catch (IllegalStateException | BufferClosedException e) {
             throw new IllegalReferenceCountException(e);
         }
     }
@@ -558,7 +559,7 @@ public final class ByteBufAdaptor extends ByteBuf {
         try {
             buffer.order(ByteOrder.LITTLE_ENDIAN).setShort(index, (short) value);
             return this;
-        } catch (BufferReadOnlyException e) {
+        } catch (IllegalStateException | BufferClosedException e) {
             throw new IllegalReferenceCountException(e);
         } finally {
             buffer.order(originalOrder);
@@ -570,7 +571,7 @@ public final class ByteBufAdaptor extends ByteBuf {
         try {
             buffer.setMedium(index, value);
             return this;
-        } catch (BufferReadOnlyException e) {
+        } catch (IllegalStateException | BufferClosedException e) {
             throw new IllegalReferenceCountException(e);
         }
     }
@@ -581,7 +582,7 @@ public final class ByteBufAdaptor extends ByteBuf {
         try {
             buffer.order(ByteOrder.LITTLE_ENDIAN).setMedium(index, value);
             return this;
-        } catch (BufferReadOnlyException e) {
+        } catch (IllegalStateException | BufferClosedException e) {
             throw new IllegalReferenceCountException(e);
         } finally {
             buffer.order(originalOrder);
@@ -593,7 +594,7 @@ public final class ByteBufAdaptor extends ByteBuf {
         try {
             buffer.setInt(index, value);
             return this;
-        } catch (BufferReadOnlyException e) {
+        } catch (IllegalStateException | BufferClosedException e) {
             throw new IllegalReferenceCountException(e);
         }
     }
@@ -604,7 +605,7 @@ public final class ByteBufAdaptor extends ByteBuf {
         try {
             buffer.order(ByteOrder.LITTLE_ENDIAN).setInt(index, value);
             return this;
-        } catch (BufferReadOnlyException e) {
+        } catch (IllegalStateException | BufferClosedException e) {
             throw new IllegalReferenceCountException(e);
         } finally {
             buffer.order(originalOrder);
@@ -616,7 +617,7 @@ public final class ByteBufAdaptor extends ByteBuf {
         try {
             buffer.setLong(index, value);
             return this;
-        } catch (BufferReadOnlyException e) {
+        } catch (IllegalStateException | BufferClosedException e) {
             throw new IllegalReferenceCountException(e);
         }
     }
@@ -627,7 +628,7 @@ public final class ByteBufAdaptor extends ByteBuf {
         try {
             buffer.order(ByteOrder.LITTLE_ENDIAN).setLong(index, value);
             return this;
-        } catch (BufferReadOnlyException e) {
+        } catch (IllegalStateException | BufferClosedException e) {
             throw new IllegalReferenceCountException(e);
         } finally {
             buffer.order(originalOrder);
@@ -639,7 +640,7 @@ public final class ByteBufAdaptor extends ByteBuf {
         try {
             buffer.setChar(index, (char) value);
             return this;
-        } catch (BufferReadOnlyException e) {
+        } catch (IllegalStateException | BufferClosedException e) {
             throw new IllegalReferenceCountException(e);
         }
     }
@@ -649,7 +650,7 @@ public final class ByteBufAdaptor extends ByteBuf {
         try {
             buffer.setFloat(index, value);
             return this;
-        } catch (BufferReadOnlyException e) {
+        } catch (IllegalStateException | BufferClosedException e) {
             throw new IllegalReferenceCountException(e);
         }
     }
@@ -659,7 +660,7 @@ public final class ByteBufAdaptor extends ByteBuf {
         try {
             buffer.setDouble(index, value);
             return this;
-        } catch (BufferReadOnlyException e) {
+        } catch (IllegalStateException | BufferClosedException e) {
             throw new IllegalReferenceCountException(e);
         }
     }
@@ -766,7 +767,7 @@ public final class ByteBufAdaptor extends ByteBuf {
     public byte readByte() {
         try {
             return buffer.readByte();
-        } catch (BufferReadOnlyException e) {
+        } catch (IllegalStateException | BufferClosedException e) {
             throw new IllegalReferenceCountException(e);
         }
     }
@@ -775,7 +776,7 @@ public final class ByteBufAdaptor extends ByteBuf {
     public short readUnsignedByte() {
         try {
             return (short) buffer.readUnsignedByte();
-        } catch (BufferReadOnlyException e) {
+        } catch (IllegalStateException | BufferClosedException e) {
             throw new IllegalReferenceCountException(e);
         }
     }
@@ -784,7 +785,7 @@ public final class ByteBufAdaptor extends ByteBuf {
     public short readShort() {
         try {
             return buffer.readShort();
-        } catch (BufferReadOnlyException e) {
+        } catch (IllegalStateException | BufferClosedException e) {
             throw new IllegalReferenceCountException(e);
         }
     }
@@ -794,7 +795,7 @@ public final class ByteBufAdaptor extends ByteBuf {
         ByteOrder originalOrder = buffer.order();
         try {
             return buffer.order(ByteOrder.LITTLE_ENDIAN).readShort();
-        } catch (BufferReadOnlyException e) {
+        } catch (IllegalStateException | BufferClosedException e) {
             throw new IllegalReferenceCountException(e);
         } finally {
             buffer.order(originalOrder);
@@ -805,7 +806,7 @@ public final class ByteBufAdaptor extends ByteBuf {
     public int readUnsignedShort() {
         try {
             return buffer.readUnsignedShort();
-        } catch (BufferReadOnlyException e) {
+        } catch (IllegalStateException | BufferClosedException e) {
             throw new IllegalReferenceCountException(e);
         }
     }
@@ -815,7 +816,7 @@ public final class ByteBufAdaptor extends ByteBuf {
         ByteOrder originalOrder = buffer.order();
         try {
             return buffer.order(ByteOrder.LITTLE_ENDIAN).readUnsignedShort();
-        } catch (BufferReadOnlyException e) {
+        } catch (IllegalStateException | BufferClosedException e) {
             throw new IllegalReferenceCountException(e);
         } finally {
             buffer.order(originalOrder);
@@ -826,7 +827,7 @@ public final class ByteBufAdaptor extends ByteBuf {
     public int readMedium() {
         try {
             return buffer.readMedium();
-        } catch (BufferReadOnlyException e) {
+        } catch (IllegalStateException | BufferClosedException e) {
             throw new IllegalReferenceCountException(e);
         }
     }
@@ -836,7 +837,7 @@ public final class ByteBufAdaptor extends ByteBuf {
         ByteOrder originalOrder = buffer.order();
         try {
             return buffer.order(ByteOrder.LITTLE_ENDIAN).readMedium();
-        } catch (BufferReadOnlyException e) {
+        } catch (IllegalStateException | BufferClosedException e) {
             throw new IllegalReferenceCountException(e);
         } finally {
             buffer.order(originalOrder);
@@ -847,7 +848,7 @@ public final class ByteBufAdaptor extends ByteBuf {
     public int readUnsignedMedium() {
         try {
             return buffer.readUnsignedMedium();
-        } catch (BufferReadOnlyException e) {
+        } catch (IllegalStateException | BufferClosedException e) {
             throw new IllegalReferenceCountException(e);
         }
     }
@@ -857,7 +858,7 @@ public final class ByteBufAdaptor extends ByteBuf {
         ByteOrder originalOrder = buffer.order();
         try {
             return buffer.order(ByteOrder.LITTLE_ENDIAN).readUnsignedMedium();
-        } catch (BufferReadOnlyException e) {
+        } catch (IllegalStateException | BufferClosedException e) {
             throw new IllegalReferenceCountException(e);
         } finally {
             buffer.order(originalOrder);
@@ -868,7 +869,7 @@ public final class ByteBufAdaptor extends ByteBuf {
     public int readInt() {
         try {
             return buffer.readInt();
-        } catch (BufferReadOnlyException e) {
+        } catch (IllegalStateException | BufferClosedException e) {
             throw new IllegalReferenceCountException(e);
         }
     }
@@ -878,7 +879,7 @@ public final class ByteBufAdaptor extends ByteBuf {
         ByteOrder originalOrder = buffer.order();
         try {
             return buffer.order(ByteOrder.LITTLE_ENDIAN).readInt();
-        } catch (BufferReadOnlyException e) {
+        } catch (IllegalStateException | BufferClosedException e) {
             throw new IllegalReferenceCountException(e);
         } finally {
             buffer.order(originalOrder);
@@ -889,7 +890,7 @@ public final class ByteBufAdaptor extends ByteBuf {
     public long readUnsignedInt() {
         try {
             return buffer.readUnsignedInt();
-        } catch (BufferReadOnlyException e) {
+        } catch (IllegalStateException | BufferClosedException e) {
             throw new IllegalReferenceCountException(e);
         }
     }
@@ -899,7 +900,7 @@ public final class ByteBufAdaptor extends ByteBuf {
         ByteOrder originalOrder = buffer.order();
         try {
             return buffer.order(ByteOrder.LITTLE_ENDIAN).readUnsignedInt();
-        } catch (BufferReadOnlyException e) {
+        } catch (IllegalStateException | BufferClosedException e) {
             throw new IllegalReferenceCountException(e);
         } finally {
             buffer.order(originalOrder);
@@ -910,7 +911,7 @@ public final class ByteBufAdaptor extends ByteBuf {
     public long readLong() {
         try {
             return buffer.readLong();
-        } catch (BufferReadOnlyException e) {
+        } catch (IllegalStateException | BufferClosedException e) {
             throw new IllegalReferenceCountException(e);
         }
     }
@@ -920,7 +921,7 @@ public final class ByteBufAdaptor extends ByteBuf {
         ByteOrder originalOrder = buffer.order();
         try {
             return buffer.order(ByteOrder.LITTLE_ENDIAN).readLong();
-        } catch (BufferReadOnlyException e) {
+        } catch (IllegalStateException | BufferClosedException e) {
             throw new IllegalReferenceCountException(e);
         } finally {
             buffer.order(originalOrder);
@@ -931,7 +932,7 @@ public final class ByteBufAdaptor extends ByteBuf {
     public char readChar() {
         try {
             return buffer.readChar();
-        } catch (BufferReadOnlyException e) {
+        } catch (IllegalStateException | BufferClosedException e) {
             throw new IllegalReferenceCountException(e);
         }
     }
@@ -940,7 +941,7 @@ public final class ByteBufAdaptor extends ByteBuf {
     public float readFloat() {
         try {
             return buffer.readFloat();
-        } catch (BufferReadOnlyException e) {
+        } catch (IllegalStateException | BufferClosedException e) {
             throw new IllegalReferenceCountException(e);
         }
     }
@@ -949,7 +950,7 @@ public final class ByteBufAdaptor extends ByteBuf {
     public double readDouble() {
         try {
             return buffer.readDouble();
-        } catch (BufferReadOnlyException e) {
+        } catch (IllegalStateException | BufferClosedException e) {
             throw new IllegalReferenceCountException(e);
         }
     }
