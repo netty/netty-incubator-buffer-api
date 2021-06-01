@@ -19,6 +19,7 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.api.BufferAllocator;
 import io.netty.buffer.api.AllocatorControl;
 import io.netty.buffer.api.Buffer;
+import io.netty.buffer.api.BufferReadOnlyException;
 import io.netty.buffer.api.ByteCursor;
 import io.netty.buffer.api.Drop;
 import io.netty.buffer.api.Owned;
@@ -99,6 +100,11 @@ class UnsafeBuffer extends ResourceSupport<Buffer, UnsafeBuffer> implements Buff
     }
 
     @Override
+    protected RuntimeException createResourceClosedException() {
+        return bufferIsClosed(this);
+    }
+
+    @Override
     public Buffer order(ByteOrder order) {
         this.order = order;
         flipBytes = order != ByteOrder.nativeOrder();
@@ -143,7 +149,7 @@ class UnsafeBuffer extends ResourceSupport<Buffer, UnsafeBuffer> implements Buff
     public Buffer fill(byte value) {
         checkSet(0, capacity());
         if (rsize == CLOSED_SIZE) {
-            throw bufferIsClosed();
+            throw bufferIsClosed(this);
         }
         try {
             PlatformDependent.setMemory(base, address, rsize, value);
@@ -220,7 +226,7 @@ class UnsafeBuffer extends ResourceSupport<Buffer, UnsafeBuffer> implements Buff
 
     private void checkCopyIntoArgs(int srcPos, int length, int destPos, int destLength) {
         if (rsize == CLOSED_SIZE) {
-            throw bufferIsClosed();
+            throw bufferIsClosed(this);
         }
         if (srcPos < 0) {
             throw new IllegalArgumentException("The srcPos cannot be negative: " + srcPos + '.');
@@ -245,7 +251,7 @@ class UnsafeBuffer extends ResourceSupport<Buffer, UnsafeBuffer> implements Buff
     public void copyInto(int srcPos, Buffer dest, int destPos, int length) {
         checkCopyIntoArgs(srcPos, length, destPos, dest.capacity());
         if (dest.readOnly()) {
-            throw bufferIsReadOnly();
+            throw bufferIsReadOnly(this);
         }
         long nativeAddress = dest.nativeAddress();
         try {
@@ -272,7 +278,7 @@ class UnsafeBuffer extends ResourceSupport<Buffer, UnsafeBuffer> implements Buff
     @Override
     public ByteCursor openCursor(int fromOffset, int length) {
         if (rsize == CLOSED_SIZE) {
-            throw bufferIsClosed();
+            throw bufferIsClosed(this);
         }
         if (fromOffset < 0) {
             throw new IllegalArgumentException("The fromOffset cannot be negative: " + fromOffset + '.');
@@ -347,7 +353,7 @@ class UnsafeBuffer extends ResourceSupport<Buffer, UnsafeBuffer> implements Buff
     @Override
     public ByteCursor openReverseCursor(int fromOffset, int length) {
         if (rsize == CLOSED_SIZE) {
-            throw bufferIsClosed();
+            throw bufferIsClosed(this);
         }
         if (fromOffset < 0) {
             throw new IllegalArgumentException("The fromOffset cannot be negative: " + fromOffset + '.');
@@ -425,6 +431,9 @@ class UnsafeBuffer extends ResourceSupport<Buffer, UnsafeBuffer> implements Buff
 
     @Override
     public void ensureWritable(int size, int minimumGrowth, boolean allowCompaction) {
+        if (!isAccessible()) {
+            throw bufferIsClosed(this);
+        }
         if (!isOwned()) {
             throw attachTrace(new IllegalStateException(
                     "Buffer is not owned. Only owned buffers can call ensureWritable."));
@@ -436,7 +445,7 @@ class UnsafeBuffer extends ResourceSupport<Buffer, UnsafeBuffer> implements Buff
             throw new IllegalArgumentException("The minimum growth cannot be negative: " + minimumGrowth + '.');
         }
         if (rsize != wsize) {
-            throw bufferIsReadOnly();
+            throw bufferIsReadOnly(this);
         }
         if (writableBytes() >= size) {
             // We already have enough space.
@@ -500,6 +509,9 @@ class UnsafeBuffer extends ResourceSupport<Buffer, UnsafeBuffer> implements Buff
             throw new IllegalArgumentException("The split offset cannot be greater than the buffer capacity, " +
                     "but the split offset was " + splitOffset + ", and capacity is " + capacity() + '.');
         }
+        if (!isAccessible()) {
+            throw attachTrace(bufferIsClosed(this));
+        }
         if (!isOwned()) {
             throw attachTrace(new IllegalStateException("Cannot split a buffer that is not owned."));
         }
@@ -533,7 +545,7 @@ class UnsafeBuffer extends ResourceSupport<Buffer, UnsafeBuffer> implements Buff
             throw attachTrace(new IllegalStateException("Buffer must be owned in order to compact."));
         }
         if (readOnly()) {
-            throw new IllegalStateException("Buffer must be writable in order to compact, but was read-only.");
+            throw new BufferReadOnlyException("Buffer must be writable in order to compact, but was read-only.");
         }
         if (roff == 0) {
             return;
@@ -1340,17 +1352,17 @@ class UnsafeBuffer extends ResourceSupport<Buffer, UnsafeBuffer> implements Buff
 
     private RuntimeException readAccessCheckException(int index) {
         if (rsize == CLOSED_SIZE) {
-            throw bufferIsClosed();
+            throw bufferIsClosed(this);
         }
         return outOfBounds(index);
     }
 
     private RuntimeException writeAccessCheckException(int index) {
         if (rsize == CLOSED_SIZE) {
-            throw bufferIsClosed();
+            throw bufferIsClosed(this);
         }
         if (wsize != rsize) {
-            return bufferIsReadOnly();
+            return bufferIsReadOnly(this);
         }
         return outOfBounds(index);
     }

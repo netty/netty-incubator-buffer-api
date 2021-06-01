@@ -17,6 +17,8 @@ package io.netty.buffer.api.tests;
 
 import io.netty.buffer.api.Buffer;
 import io.netty.buffer.api.BufferAllocator;
+import io.netty.buffer.api.BufferClosedException;
+import io.netty.buffer.api.BufferReadOnlyException;
 import io.netty.buffer.api.ByteCursor;
 import io.netty.buffer.api.CompositeBuffer;
 import org.junit.jupiter.api.Test;
@@ -189,7 +191,7 @@ public class BufferComponentIterationTest extends BufferTestSupport {
             var buf = allocator.allocate(8);
             buf.writeLong(0);
             buf.close();
-            assertThrows(IllegalStateException.class, () -> buf.forEachReadable(0, (component, index) -> true));
+            assertThrows(BufferClosedException.class, () -> buf.forEachReadable(0, (component, index) -> true));
         }
     }
 
@@ -357,7 +359,7 @@ public class BufferComponentIterationTest extends BufferTestSupport {
         try (BufferAllocator allocator = fixture.createAllocator()) {
             Buffer buf = allocator.allocate(8);
             buf.close();
-            assertThrows(IllegalStateException.class, () -> buf.forEachWritable(0, (index, component) -> true));
+            assertThrows(BufferClosedException.class, () -> buf.forEachWritable(0, (index, component) -> true));
         }
     }
 
@@ -366,7 +368,7 @@ public class BufferComponentIterationTest extends BufferTestSupport {
     public void forEachWritableOnReadOnlyBufferMustThrow(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8).makeReadOnly()) {
-            assertThrows(IllegalStateException.class, () -> buf.forEachWritable(0, (index, component) -> true));
+            assertThrows(BufferReadOnlyException.class, () -> buf.forEachWritable(0, (index, component) -> true));
         }
     }
 

@@ -27,6 +27,9 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Stream;
 
+import static io.netty.buffer.api.internal.Statics.bufferIsClosed;
+import static io.netty.buffer.api.internal.Statics.bufferIsReadOnly;
+
 /**
  * The {@code CompositeBuffer} is a concrete {@link Buffer} implementation that make a number of other buffers appear
  * as one. A composite buffer behaves the same as a normal, non-composite buffer in every way, so you normally don't
@@ -330,6 +333,11 @@ public final class CompositeBuffer extends ResourceSupport<Buffer, CompositeBuff
     @Override
     public String toString() {
         return "Buffer[roff:" + roff + ", woff:" + woff + ", cap:" + capacity + ']';
+    }
+
+    @Override
+    protected RuntimeException createResourceClosedException() {
+        return bufferIsClosed(this);
     }
 
     @Override
@@ -723,6 +731,9 @@ public final class CompositeBuffer extends ResourceSupport<Buffer, CompositeBuff
 
     @Override
     public void ensureWritable(int size, int minimumGrowth, boolean allowCompaction) {
+        if (!isAccessible()) {
+            throw bufferIsClosed(this);
+        }
         if (!isOwned()) {
             throw new IllegalStateException("Buffer is not owned. Only owned buffers can call ensureWritable.");
         }
@@ -733,7 +744,7 @@ public final class CompositeBuffer extends ResourceSupport<Buffer, CompositeBuff
             throw new IllegalArgumentException("The minimum growth cannot be negative: " + minimumGrowth + '.');
         }
         if (readOnly) {
-            throw bufferIsReadOnly();
+            throw bufferIsReadOnly(this);
         }
         if (writableBytes() >= size) {
             // We already have enough space.
@@ -797,8 +808,11 @@ public final class CompositeBuffer extends ResourceSupport<Buffer, CompositeBuff
     public void extendWith(Send<Buffer> extension) {
         Objects.requireNonNull(extension, "Extension buffer cannot be null.");
         Buffer buffer = extension.receive();
-        if (!isOwned()) {
+        if (!isAccessible() || !isOwned()) {
             buffer.close();
+            if (!isAccessible()) {
+                throw bufferIsClosed(this);
+            }
             throw new IllegalStateException("This buffer cannot be extended because it is not in an owned state.");
         }
         if (bufs.length > 0 && buffer.order() != order()) {
@@ -882,6 +896,9 @@ public final class CompositeBuffer extends ResourceSupport<Buffer, CompositeBuff
         if (capacity() < splitOffset) {
             throw new IllegalArgumentException("The split offset cannot be greater than the buffer capacity, " +
                     "but the split offset was " + splitOffset + ", and capacity is " + capacity() + '.');
+        }
+        if (!isAccessible()) {
+            throw attachTrace(bufferIsClosed(this));
         }
         if (!isOwned()) {
             throw new IllegalStateException("Cannot split a buffer that is not owned.");
@@ -975,7 +992,7 @@ public final class CompositeBuffer extends ResourceSupport<Buffer, CompositeBuff
             throw new IllegalStateException("Buffer must be owned in order to compact.");
         }
         if (readOnly()) {
-            throw new IllegalStateException("Buffer must be writable in order to compact, but was read-only.");
+            throw new BufferReadOnlyException("Buffer must be writable in order to compact, but was read-only.");
         }
         int distance = roff;
         if (distance == 0) {
@@ -1462,22 +1479,14 @@ public final class CompositeBuffer extends ResourceSupport<Buffer, CompositeBuff
 
     private RuntimeException indexOutOfBounds(int index, boolean write) {
         if (closed) {
-            return bufferIsClosed();
+            return bufferIsClosed(this);
         }
         if (write && readOnly) {
-            return bufferIsReadOnly();
+            return bufferIsReadOnly(this);
         }
         return new IndexOutOfBoundsException(
                 "Index " + index + " is out of bounds: [read 0 to " + woff + ", write 0 to " +
                 capacity + "].");
-    }
-
-    private static IllegalStateException bufferIsClosed() {
-        return new IllegalStateException("This buffer is closed.");
-    }
-
-    private static IllegalStateException bufferIsReadOnly() {
-        return new IllegalStateException("This buffer is read-only.");
     }
 
     private BufferAccessors chooseBuffer(int index, int size) {

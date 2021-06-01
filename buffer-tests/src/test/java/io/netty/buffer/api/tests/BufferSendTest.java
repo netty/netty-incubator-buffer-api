@@ -17,6 +17,7 @@ package io.netty.buffer.api.tests;
 
 import io.netty.buffer.api.Buffer;
 import io.netty.buffer.api.BufferAllocator;
+import io.netty.buffer.api.BufferClosedException;
 import io.netty.buffer.api.BufferRef;
 import io.netty.buffer.api.Send;
 import io.netty.buffer.api.internal.ResourceSupport;
@@ -110,9 +111,9 @@ public class BufferSendTest extends BufferTestSupport {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
             var send = buf.send();
-            var exc = assertThrows(IllegalStateException.class, () -> buf.send());
+            var exc = assertThrows(BufferClosedException.class, () -> buf.send());
             send.receive().close();
-            assertThat(exc).hasMessageContaining("Cannot send()");
+            assertThat(exc).hasMessageContaining("closed");
         }
     }
 

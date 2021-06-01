@@ -17,6 +17,7 @@ package io.netty.buffer.api.tests;
 
 import io.netty.buffer.api.Buffer;
 import io.netty.buffer.api.BufferAllocator;
+import io.netty.buffer.api.BufferClosedException;
 import io.netty.buffer.api.CompositeBuffer;
 import io.netty.buffer.api.internal.ResourceSupport;
 import org.junit.jupiter.api.Test;
@@ -77,7 +78,7 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
         try (BufferAllocator allocator = fixture.createAllocator()) {
             var buf = allocator.allocate(8);
             buf.close();
-            assertThrows(IllegalStateException.class, () -> acquire((ResourceSupport<?, ?>) buf));
+            assertThrows(BufferClosedException.class, () -> acquire((ResourceSupport<?, ?>) buf));
         }
     }
 

@@ -17,6 +17,7 @@ package io.netty.buffer.api.tests;
 
 import io.netty.buffer.api.Buffer;
 import io.netty.buffer.api.BufferAllocator;
+import io.netty.buffer.api.BufferClosedException;
 import io.netty.buffer.api.CompositeBuffer;
 import io.netty.buffer.api.MemoryManagers;
 import io.netty.buffer.api.internal.ResourceSupport;
@@ -323,88 +324,88 @@ public abstract class BufferTestSupport {
     public static void verifyInaccessible(Buffer buf) {
         verifyReadInaccessible(buf);
 
-        verifyWriteInaccessible(buf);
+        verifyWriteInaccessible(buf, BufferClosedException.class);
 
         try (BufferAllocator allocator = BufferAllocator.heap();
              Buffer target = allocator.allocate(24)) {
-            assertThrows(IllegalStateException.class, () -> buf.copyInto(0, target, 0, 1));
-            assertThrows(IllegalStateException.class, () -> buf.copyInto(0, new byte[1], 0, 1));
-            assertThrows(IllegalStateException.class, () -> buf.copyInto(0, ByteBuffer.allocate(1), 0, 1));
+            assertThrows(BufferClosedException.class, () -> buf.copyInto(0, target, 0, 1));
+            assertThrows(BufferClosedException.class, () -> buf.copyInto(0, new byte[1], 0, 1));
+            assertThrows(BufferClosedException.class, () -> buf.copyInto(0, ByteBuffer.allocate(1), 0, 1));
             if (CompositeBuffer.isComposite(buf)) {
-                assertThrows(IllegalStateException.class, () -> ((CompositeBuffer) buf).extendWith(target.send()));
+                assertThrows(BufferClosedException.class, () -> ((CompositeBuffer) buf).extendWith(target.send()));
             }
         }
 
-        assertThrows(IllegalStateException.class, () -> buf.split());
-        assertThrows(IllegalStateException.class, () -> buf.send());
-        assertThrows(IllegalStateException.class, () -> acquire((ResourceSupport<?, ?>) buf));
-        assertThrows(IllegalStateException.class, () -> buf.copy());
-        assertThrows(IllegalStateException.class, () -> buf.openCursor());
-        assertThrows(IllegalStateException.class, () -> buf.openCursor(0, 0));
-        assertThrows(IllegalStateException.class, () -> buf.openReverseCursor());
-        assertThrows(IllegalStateException.class, () -> buf.openReverseCursor(0, 0));
+        assertThrows(BufferClosedException.class, () -> buf.split());
+        assertThrows(BufferClosedException.class, () -> buf.send());
+        assertThrows(BufferClosedException.class, () -> acquire((ResourceSupport<?, ?>) buf));
+        assertThrows(BufferClosedException.class, () -> buf.copy());
+        assertThrows(BufferClosedException.class, () -> buf.openCursor());
+        assertThrows(BufferClosedException.class, () -> buf.openCursor(0, 0));
+        assertThrows(BufferClosedException.class, () -> buf.openReverseCursor());
+        assertThrows(BufferClosedException.class, () -> buf.openReverseCursor(0, 0));
     }
 
     public static void verifyReadInaccessible(Buffer buf) {
-        assertThrows(IllegalStateException.class, () -> buf.readByte());
-        assertThrows(IllegalStateException.class, () -> buf.readUnsignedByte());
-        assertThrows(IllegalStateException.class, () -> buf.readChar());
-        assertThrows(IllegalStateException.class, () -> buf.readShort());
-        assertThrows(IllegalStateException.class, () -> buf.readUnsignedShort());
-        assertThrows(IllegalStateException.class, () -> buf.readMedium());
-        assertThrows(IllegalStateException.class, () -> buf.readUnsignedMedium());
-        assertThrows(IllegalStateException.class, () -> buf.readInt());
-        assertThrows(IllegalStateException.class, () -> buf.readUnsignedInt());
-        assertThrows(IllegalStateException.class, () -> buf.readFloat());
-        assertThrows(IllegalStateException.class, () -> buf.readLong());
-        assertThrows(IllegalStateException.class, () -> buf.readDouble());
+        assertThrows(BufferClosedException.class, () -> buf.readByte());
+        assertThrows(BufferClosedException.class, () -> buf.readUnsignedByte());
+        assertThrows(BufferClosedException.class, () -> buf.readChar());
+        assertThrows(BufferClosedException.class, () -> buf.readShort());
+        assertThrows(BufferClosedException.class, () -> buf.readUnsignedShort());
+        assertThrows(BufferClosedException.class, () -> buf.readMedium());
+        assertThrows(BufferClosedException.class, () -> buf.readUnsignedMedium());
+        assertThrows(BufferClosedException.class, () -> buf.readInt());
+        assertThrows(BufferClosedException.class, () -> buf.readUnsignedInt());
+        assertThrows(BufferClosedException.class, () -> buf.readFloat());
+        assertThrows(BufferClosedException.class, () -> buf.readLong());
+        assertThrows(BufferClosedException.class, () -> buf.readDouble());
 
-        assertThrows(IllegalStateException.class, () -> buf.getByte(0));
-        assertThrows(IllegalStateException.class, () -> buf.getUnsignedByte(0));
-        assertThrows(IllegalStateException.class, () -> buf.getChar(0));
-        assertThrows(IllegalStateException.class, () -> buf.getShort(0));
-        assertThrows(IllegalStateException.class, () -> buf.getUnsignedShort(0));
-        assertThrows(IllegalStateException.class, () -> buf.getMedium(0));
-        assertThrows(IllegalStateException.class, () -> buf.getUnsignedMedium(0));
-        assertThrows(IllegalStateException.class, () -> buf.getInt(0));
-        assertThrows(IllegalStateException.class, () -> buf.getUnsignedInt(0));
-        assertThrows(IllegalStateException.class, () -> buf.getFloat(0));
-        assertThrows(IllegalStateException.class, () -> buf.getLong(0));
-        assertThrows(IllegalStateException.class, () -> buf.getDouble(0));
+        assertThrows(BufferClosedException.class, () -> buf.getByte(0));
+        assertThrows(BufferClosedException.class, () -> buf.getUnsignedByte(0));
+        assertThrows(BufferClosedException.class, () -> buf.getChar(0));
+        assertThrows(BufferClosedException.class, () -> buf.getShort(0));
+        assertThrows(BufferClosedException.class, () -> buf.getUnsignedShort(0));
+        assertThrows(BufferClosedException.class, () -> buf.getMedium(0));
+        assertThrows(BufferClosedException.class, () -> buf.getUnsignedMedium(0));
+        assertThrows(BufferClosedException.class, () -> buf.getInt(0));
+        assertThrows(BufferClosedException.class, () -> buf.getUnsignedInt(0));
+        assertThrows(BufferClosedException.class, () -> buf.getFloat(0));
+        assertThrows(BufferClosedException.class, () -> buf.getLong(0));
+        assertThrows(BufferClosedException.class, () -> buf.getDouble(0));
     }
 
-    public static void verifyWriteInaccessible(Buffer buf) {
-        assertThrows(IllegalStateException.class, () -> buf.writeByte((byte) 32));
-        assertThrows(IllegalStateException.class, () -> buf.writeUnsignedByte(32));
-        assertThrows(IllegalStateException.class, () -> buf.writeChar('3'));
-        assertThrows(IllegalStateException.class, () -> buf.writeShort((short) 32));
-        assertThrows(IllegalStateException.class, () -> buf.writeUnsignedShort(32));
-        assertThrows(IllegalStateException.class, () -> buf.writeMedium(32));
-        assertThrows(IllegalStateException.class, () -> buf.writeUnsignedMedium(32));
-        assertThrows(IllegalStateException.class, () -> buf.writeInt(32));
-        assertThrows(IllegalStateException.class, () -> buf.writeUnsignedInt(32));
-        assertThrows(IllegalStateException.class, () -> buf.writeFloat(3.2f));
-        assertThrows(IllegalStateException.class, () -> buf.writeLong(32));
-        assertThrows(IllegalStateException.class, () -> buf.writeDouble(32));
+    public static void verifyWriteInaccessible(Buffer buf, Class<? extends RuntimeException> expected) {
+        assertThrows(expected, () -> buf.writeByte((byte) 32));
+        assertThrows(expected, () -> buf.writeUnsignedByte(32));
+        assertThrows(expected, () -> buf.writeChar('3'));
+        assertThrows(expected, () -> buf.writeShort((short) 32));
+        assertThrows(expected, () -> buf.writeUnsignedShort(32));
+        assertThrows(expected, () -> buf.writeMedium(32));
+        assertThrows(expected, () -> buf.writeUnsignedMedium(32));
+        assertThrows(expected, () -> buf.writeInt(32));
+        assertThrows(expected, () -> buf.writeUnsignedInt(32));
+        assertThrows(expected, () -> buf.writeFloat(3.2f));
+        assertThrows(expected, () -> buf.writeLong(32));
+        assertThrows(expected, () -> buf.writeDouble(32));
 
-        assertThrows(IllegalStateException.class, () -> buf.setByte(0, (byte) 32));
-        assertThrows(IllegalStateException.class, () -> buf.setUnsignedByte(0, 32));
-        assertThrows(IllegalStateException.class, () -> buf.setChar(0, '3'));
-        assertThrows(IllegalStateException.class, () -> buf.setShort(0, (short) 32));
-        assertThrows(IllegalStateException.class, () -> buf.setUnsignedShort(0, 32));
-        assertThrows(IllegalStateException.class, () -> buf.setMedium(0, 32));
-        assertThrows(IllegalStateException.class, () -> buf.setUnsignedMedium(0, 32));
-        assertThrows(IllegalStateException.class, () -> buf.setInt(0, 32));
-        assertThrows(IllegalStateException.class, () -> buf.setUnsignedInt(0, 32));
-        assertThrows(IllegalStateException.class, () -> buf.setFloat(0, 3.2f));
-        assertThrows(IllegalStateException.class, () -> buf.setLong(0, 32));
-        assertThrows(IllegalStateException.class, () -> buf.setDouble(0, 32));
+        assertThrows(expected, () -> buf.setByte(0, (byte) 32));
+        assertThrows(expected, () -> buf.setUnsignedByte(0, 32));
+        assertThrows(expected, () -> buf.setChar(0, '3'));
+        assertThrows(expected, () -> buf.setShort(0, (short) 32));
+        assertThrows(expected, () -> buf.setUnsignedShort(0, 32));
+        assertThrows(expected, () -> buf.setMedium(0, 32));
+        assertThrows(expected, () -> buf.setUnsignedMedium(0, 32));
+        assertThrows(expected, () -> buf.setInt(0, 32));
+        assertThrows(expected, () -> buf.setUnsignedInt(0, 32));
+        assertThrows(expected, () -> buf.setFloat(0, 3.2f));
+        assertThrows(expected, () -> buf.setLong(0, 32));
+        assertThrows(expected, () -> buf.setDouble(0, 32));
 
-        assertThrows(IllegalStateException.class, () -> buf.ensureWritable(1));
-        assertThrows(IllegalStateException.class, () -> buf.fill((byte) 0));
+        assertThrows(expected, () -> buf.ensureWritable(1));
+        assertThrows(expected, () -> buf.fill((byte) 0));
         try (BufferAllocator allocator = BufferAllocator.heap();
              Buffer source = allocator.allocate(8)) {
-            assertThrows(IllegalStateException.class, () -> source.copyInto(0, buf, 0, 1));
+            assertThrows(expected, () -> source.copyInto(0, buf, 0, 1));
         }
     }
 

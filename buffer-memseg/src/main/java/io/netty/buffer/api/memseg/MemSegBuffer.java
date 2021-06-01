@@ -17,6 +17,7 @@ package io.netty.buffer.api.memseg;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.api.BufferAllocator;
+import io.netty.buffer.api.BufferReadOnlyException;
 import io.netty.buffer.api.adaptor.BufferIntegratable;
 import io.netty.buffer.api.adaptor.ByteBufAdaptor;
 import io.netty.buffer.api.adaptor.ByteBufAllocatorAdaptor;
@@ -39,6 +40,8 @@ import jdk.incubator.foreign.ResourceScope;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
+import static io.netty.buffer.api.internal.Statics.bufferIsClosed;
+import static io.netty.buffer.api.internal.Statics.bufferIsReadOnly;
 import static jdk.incubator.foreign.MemoryAccess.getByteAtOffset;
 import static jdk.incubator.foreign.MemoryAccess.getCharAtOffset;
 import static jdk.incubator.foreign.MemoryAccess.getDoubleAtOffset;
@@ -165,6 +168,11 @@ class MemSegBuffer extends ResourceSupport<Buffer, MemSegBuffer> implements Buff
     }
 
     @Override
+    protected RuntimeException createResourceClosedException() {
+        return bufferIsClosed(this);
+    }
+
+    @Override
     public Buffer order(ByteOrder order) {
         this.order = order;
         return this;
@@ -206,6 +214,9 @@ class MemSegBuffer extends ResourceSupport<Buffer, MemSegBuffer> implements Buff
 
     @Override
     public Buffer fill(byte value) {
+        if (!isAccessible()) {
+            throw bufferIsClosed(this);
+        }
         checkSet(0, capacity());
         seg.fill(value);
         return this;
@@ -280,6 +291,9 @@ class MemSegBuffer extends ResourceSupport<Buffer, MemSegBuffer> implements Buff
 
     @Override
     public long nativeAddress() {
+        if (!isAccessible()) {
+            throw bufferIsClosed(this);
+        }
         if (seg.isNative()) {
             return seg.address().toRawLongValue();
         }
@@ -338,7 +352,7 @@ class MemSegBuffer extends ResourceSupport<Buffer, MemSegBuffer> implements Buff
 
     private void copyInto(int srcPos, MemorySegment dest, int destPos, int length) {
         if (seg == CLOSED_SEGMENT) {
-            throw Statics.bufferIsClosed();
+            throw bufferIsClosed(this);
         }
         if (srcPos < 0) {
             throw new IllegalArgumentException("The srcPos cannot be negative: " + srcPos + '.');
@@ -373,7 +387,7 @@ class MemSegBuffer extends ResourceSupport<Buffer, MemSegBuffer> implements Buff
     @Override
     public ByteCursor openCursor(int fromOffset, int length) {
         if (seg == CLOSED_SEGMENT) {
-            throw Statics.bufferIsClosed();
+            throw bufferIsClosed(this);
         }
         if (fromOffset < 0) {
             throw new IllegalArgumentException("The fromOffset cannot be negative: " + fromOffset + '.');
@@ -443,7 +457,7 @@ class MemSegBuffer extends ResourceSupport<Buffer, MemSegBuffer> implements Buff
     @Override
     public ByteCursor openReverseCursor(int fromOffset, int length) {
         if (seg == CLOSED_SEGMENT) {
-            throw Statics.bufferIsClosed();
+            throw bufferIsClosed(this);
         }
         if (fromOffset < 0) {
             throw new IllegalArgumentException("The fromOffset cannot be negative: " + fromOffset + '.');
@@ -510,6 +524,9 @@ class MemSegBuffer extends ResourceSupport<Buffer, MemSegBuffer> implements Buff
 
     @Override
     public void ensureWritable(int size, int minimumGrowth, boolean allowCompaction) {
+        if (!isAccessible()) {
+            throw bufferIsClosed(this);
+        }
         if (!isOwned()) {
             throw attachTrace(new IllegalStateException(
                     "Buffer is not owned. Only owned buffers can call ensureWritable."));
@@ -521,7 +538,7 @@ class MemSegBuffer extends ResourceSupport<Buffer, MemSegBuffer> implements Buff
             throw new IllegalArgumentException("The minimum growth cannot be negative: " + minimumGrowth + '.');
         }
         if (seg != wseg) {
-            throw Statics.bufferIsReadOnly();
+            throw bufferIsReadOnly(this);
         }
         if (writableBytes() >= size) {
             // We already have enough space.
@@ -577,6 +594,9 @@ class MemSegBuffer extends ResourceSupport<Buffer, MemSegBuffer> implements Buff
             throw new IllegalArgumentException("The split offset cannot be greater than the buffer capacity, " +
                     "but the split offset was " + splitOffset + ", and capacity is " + capacity() + '.');
         }
+        if (!isAccessible()) {
+            throw attachTrace(bufferIsClosed(this));
+        }
         if (!isOwned()) {
             throw attachTrace(new IllegalStateException("Cannot split a buffer that is not owned."));
         }
@@ -608,7 +628,7 @@ class MemSegBuffer extends ResourceSupport<Buffer, MemSegBuffer> implements Buff
             throw attachTrace(new IllegalStateException("Buffer must be owned in order to compact."));
         }
         if (readOnly()) {
-            throw new IllegalStateException("Buffer must be writable in order to compact, but was read-only.");
+            throw new BufferReadOnlyException("Buffer must be writable in order to compact, but was read-only.");
         }
         int distance = roff;
         if (distance == 0) {
@@ -1184,27 +1204,27 @@ class MemSegBuffer extends ResourceSupport<Buffer, MemSegBuffer> implements Buff
 
     private RuntimeException checkWriteState(IndexOutOfBoundsException ioobe) {
         if (seg == CLOSED_SEGMENT) {
-            return Statics.bufferIsClosed();
+            return bufferIsClosed(this);
         }
         if (wseg != seg) {
-            return Statics.bufferIsReadOnly();
+            return bufferIsReadOnly(this);
         }
         return ioobe;
     }
 
     private RuntimeException readAccessCheckException(int index) {
         if (seg == CLOSED_SEGMENT) {
-            throw Statics.bufferIsClosed();
+            throw bufferIsClosed(this);
         }
         return outOfBounds(index);
     }
 
     private RuntimeException writeAccessCheckException(int index) {
         if (seg == CLOSED_SEGMENT) {
-            throw Statics.bufferIsClosed();
+            throw bufferIsClosed(this);
         }
         if (wseg != seg) {
-            return Statics.bufferIsReadOnly();
+            return bufferIsReadOnly(this);
         }
         return outOfBounds(index);
     }

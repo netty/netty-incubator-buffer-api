@@ -19,6 +19,7 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.api.AllocatorControl;
 import io.netty.buffer.api.Buffer;
 import io.netty.buffer.api.BufferAllocator;
+import io.netty.buffer.api.BufferReadOnlyException;
 import io.netty.buffer.api.ByteCursor;
 import io.netty.buffer.api.Drop;
 import io.netty.buffer.api.Owned;
@@ -126,6 +127,11 @@ class NioBuffer extends ResourceSupport<Buffer, NioBuffer> implements Buffer, Re
     }
 
     @Override
+    protected RuntimeException createResourceClosedException() {
+        return bufferIsClosed(this);
+    }
+
+    @Override
     public Buffer order(ByteOrder order) {
         rmem.order(order);
         return this;
@@ -170,7 +176,7 @@ class NioBuffer extends ResourceSupport<Buffer, NioBuffer> implements Buffer, Re
         int capacity = capacity();
         checkSet(0, capacity);
         if (rmem == CLOSED_BUFFER) {
-            throw bufferIsClosed();
+            throw bufferIsClosed(this);
         }
         for (int i = 0; i < capacity; i++) {
             wmem.put(i, value);
@@ -218,7 +224,7 @@ class NioBuffer extends ResourceSupport<Buffer, NioBuffer> implements Buffer, Re
     @Override
     public void copyInto(int srcPos, ByteBuffer dest, int destPos, int length) {
         if (rmem == CLOSED_BUFFER) {
-            throw bufferIsClosed();
+            throw bufferIsClosed(this);
         }
         if (srcPos < 0) {
             throw new IllegalArgumentException("The srcPos cannot be negative: " + srcPos + '.');
@@ -254,7 +260,7 @@ class NioBuffer extends ResourceSupport<Buffer, NioBuffer> implements Buffer, Re
     @Override
     public ByteCursor openCursor(int fromOffset, int length) {
         if (rmem == CLOSED_BUFFER) {
-            throw bufferIsClosed();
+            throw bufferIsClosed(this);
         }
         if (fromOffset < 0) {
             throw new IllegalArgumentException("The fromOffset cannot be negative: " + fromOffset + '.');
@@ -319,7 +325,7 @@ class NioBuffer extends ResourceSupport<Buffer, NioBuffer> implements Buffer, Re
     @Override
     public ByteCursor openReverseCursor(int fromOffset, int length) {
         if (rmem == CLOSED_BUFFER) {
-            throw bufferIsClosed();
+            throw bufferIsClosed(this);
         }
         if (fromOffset < 0) {
             throw new IllegalArgumentException("The fromOffset cannot be negative: " + fromOffset + '.');
@@ -386,6 +392,9 @@ class NioBuffer extends ResourceSupport<Buffer, NioBuffer> implements Buffer, Re
 
     @Override
     public void ensureWritable(int size, int minimumGrowth, boolean allowCompaction) {
+        if (!isAccessible()) {
+            throw bufferIsClosed(this);
+        }
         if (!isOwned()) {
             throw attachTrace(new IllegalStateException(
                     "Buffer is not owned. Only owned buffers can call ensureWritable."));
@@ -397,7 +406,7 @@ class NioBuffer extends ResourceSupport<Buffer, NioBuffer> implements Buffer, Re
             throw new IllegalArgumentException("The minimum growth cannot be negative: " + minimumGrowth + '.');
         }
         if (rmem != wmem) {
-            throw bufferIsReadOnly();
+            throw bufferIsReadOnly(this);
         }
         if (writableBytes() >= size) {
             // We already have enough space.
@@ -453,6 +462,9 @@ class NioBuffer extends ResourceSupport<Buffer, NioBuffer> implements Buffer, Re
             throw new IllegalArgumentException("The split offset cannot be greater than the buffer capacity, " +
                     "but the split offset was " + splitOffset + ", and capacity is " + capacity() + '.');
         }
+        if (!isAccessible()) {
+            throw attachTrace(bufferIsClosed(this));
+        }
         if (!isOwned()) {
             throw attachTrace(new IllegalStateException("Cannot split a buffer that is not owned."));
         }
@@ -487,7 +499,7 @@ class NioBuffer extends ResourceSupport<Buffer, NioBuffer> implements Buffer, Re
             throw attachTrace(new IllegalStateException("Buffer must be owned in order to compact."));
         }
         if (readOnly()) {
-            throw new IllegalStateException("Buffer must be writable in order to compact, but was read-only.");
+            throw new BufferReadOnlyException("Buffer must be writable in order to compact, but was read-only.");
         }
         if (roff == 0) {
             return;
@@ -622,7 +634,7 @@ class NioBuffer extends ResourceSupport<Buffer, NioBuffer> implements Buffer, Re
         } catch (IndexOutOfBoundsException e) {
             throw checkWriteState(e, woff);
         } catch (ReadOnlyBufferException e) {
-            throw bufferIsReadOnly();
+            throw bufferIsReadOnly(this);
         }
     }
 
@@ -634,7 +646,7 @@ class NioBuffer extends ResourceSupport<Buffer, NioBuffer> implements Buffer, Re
         } catch (IndexOutOfBoundsException e) {
             throw checkWriteState(e, woff);
         } catch (ReadOnlyBufferException e) {
-            throw bufferIsReadOnly();
+            throw bufferIsReadOnly(this);
         }
     }
 
@@ -647,7 +659,7 @@ class NioBuffer extends ResourceSupport<Buffer, NioBuffer> implements Buffer, Re
         } catch (IndexOutOfBoundsException e) {
             throw checkWriteState(e, woff);
         } catch (ReadOnlyBufferException e) {
-            throw bufferIsReadOnly();
+            throw bufferIsReadOnly(this);
         }
     }
 
@@ -659,7 +671,7 @@ class NioBuffer extends ResourceSupport<Buffer, NioBuffer> implements Buffer, Re
         } catch (IndexOutOfBoundsException e) {
             throw checkWriteState(e, woff);
         } catch (ReadOnlyBufferException e) {
-            throw bufferIsReadOnly();
+            throw bufferIsReadOnly(this);
         }
     }
 
@@ -686,7 +698,7 @@ class NioBuffer extends ResourceSupport<Buffer, NioBuffer> implements Buffer, Re
         } catch (IndexOutOfBoundsException e) {
             throw checkWriteState(e, woff);
         } catch (ReadOnlyBufferException e) {
-            throw bufferIsReadOnly();
+            throw bufferIsReadOnly(this);
         }
     }
 
@@ -698,7 +710,7 @@ class NioBuffer extends ResourceSupport<Buffer, NioBuffer> implements Buffer, Re
         } catch (IndexOutOfBoundsException e) {
             throw checkWriteState(e, woff);
         } catch (ReadOnlyBufferException e) {
-            throw bufferIsReadOnly();
+            throw bufferIsReadOnly(this);
         }
     }
 
@@ -739,7 +751,7 @@ class NioBuffer extends ResourceSupport<Buffer, NioBuffer> implements Buffer, Re
         } catch (IndexOutOfBoundsException e) {
             throw checkWriteState(e, woff);
         } catch (ReadOnlyBufferException e) {
-            throw bufferIsReadOnly();
+            throw bufferIsReadOnly(this);
         }
     }
 
@@ -751,7 +763,7 @@ class NioBuffer extends ResourceSupport<Buffer, NioBuffer> implements Buffer, Re
         } catch (IndexOutOfBoundsException e) {
             throw checkWriteState(e, woff);
         } catch (ReadOnlyBufferException e) {
-            throw bufferIsReadOnly();
+            throw bufferIsReadOnly(this);
         }
     }
 
@@ -764,7 +776,7 @@ class NioBuffer extends ResourceSupport<Buffer, NioBuffer> implements Buffer, Re
         } catch (IndexOutOfBoundsException e) {
             throw checkWriteState(e, woff);
         } catch (ReadOnlyBufferException e) {
-            throw bufferIsReadOnly();
+            throw bufferIsReadOnly(this);
         }
     }
 
@@ -776,7 +788,7 @@ class NioBuffer extends ResourceSupport<Buffer, NioBuffer> implements Buffer, Re
         } catch (IndexOutOfBoundsException e) {
             throw checkWriteState(e, woff);
         } catch (ReadOnlyBufferException e) {
-            throw bufferIsReadOnly();
+            throw bufferIsReadOnly(this);
         }
     }
 
@@ -931,7 +943,7 @@ class NioBuffer extends ResourceSupport<Buffer, NioBuffer> implements Buffer, Re
         } catch (IndexOutOfBoundsException e) {
             throw checkWriteState(e, woff);
         } catch (ReadOnlyBufferException e) {
-            throw bufferIsReadOnly();
+            throw bufferIsReadOnly(this);
         }
     }
 
@@ -943,7 +955,7 @@ class NioBuffer extends ResourceSupport<Buffer, NioBuffer> implements Buffer, Re
         } catch (IndexOutOfBoundsException e) {
             throw checkWriteState(e, this.woff);
         } catch (ReadOnlyBufferException e) {
-            throw bufferIsReadOnly();
+            throw bufferIsReadOnly(this);
         }
     }
 
@@ -956,7 +968,7 @@ class NioBuffer extends ResourceSupport<Buffer, NioBuffer> implements Buffer, Re
         } catch (IndexOutOfBoundsException e) {
             throw checkWriteState(e, woff);
         } catch (ReadOnlyBufferException e) {
-            throw bufferIsReadOnly();
+            throw bufferIsReadOnly(this);
         }
     }
 
@@ -968,7 +980,7 @@ class NioBuffer extends ResourceSupport<Buffer, NioBuffer> implements Buffer, Re
         } catch (IndexOutOfBoundsException e) {
             throw checkWriteState(e, this.woff);
         } catch (ReadOnlyBufferException e) {
-            throw bufferIsReadOnly();
+            throw bufferIsReadOnly(this);
         }
     }
 
@@ -995,7 +1007,7 @@ class NioBuffer extends ResourceSupport<Buffer, NioBuffer> implements Buffer, Re
         } catch (IndexOutOfBoundsException e) {
             throw checkWriteState(e, woff);
         } catch (ReadOnlyBufferException e) {
-            throw bufferIsReadOnly();
+            throw bufferIsReadOnly(this);
         }
     }
 
@@ -1007,7 +1019,7 @@ class NioBuffer extends ResourceSupport<Buffer, NioBuffer> implements Buffer, Re
         } catch (IndexOutOfBoundsException e) {
             throw checkWriteState(e, woff);
         } catch (ReadOnlyBufferException e) {
-            throw bufferIsReadOnly();
+            throw bufferIsReadOnly(this);
         }
     }
 
@@ -1034,7 +1046,7 @@ class NioBuffer extends ResourceSupport<Buffer, NioBuffer> implements Buffer, Re
         } catch (IndexOutOfBoundsException e) {
             throw checkWriteState(e, woff);
         } catch (ReadOnlyBufferException e) {
-            throw bufferIsReadOnly();
+            throw bufferIsReadOnly(this);
         }
     }
 
@@ -1046,7 +1058,7 @@ class NioBuffer extends ResourceSupport<Buffer, NioBuffer> implements Buffer, Re
         } catch (IndexOutOfBoundsException e) {
             throw checkWriteState(e, woff);
         } catch (ReadOnlyBufferException e) {
-            throw bufferIsReadOnly();
+            throw bufferIsReadOnly(this);
         }
     }
 
@@ -1073,7 +1085,7 @@ class NioBuffer extends ResourceSupport<Buffer, NioBuffer> implements Buffer, Re
         } catch (IndexOutOfBoundsException e) {
             throw checkWriteState(e, woff);
         } catch (ReadOnlyBufferException e) {
-            throw bufferIsReadOnly();
+            throw bufferIsReadOnly(this);
         }
     }
 
@@ -1085,7 +1097,7 @@ class NioBuffer extends ResourceSupport<Buffer, NioBuffer> implements Buffer, Re
         } catch (IndexOutOfBoundsException e) {
             throw checkWriteState(e, woff);
         } catch (ReadOnlyBufferException e) {
-            throw bufferIsReadOnly();
+            throw bufferIsReadOnly(this);
         }
     }
     // </editor-fold>
@@ -1160,10 +1172,10 @@ class NioBuffer extends ResourceSupport<Buffer, NioBuffer> implements Buffer, Re
 
     private RuntimeException checkWriteState(IndexOutOfBoundsException ioobe, int offset) {
         if (rmem == CLOSED_BUFFER) {
-            return bufferIsClosed();
+            return bufferIsClosed(this);
         }
         if (wmem != rmem) {
-            return bufferIsReadOnly();
+            return bufferIsReadOnly(this);
         }
 
         IndexOutOfBoundsException exception = outOfBounds(offset);
@@ -1173,17 +1185,17 @@ class NioBuffer extends ResourceSupport<Buffer, NioBuffer> implements Buffer, Re
 
     private RuntimeException readAccessCheckException(int index) {
         if (rmem == CLOSED_BUFFER) {
-            throw bufferIsClosed();
+            throw bufferIsClosed(this);
         }
         return outOfBounds(index);
     }
 
     private RuntimeException writeAccessCheckException(int index) {
         if (rmem == CLOSED_BUFFER) {
-            throw bufferIsClosed();
+            throw bufferIsClosed(this);
         }
         if (wmem != rmem) {
-            return bufferIsReadOnly();
+            return bufferIsReadOnly(this);
         }
         return outOfBounds(index);
     }
