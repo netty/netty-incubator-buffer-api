@@ -17,6 +17,7 @@ package io.netty.buffer.api.memseg;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.api.BufferAllocator;
+import io.netty.buffer.api.BufferReadOnlyException;
 import io.netty.buffer.api.adaptor.BufferIntegratable;
 import io.netty.buffer.api.adaptor.ByteBufAdaptor;
 import io.netty.buffer.api.adaptor.ByteBufAllocatorAdaptor;
@@ -618,7 +619,7 @@ class MemSegBuffer extends ResourceSupport<Buffer, MemSegBuffer> implements Buff
             throw attachTrace(new IllegalStateException("Buffer must be owned in order to compact."));
         }
         if (readOnly()) {
-            throw new IllegalStateException("Buffer must be writable in order to compact, but was read-only.");
+            throw new BufferReadOnlyException("Buffer must be writable in order to compact, but was read-only.");
         }
         int distance = roff;
         if (distance == 0) {
