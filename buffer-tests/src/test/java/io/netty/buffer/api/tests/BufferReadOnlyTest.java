@@ -44,7 +44,7 @@ public class BufferReadOnlyTest extends BufferTestSupport {
              Buffer buf = allocator.allocate(8)) {
             var b = buf.makeReadOnly();
             assertThat(b).isSameAs(buf);
-            verifyWriteInaccessible(buf, BufferReadOnlyException.class, BufferReadOnlyException.class);
+            verifyWriteInaccessible(buf, BufferReadOnlyException.class);
         }
     }
 
@@ -67,12 +67,12 @@ public class BufferReadOnlyTest extends BufferTestSupport {
             assertFalse(buf.readOnly());
             buf.makeReadOnly();
             assertTrue(buf.readOnly());
-            verifyWriteInaccessible(buf, BufferReadOnlyException.class, BufferReadOnlyException.class);
+            verifyWriteInaccessible(buf, BufferReadOnlyException.class);
 
             buf.makeReadOnly();
             assertTrue(buf.readOnly());
 
-            verifyWriteInaccessible(buf, BufferReadOnlyException.class, BufferReadOnlyException.class);
+            verifyWriteInaccessible(buf, BufferReadOnlyException.class);
         }
     }
 
@@ -85,7 +85,7 @@ public class BufferReadOnlyTest extends BufferTestSupport {
             var send = buf.send();
             try (Buffer receive = send.receive()) {
                 assertTrue(receive.readOnly());
-                verifyWriteInaccessible(receive, BufferReadOnlyException.class, BufferReadOnlyException.class);
+                verifyWriteInaccessible(receive, BufferReadOnlyException.class);
             }
         }
     }

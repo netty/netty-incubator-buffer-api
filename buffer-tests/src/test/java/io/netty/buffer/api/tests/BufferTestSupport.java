@@ -324,7 +324,7 @@ public abstract class BufferTestSupport {
     public static void verifyInaccessible(Buffer buf) {
         verifyReadInaccessible(buf);
 
-        verifyWriteInaccessible(buf, BufferClosedException.class, IllegalStateException.class);
+        verifyWriteInaccessible(buf, BufferClosedException.class);
 
         try (BufferAllocator allocator = BufferAllocator.heap();
              Buffer target = allocator.allocate(24)) {
@@ -375,8 +375,7 @@ public abstract class BufferTestSupport {
         assertThrows(UnsupportedOperationException.class, () -> buf.getDouble(0));
     }
 
-    public static void verifyWriteInaccessible(Buffer buf, Class<? extends RuntimeException> expected,
-                                               Class<? extends RuntimeException> expectedEnsureWritable) {
+    public static void verifyWriteInaccessible(Buffer buf, Class<? extends RuntimeException> expected) {
         assertThrows(expected, () -> buf.writeByte((byte) 32));
         assertThrows(expected, () -> buf.writeUnsignedByte(32));
         assertThrows(expected, () -> buf.writeChar('3'));
@@ -403,7 +402,7 @@ public abstract class BufferTestSupport {
         assertThrows(expected, () -> buf.setLong(0, 32));
         assertThrows(expected, () -> buf.setDouble(0, 32));
 
-        assertThrows(expectedEnsureWritable, () -> buf.ensureWritable(1));
+        assertThrows(expected, () -> buf.ensureWritable(1));
         final RuntimeException f1e = assertThrows(RuntimeException.class, () -> buf.fill((byte) 0));
         assertTrue(f1e instanceof IllegalStateException || f1e instanceof UnsupportedOperationException);
         try (BufferAllocator allocator = BufferAllocator.heap();

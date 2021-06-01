@@ -392,7 +392,7 @@ public class BufferCompositionTest extends BufferTestSupport {
              Buffer b = allocator.allocate(4).makeReadOnly();
              Buffer composite = CompositeBuffer.compose(allocator, a.send(), b.send())) {
             assertTrue(composite.readOnly());
-            verifyWriteInaccessible(composite, BufferReadOnlyException.class, BufferReadOnlyException.class);
+            verifyWriteInaccessible(composite, BufferReadOnlyException.class);
         }
     }
 

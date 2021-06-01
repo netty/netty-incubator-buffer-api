@@ -431,6 +431,9 @@ class UnsafeBuffer extends ResourceSupport<Buffer, UnsafeBuffer> implements Buff
 
     @Override
     public void ensureWritable(int size, int minimumGrowth, boolean allowCompaction) {
+        if (!isAccessible()) {
+            throw bufferIsClosed(this);
+        }
         if (!isOwned()) {
             throw attachTrace(new IllegalStateException(
                     "Buffer is not owned. Only owned buffers can call ensureWritable."));
