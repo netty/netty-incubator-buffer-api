@@ -891,6 +891,9 @@ public final class CompositeBuffer extends ResourceSupport<Buffer, CompositeBuff
             throw new IllegalArgumentException("The split offset cannot be greater than the buffer capacity, " +
                     "but the split offset was " + splitOffset + ", and capacity is " + capacity() + '.');
         }
+        if (!isAccessible()) {
+            throw attachTrace(bufferIsClosed(this));
+        }
         if (!isOwned()) {
             throw new IllegalStateException("Cannot split a buffer that is not owned.");
         }

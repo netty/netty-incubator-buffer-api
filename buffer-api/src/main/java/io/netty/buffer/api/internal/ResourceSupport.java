@@ -108,6 +108,9 @@ public abstract class ResourceSupport<I extends Resource<I>, T extends ResourceS
      */
     @Override
     public final Send<I> send() {
+        if (acquires < 0) {
+            throw attachTrace(createResourceClosedException());
+        }
         if (!isOwned()) {
             throw notSendableException();
         }
