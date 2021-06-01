@@ -214,6 +214,9 @@ class MemSegBuffer extends ResourceSupport<Buffer, MemSegBuffer> implements Buff
 
     @Override
     public Buffer fill(byte value) {
+        if (!isAccessible()) {
+            throw bufferIsClosed(this);
+        }
         checkSet(0, capacity());
         seg.fill(value);
         return this;
@@ -288,6 +291,9 @@ class MemSegBuffer extends ResourceSupport<Buffer, MemSegBuffer> implements Buff
 
     @Override
     public long nativeAddress() {
+        if (!isAccessible()) {
+            throw bufferIsClosed(this);
+        }
         if (seg.isNative()) {
             return seg.address().toRawLongValue();
         }

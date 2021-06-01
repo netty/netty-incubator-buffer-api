@@ -17,6 +17,7 @@ package io.netty.buffer.api.tests;
 
 import io.netty.buffer.api.Buffer;
 import io.netty.buffer.api.BufferAllocator;
+import io.netty.buffer.api.BufferClosedException;
 import io.netty.buffer.api.BufferReadOnlyException;
 import io.netty.buffer.api.CompositeBuffer;
 import io.netty.buffer.api.Send;
@@ -69,7 +70,7 @@ public class BufferCompositionTest extends BufferTestSupport {
             CompositeBuffer bufA = CompositeBuffer.compose(allocator, allocator.allocate(4).send());
             Send<Buffer> sendA = bufA.send();
             try {
-                assertThrows(IllegalStateException.class, () -> bufA.extendWith(sendA));
+                assertThrows(BufferClosedException.class, () -> bufA.extendWith(sendA));
             } finally {
                 sendA.discard();
             }
@@ -151,9 +152,7 @@ public class BufferCompositionTest extends BufferTestSupport {
                 composite = CompositeBuffer.compose(allocator, a.send());
             }
             try (composite) {
-                var exc = assertThrows(IllegalStateException.class,
-                        () -> composite.extendWith(composite.send()));
-                assertThat(exc).hasMessageContaining("cannot be extended");
+                assertThrows(BufferClosedException.class, () -> composite.extendWith(composite.send()));
             }
         }
     }

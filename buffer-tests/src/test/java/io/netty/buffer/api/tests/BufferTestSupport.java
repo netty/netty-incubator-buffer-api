@@ -332,15 +332,14 @@ public abstract class BufferTestSupport {
             assertThrows(BufferClosedException.class, () -> buf.copyInto(0, new byte[1], 0, 1));
             assertThrows(BufferClosedException.class, () -> buf.copyInto(0, ByteBuffer.allocate(1), 0, 1));
             if (CompositeBuffer.isComposite(buf)) {
-                assertThrows(IllegalStateException.class, () -> ((CompositeBuffer) buf).extendWith(target.send()));
+                assertThrows(BufferClosedException.class, () -> ((CompositeBuffer) buf).extendWith(target.send()));
             }
         }
 
         assertThrows(BufferClosedException.class, () -> buf.split());
         assertThrows(BufferClosedException.class, () -> buf.send());
-        assertThrows(UnsupportedOperationException.class, () -> acquire((ResourceSupport<?, ?>) buf));
-        final RuntimeException c1e = assertThrows(RuntimeException.class, () -> buf.copy());
-        assertTrue(c1e instanceof UnsupportedOperationException || c1e instanceof IllegalStateException);
+        assertThrows(BufferClosedException.class, () -> acquire((ResourceSupport<?, ?>) buf));
+        assertThrows(BufferClosedException.class, () -> buf.copy());
         assertThrows(BufferClosedException.class, () -> buf.openCursor());
         assertThrows(BufferClosedException.class, () -> buf.openCursor(0, 0));
         assertThrows(BufferClosedException.class, () -> buf.openReverseCursor());
@@ -348,31 +347,31 @@ public abstract class BufferTestSupport {
     }
 
     public static void verifyReadInaccessible(Buffer buf) {
-        assertThrows(UnsupportedOperationException.class, () -> buf.readByte());
-        assertThrows(UnsupportedOperationException.class, () -> buf.readUnsignedByte());
-        assertThrows(UnsupportedOperationException.class, () -> buf.readChar());
-        assertThrows(UnsupportedOperationException.class, () -> buf.readShort());
-        assertThrows(UnsupportedOperationException.class, () -> buf.readUnsignedShort());
-        assertThrows(UnsupportedOperationException.class, () -> buf.readMedium());
-        assertThrows(UnsupportedOperationException.class, () -> buf.readUnsignedMedium());
-        assertThrows(UnsupportedOperationException.class, () -> buf.readInt());
-        assertThrows(UnsupportedOperationException.class, () -> buf.readUnsignedInt());
-        assertThrows(UnsupportedOperationException.class, () -> buf.readFloat());
-        assertThrows(UnsupportedOperationException.class, () -> buf.readLong());
-        assertThrows(UnsupportedOperationException.class, () -> buf.readDouble());
+        assertThrows(BufferClosedException.class, () -> buf.readByte());
+        assertThrows(BufferClosedException.class, () -> buf.readUnsignedByte());
+        assertThrows(BufferClosedException.class, () -> buf.readChar());
+        assertThrows(BufferClosedException.class, () -> buf.readShort());
+        assertThrows(BufferClosedException.class, () -> buf.readUnsignedShort());
+        assertThrows(BufferClosedException.class, () -> buf.readMedium());
+        assertThrows(BufferClosedException.class, () -> buf.readUnsignedMedium());
+        assertThrows(BufferClosedException.class, () -> buf.readInt());
+        assertThrows(BufferClosedException.class, () -> buf.readUnsignedInt());
+        assertThrows(BufferClosedException.class, () -> buf.readFloat());
+        assertThrows(BufferClosedException.class, () -> buf.readLong());
+        assertThrows(BufferClosedException.class, () -> buf.readDouble());
 
-        assertThrows(UnsupportedOperationException.class, () -> buf.getByte(0));
-        assertThrows(UnsupportedOperationException.class, () -> buf.getUnsignedByte(0));
-        assertThrows(UnsupportedOperationException.class, () -> buf.getChar(0));
-        assertThrows(UnsupportedOperationException.class, () -> buf.getShort(0));
-        assertThrows(UnsupportedOperationException.class, () -> buf.getUnsignedShort(0));
-        assertThrows(UnsupportedOperationException.class, () -> buf.getMedium(0));
-        assertThrows(UnsupportedOperationException.class, () -> buf.getUnsignedMedium(0));
-        assertThrows(UnsupportedOperationException.class, () -> buf.getInt(0));
-        assertThrows(UnsupportedOperationException.class, () -> buf.getUnsignedInt(0));
-        assertThrows(UnsupportedOperationException.class, () -> buf.getFloat(0));
-        assertThrows(UnsupportedOperationException.class, () -> buf.getLong(0));
-        assertThrows(UnsupportedOperationException.class, () -> buf.getDouble(0));
+        assertThrows(BufferClosedException.class, () -> buf.getByte(0));
+        assertThrows(BufferClosedException.class, () -> buf.getUnsignedByte(0));
+        assertThrows(BufferClosedException.class, () -> buf.getChar(0));
+        assertThrows(BufferClosedException.class, () -> buf.getShort(0));
+        assertThrows(BufferClosedException.class, () -> buf.getUnsignedShort(0));
+        assertThrows(BufferClosedException.class, () -> buf.getMedium(0));
+        assertThrows(BufferClosedException.class, () -> buf.getUnsignedMedium(0));
+        assertThrows(BufferClosedException.class, () -> buf.getInt(0));
+        assertThrows(BufferClosedException.class, () -> buf.getUnsignedInt(0));
+        assertThrows(BufferClosedException.class, () -> buf.getFloat(0));
+        assertThrows(BufferClosedException.class, () -> buf.getLong(0));
+        assertThrows(BufferClosedException.class, () -> buf.getDouble(0));
     }
 
     public static void verifyWriteInaccessible(Buffer buf, Class<? extends RuntimeException> expected) {
@@ -403,8 +402,7 @@ public abstract class BufferTestSupport {
         assertThrows(expected, () -> buf.setDouble(0, 32));
 
         assertThrows(expected, () -> buf.ensureWritable(1));
-        final RuntimeException f1e = assertThrows(RuntimeException.class, () -> buf.fill((byte) 0));
-        assertTrue(f1e instanceof IllegalStateException || f1e instanceof UnsupportedOperationException);
+        assertThrows(expected, () -> buf.fill((byte) 0));
         try (BufferAllocator allocator = BufferAllocator.heap();
              Buffer source = allocator.allocate(8)) {
             assertThrows(expected, () -> source.copyInto(0, buf, 0, 1));

@@ -808,8 +808,11 @@ public final class CompositeBuffer extends ResourceSupport<Buffer, CompositeBuff
     public void extendWith(Send<Buffer> extension) {
         Objects.requireNonNull(extension, "Extension buffer cannot be null.");
         Buffer buffer = extension.receive();
-        if (!isOwned()) {
+        if (!isAccessible() || !isOwned()) {
             buffer.close();
+            if (!isAccessible()) {
+                throw bufferIsClosed(this);
+            }
             throw new IllegalStateException("This buffer cannot be extended because it is not in an owned state.");
         }
         if (bufs.length > 0 && buffer.order() != order()) {
