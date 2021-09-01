@@ -448,18 +448,6 @@ public class ByteToMessageDecoderTest {
     }
 
     @Test
-    public void releaseWhenCompositeCumulateThrows() {
-        Buffer in = onHeapUnpooled().allocate(12).writerOffset(12);
-        try (Buffer cumulation = compose(onHeapUnpooled(), onHeapUnpooled().allocate(1).writeByte((byte) 0).send())) {
-            ByteToMessageDecoder.COMPOSITE_CUMULATOR.cumulate(onHeapUnpooled(), cumulation, in);
-            fail();
-        } catch (IllegalArgumentException expected) {
-            assertThat(expected).hasMessageContaining("byte order");
-            assertFalse(in.isAccessible());
-        }
-    }
-
-    @Test
     public void testDoesNotOverRead() {
         class ReadInterceptingHandler implements ChannelHandler {
             private int readsTriggered;
