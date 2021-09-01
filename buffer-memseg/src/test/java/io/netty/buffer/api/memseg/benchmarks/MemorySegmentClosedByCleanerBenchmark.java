@@ -16,9 +16,9 @@
 package io.netty.buffer.api.memseg.benchmarks;
 
 import io.netty.buffer.api.BufferAllocator;
+import io.netty.buffer.api.MemoryManager;
 import io.netty.buffer.api.memseg.SegmentMemoryManagers;
 import io.netty.buffer.api.Buffer;
-import io.netty.buffer.api.MemoryManagers;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
@@ -64,9 +64,9 @@ public class MemorySegmentClosedByCleanerBenchmark {
             }
         }
 
-        var allocs = MemoryManagers.using(new SegmentMemoryManagers(), () -> {
-            return new Allocators(BufferAllocator.heap(), BufferAllocator.pooledHeap(),
-                    BufferAllocator.direct(), BufferAllocator.pooledDirect());
+        var allocs = MemoryManager.using(new SegmentMemoryManagers(), () -> {
+            return new Allocators(BufferAllocator.onHeapUnpooled(), BufferAllocator.onHeapPooled(),
+                    BufferAllocator.offHeapUnpooled(), BufferAllocator.offHeapPooled());
         });
 
         heap = allocs.heap;

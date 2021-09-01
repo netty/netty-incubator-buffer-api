@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 The Netty Project
+ * Copyright 2021 The Netty Project
  *
  * The Netty Project licenses this file to you under the Apache License,
  * version 2.0 (the "License"); you may not use this file except in compliance
@@ -66,20 +66,10 @@ public final class Fixture implements Supplier<BufferAllocator> {
         return properties.contains(Properties.POOLED);
     }
 
-    public boolean isCleaner() {
-        return properties.contains(Properties.CLEANER);
-    }
-
-    public boolean isConst() {
-        return properties.contains(Properties.CONST);
-    }
-
     public enum Properties {
         HEAP,
         DIRECT,
-        CONST,
         COMPOSITE,
-        CLEANER,
         POOLED
     }
 }

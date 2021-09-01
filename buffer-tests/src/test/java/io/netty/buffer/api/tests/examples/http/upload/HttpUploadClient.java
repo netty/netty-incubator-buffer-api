@@ -18,7 +18,6 @@ package io.netty.buffer.api.tests.examples.http.upload;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.api.adaptor.ByteBufAllocatorAdaptor;
 import io.netty.channel.Channel;
-import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.MultithreadEventLoopGroup;
@@ -156,7 +155,7 @@ public final class HttpUploadClient {
             Bootstrap bootstrap, String host, int port, String get, URI uriSimple) throws Exception {
         // XXX /formget
         // No use of HttpPostRequestEncoder since not a POST
-        Channel channel = bootstrap.connect(host, port).sync().channel();
+        Channel channel = bootstrap.connect(host, port).sync().getNow();
 
         // Prepare the HTTP request.
         QueryStringEncoder encoder = new QueryStringEncoder(get);
@@ -213,9 +212,9 @@ public final class HttpUploadClient {
             List<Entry<String, String>> headers) throws Exception {
         // XXX /formpost
         // Start the connection attempt.
-        ChannelFuture future = bootstrap.connect(SocketUtils.socketAddress(host, port));
+        var future = bootstrap.connect(SocketUtils.socketAddress(host, port));
         // Wait until the connection attempt succeeds or fails.
-        Channel channel = future.sync().channel();
+        Channel channel = future.sync().getNow();
 
         // Prepare the HTTP request.
         HttpRequest request = new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, uriSimple.toASCIIString());
@@ -273,9 +272,9 @@ public final class HttpUploadClient {
             Iterable<Entry<String, String>> headers, List<InterfaceHttpData> bodylist) throws Exception {
         // XXX /formpostmultipart
         // Start the connection attempt.
-        ChannelFuture future = bootstrap.connect(SocketUtils.socketAddress(host, port));
+        var future = bootstrap.connect(SocketUtils.socketAddress(host, port));
         // Wait until the connection attempt succeeds or fails.
-        Channel channel = future.sync().channel();
+        Channel channel = future.sync().getNow();
 
         // Prepare the HTTP request.
         HttpRequest request = new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, uriFile.toASCIIString());

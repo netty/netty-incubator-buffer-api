@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 The Netty Project
+ * Copyright 2021 The Netty Project
  *
  * The Netty Project licenses this file to you under the Apache License,
  * version 2.0 (the "License"); you may not use this file except in compliance
@@ -2746,12 +2746,14 @@ public abstract class AbstractByteBufTest {
 
     @Test
     public void testGetBytesAfterRelease7() throws IOException {
-        assertThrows(IllegalReferenceCountException.class, () -> releasedBuffer().getBytes(0, new ByteArrayOutputStream(), 1));
+        assertThrows(IllegalReferenceCountException.class,
+                     () -> releasedBuffer().getBytes(0, new ByteArrayOutputStream(), 1));
     }
 
     @Test
     public void testGetBytesAfterRelease8() throws IOException {
-        assertThrows(IllegalReferenceCountException.class, () -> releasedBuffer().getBytes(0, new DevNullGatheringByteChannel(), 1));
+        assertThrows(IllegalReferenceCountException.class,
+                     () -> releasedBuffer().getBytes(0, new DevNullGatheringByteChannel(), 1));
     }
 
     @Test
@@ -2857,12 +2859,14 @@ public abstract class AbstractByteBufTest {
 
     @Test
     public void testSetUsAsciiCharSequenceAfterRelease() {
-        assertThrows(IllegalReferenceCountException.class, () -> testSetCharSequenceAfterRelease0(CharsetUtil.US_ASCII));
+        assertThrows(IllegalReferenceCountException.class,
+                     () -> testSetCharSequenceAfterRelease0(CharsetUtil.US_ASCII));
     }
 
     @Test
     public void testSetIso88591CharSequenceAfterRelease() {
-        assertThrows(IllegalReferenceCountException.class, () -> testSetCharSequenceAfterRelease0(CharsetUtil.ISO_8859_1));
+        assertThrows(IllegalReferenceCountException.class,
+                     () -> testSetCharSequenceAfterRelease0(CharsetUtil.ISO_8859_1));
     }
 
     @Test
@@ -2896,12 +2900,14 @@ public abstract class AbstractByteBufTest {
 
     @Test
     public void testSetBytesAfterRelease7() throws IOException {
-        assertThrows(IllegalReferenceCountException.class, () -> releasedBuffer().setBytes(0, new ByteArrayInputStream(new byte[8]), 1));
+        assertThrows(IllegalReferenceCountException.class,
+                     () -> releasedBuffer().setBytes(0, new ByteArrayInputStream(new byte[8]), 1));
     }
 
     @Test
     public void testSetBytesAfterRelease8() throws IOException {
-        assertThrows(IllegalReferenceCountException.class, () -> releasedBuffer().setBytes(0, new TestScatteringByteChannel(), 1));
+        assertThrows(IllegalReferenceCountException.class,
+                     () -> releasedBuffer().setBytes(0, new TestScatteringByteChannel(), 1));
     }
 
     @Test
@@ -3077,17 +3083,20 @@ public abstract class AbstractByteBufTest {
 
     @Test
     public void testReadBytesAfterRelease8() throws IOException {
-        assertThrows(IllegalReferenceCountException.class, () -> releasedBuffer().readBytes(new ByteArrayOutputStream(), 1));
+        assertThrows(IllegalReferenceCountException.class,
+                     () -> releasedBuffer().readBytes(new ByteArrayOutputStream(), 1));
     }
 
     @Test
     public void testReadBytesAfterRelease9() throws IOException {
-        assertThrows(IllegalReferenceCountException.class, () -> releasedBuffer().readBytes(new ByteArrayOutputStream(), 1));
+        assertThrows(IllegalReferenceCountException.class,
+                     () -> releasedBuffer().readBytes(new ByteArrayOutputStream(), 1));
     }
 
     @Test
     public void testReadBytesAfterRelease10() throws IOException {
-        assertThrows(IllegalReferenceCountException.class, () -> releasedBuffer().readBytes(new DevNullGatheringByteChannel(), 1));
+        assertThrows(IllegalReferenceCountException.class,
+                     () -> releasedBuffer().readBytes(new DevNullGatheringByteChannel(), 1));
     }
 
     @Test
@@ -3218,12 +3227,14 @@ public abstract class AbstractByteBufTest {
 
     @Test
     public void testWriteBytesAfterRelease7() throws IOException {
-        assertThrows(IllegalReferenceCountException.class, () -> releasedBuffer().writeBytes(new ByteArrayInputStream(new byte[8]), 1));
+        assertThrows(IllegalReferenceCountException.class,
+                     () -> releasedBuffer().writeBytes(new ByteArrayInputStream(new byte[8]), 1));
     }
 
     @Test
     public void testWriteBytesAfterRelease8() throws IOException {
-        assertThrows(IllegalReferenceCountException.class, () -> releasedBuffer().writeBytes(new TestScatteringByteChannel(), 1));
+        assertThrows(IllegalReferenceCountException.class,
+                     () -> releasedBuffer().writeBytes(new TestScatteringByteChannel(), 1));
     }
 
     @Test
@@ -3233,22 +3244,26 @@ public abstract class AbstractByteBufTest {
 
     @Test
     public void testWriteUsAsciiCharSequenceAfterRelease() {
-        assertThrows(IllegalReferenceCountException.class, () -> testWriteCharSequenceAfterRelease0(CharsetUtil.US_ASCII));
+        assertThrows(IllegalReferenceCountException.class,
+                     () -> testWriteCharSequenceAfterRelease0(CharsetUtil.US_ASCII));
     }
 
     @Test
     public void testWriteIso88591CharSequenceAfterRelease() {
-        assertThrows(IllegalReferenceCountException.class, () -> testWriteCharSequenceAfterRelease0(CharsetUtil.ISO_8859_1));
+        assertThrows(IllegalReferenceCountException.class,
+                     () -> testWriteCharSequenceAfterRelease0(CharsetUtil.ISO_8859_1));
     }
 
     @Test
     public void testWriteUtf8CharSequenceAfterRelease() {
-        assertThrows(IllegalReferenceCountException.class, () -> testWriteCharSequenceAfterRelease0(CharsetUtil.UTF_8));
+        assertThrows(IllegalReferenceCountException.class,
+                     () -> testWriteCharSequenceAfterRelease0(CharsetUtil.UTF_8));
     }
 
     @Test
     public void testWriteUtf16CharSequenceAfterRelease() {
-        assertThrows(IllegalReferenceCountException.class, () -> testWriteCharSequenceAfterRelease0(CharsetUtil.UTF_16));
+        assertThrows(IllegalReferenceCountException.class,
+                     () -> testWriteCharSequenceAfterRelease0(CharsetUtil.UTF_16));
     }
 
     private void testWriteCharSequenceAfterRelease0(Charset charset) {
@@ -3257,22 +3272,26 @@ public abstract class AbstractByteBufTest {
 
     @Test
     public void testForEachByteAfterRelease() {
-        assertThrows(IllegalReferenceCountException.class, () -> releasedBuffer().forEachByte(new TestByteProcessor()));
+        assertThrows(IllegalReferenceCountException.class,
+                     () -> releasedBuffer().forEachByte(new TestByteProcessor()));
     }
 
     @Test
     public void testForEachByteAfterRelease1() {
-        assertThrows(IllegalReferenceCountException.class, () -> releasedBuffer().forEachByte(0, 1, new TestByteProcessor()));
+        assertThrows(IllegalReferenceCountException.class,
+                     () -> releasedBuffer().forEachByte(0, 1, new TestByteProcessor()));
     }
 
     @Test
     public void testForEachByteDescAfterRelease() {
-        assertThrows(IllegalReferenceCountException.class, () -> releasedBuffer().forEachByteDesc(new TestByteProcessor()));
+        assertThrows(IllegalReferenceCountException.class,
+                     () -> releasedBuffer().forEachByteDesc(new TestByteProcessor()));
     }
 
     @Test
     public void testForEachByteDescAfterRelease1() {
-        assertThrows(IllegalReferenceCountException.class, () -> releasedBuffer().forEachByteDesc(0, 1, new TestByteProcessor()));
+        assertThrows(IllegalReferenceCountException.class,
+                     () -> releasedBuffer().forEachByteDesc(0, 1, new TestByteProcessor()));
     }
 
     @Test

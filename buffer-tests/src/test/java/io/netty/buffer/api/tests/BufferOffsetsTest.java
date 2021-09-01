@@ -26,15 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 public class BufferOffsetsTest extends BufferTestSupport {
 
     @ParameterizedTest
-    @MethodSource("initialAllocators")
-    void mustThrowWhenAllocatingZeroSizedBuffer(Fixture fixture) {
-        try (BufferAllocator allocator = fixture.createAllocator()) {
-            assertThrows(IllegalArgumentException.class, () -> allocator.allocate(0));
-        }
-    }
-
-    @ParameterizedTest
-    @MethodSource("allocators")
+    @MethodSource("initialCombinations")
     void mustThrowWhenAllocatingNegativeSizedBuffer(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator()) {
             assertThrows(IllegalArgumentException.class, () -> allocator.allocate(-1));
@@ -169,7 +161,7 @@ public class BufferOffsetsTest extends BufferTestSupport {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
             buf.writeInt(0).readShort();
-            buf.reset();
+            buf.resetOffsets();
             assertEquals(0, buf.readerOffset());
             assertEquals(0, buf.writerOffset());
         }

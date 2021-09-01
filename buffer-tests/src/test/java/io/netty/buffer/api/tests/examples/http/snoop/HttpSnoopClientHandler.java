@@ -28,8 +28,7 @@ public class HttpSnoopClientHandler extends SimpleChannelInboundHandler<HttpObje
 
     @Override
     public void messageReceived(ChannelHandlerContext ctx, HttpObject msg) {
-        if (msg instanceof HttpResponse) {
-            HttpResponse response = (HttpResponse) msg;
+        if (msg instanceof HttpResponse response) {
 
             System.err.println("STATUS: " + response.status());
             System.err.println("VERSION: " + response.protocolVersion());
@@ -50,8 +49,7 @@ public class HttpSnoopClientHandler extends SimpleChannelInboundHandler<HttpObje
                 System.err.println("CONTENT {");
             }
         }
-        if (msg instanceof HttpContent) {
-            HttpContent content = (HttpContent) msg;
+        if (msg instanceof HttpContent content) {
 
             System.err.print(content.content().toString(CharsetUtil.UTF_8));
             System.err.flush();

@@ -15,8 +15,8 @@
  */
 package io.netty.buffer.api.tests.examples.bytetomessagedecoder;
 
-import io.netty.buffer.api.BufferAllocator;
 import io.netty.buffer.api.Buffer;
+import io.netty.buffer.api.BufferAllocator;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.embedded.EmbeddedChannel;
 import org.junit.jupiter.api.Test;
@@ -27,7 +27,6 @@ import java.util.List;
 import java.util.SplittableRandom;
 
 import static io.netty.buffer.api.tests.BufferTestSupport.readByteArray;
-import static io.netty.buffer.api.tests.BufferTestSupport.toByteArray;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -59,7 +58,7 @@ public class AlternativeMessageDecoderTest {
         });
 
         List<byte[]> messages = new ArrayList<>();
-        Buffer messagesBuffer = BufferAllocator.heap().allocate(132 * 1024);
+        Buffer messagesBuffer = BufferAllocator.onHeapUnpooled().allocate(132 * 1024);
         SplittableRandom rng = new SplittableRandom(42);
         for (int i = 0; i < 1000; i++) {
             byte[] message = new byte[rng.nextInt(4, 256)];

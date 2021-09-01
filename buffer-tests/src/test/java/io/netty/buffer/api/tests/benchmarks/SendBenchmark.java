@@ -40,8 +40,8 @@ import static java.util.concurrent.CompletableFuture.completedFuture;
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
 @State(Scope.Benchmark)
 public class SendBenchmark {
-    private static final BufferAllocator NON_POOLED = BufferAllocator.heap();
-    private static final BufferAllocator POOLED = BufferAllocator.pooledHeap();
+    private static final BufferAllocator NON_POOLED = BufferAllocator.onHeapUnpooled();
+    private static final BufferAllocator POOLED = BufferAllocator.onHeapPooled();
     private static final Function<Send<Buffer>, Send<Buffer>> BUFFER_BOUNCE = send -> {
         try (Buffer buf = send.receive()) {
             return buf.send();

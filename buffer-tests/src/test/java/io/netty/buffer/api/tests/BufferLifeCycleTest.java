@@ -20,23 +20,23 @@ import io.netty.buffer.api.BufferAllocator;
 import io.netty.buffer.api.BufferClosedException;
 import io.netty.buffer.api.CompositeBuffer;
 import io.netty.buffer.api.internal.ResourceSupport;
+import io.netty.util.internal.EmptyArrays;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.function.Supplier;
 
 import static io.netty.buffer.api.internal.Statics.acquire;
 import static io.netty.buffer.api.internal.Statics.isOwned;
-import static java.nio.ByteOrder.BIG_ENDIAN;
-import static java.nio.ByteOrder.LITTLE_ENDIAN;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-public class BufferReferenceCountingTest extends BufferTestSupport {
+public class BufferLifeCycleTest extends BufferTestSupport {
     @ParameterizedTest
     @MethodSource("allocators")
     void allocateAndAccessingBuffer(Fixture fixture) {
@@ -69,6 +69,25 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
             var re = assertThrows(RuntimeException.class, buf::readByte);
             assertThat(re).hasMessageContaining("bound");
             assertThat(toByteArray(buf)).containsExactly(1, 2, 3, 4, 5, 6, 7, 8);
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("initialCombinations")
+    public void allocatingZeroSizedBuffer(Fixture fixture) {
+        try (BufferAllocator allocator = fixture.createAllocator()) {
+            Supplier<Buffer> supplier = allocator.constBufferSupplier(EmptyArrays.EMPTY_BYTES);
+
+            try (Buffer empty = supplier.get()) {
+                assertThat(empty.capacity()).isZero();
+                assertTrue(empty.readOnly());
+            }
+
+            try (Buffer empty = allocator.allocate(0)) {
+                assertThat(empty.capacity()).isZero();
+                empty.ensureWritable(8);
+                assertThat(empty.capacity()).isGreaterThanOrEqualTo(8);
+            }
         }
     }
 
@@ -171,10 +190,10 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
             try (Buffer copy = buf.copy()) {
                 assertTrue(isOwned((ResourceSupport<?, ?>) buf));
                 assertTrue(isOwned((ResourceSupport<?, ?>) copy));
-                copy.send().discard();
+                copy.send().close();
             }
             assertTrue(isOwned((ResourceSupport<?, ?>) buf));
-            buf.send().discard();
+            buf.send().close();
         }
     }
 
@@ -186,10 +205,10 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
             try (Buffer copy = buf.copy(0, 8)) {
                 assertTrue(isOwned((ResourceSupport<?, ?>) buf));
                 assertTrue(isOwned((ResourceSupport<?, ?>) copy));
-                copy.send().discard();
+                copy.send().close();
             }
             assertTrue(isOwned((ResourceSupport<?, ?>) buf));
-            buf.send().discard();
+            buf.send().close();
         }
     }
 
@@ -198,14 +217,9 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
     void copyWithoutOffsetAndSizeHasSameEndianAsParent(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            buf.order(BIG_ENDIAN);
             buf.writeLong(0x0102030405060708L);
             try (Buffer copy = buf.copy()) {
                 assertEquals(0x0102030405060708L, copy.readLong());
-            }
-            buf.order(LITTLE_ENDIAN);
-            try (Buffer copy = buf.copy()) {
-                assertEquals(0x0807060504030201L, copy.readLong());
             }
         }
     }
@@ -215,14 +229,9 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
     void copyWithOffsetAndSizeHasSameEndianAsParent(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            buf.order(BIG_ENDIAN);
             buf.writeLong(0x0102030405060708L);
             try (Buffer copy = buf.copy(0, 8)) {
                 assertEquals(0x0102030405060708L, copy.readLong());
-            }
-            buf.order(LITTLE_ENDIAN);
-            try (Buffer copy = buf.copy(0, 8)) {
-                assertEquals(0x0807060504030201L, copy.readLong());
             }
         }
     }
@@ -234,7 +243,7 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
              Buffer buf = allocator.allocate(8)) {
             try (Buffer copy = buf.copy()) {
                 assertTrue(isOwned((ResourceSupport<?, ?>) buf));
-                copy.send().discard();
+                copy.send().close();
             }
             // Verify that the copy is closed properly afterwards.
             assertTrue(isOwned((ResourceSupport<?, ?>) buf));
@@ -249,7 +258,7 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
              Buffer buf = allocator.allocate(8)) {
             try (Buffer copy = buf.copy(0, 8)) {
                 assertTrue(isOwned((ResourceSupport<?, ?>) buf));
-                copy.send().discard();
+                copy.send().close();
             }
             // Verify that the copy is closed properly afterwards.
             assertTrue(isOwned((ResourceSupport<?, ?>) buf));
@@ -305,7 +314,7 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    public void copyMustBeOwned(Fixture fixture) {
+    void copyMustBeOwned(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator()) {
             Buffer buf = allocator.allocate(8);
             buf.writeInt(42);
@@ -325,6 +334,17 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
 
     @ParameterizedTest
     @MethodSource("allocators")
+    public void copyOfLastByte(Fixture fixture) {
+        try (BufferAllocator allocator = fixture.createAllocator();
+             Buffer buf = allocator.allocate(8).writeLong(0x0102030405060708L);
+             Buffer copy = buf.copy(7, 1)) {
+            assertThat(copy.capacity()).isOne();
+            assertEquals((byte) 0x08, copy.readByte());
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
     public void pooledBuffersMustResetStateBeforeReuse(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer expected = allocator.allocate(8)) {
@@ -335,13 +355,11 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
                     assertEquals(expected.readerOffset(), buf.readerOffset());
                     assertEquals(expected.writableBytes(), buf.writableBytes());
                     assertEquals(expected.writerOffset(), buf.writerOffset());
-                    assertThat(buf.order()).isEqualTo(expected.order());
                     byte[] bytes = new byte[8];
                     buf.copyInto(0, bytes, 0, 8);
                     assertThat(bytes).containsExactly(0, 0, 0, 0, 0, 0, 0, 0);
 
                     var tlr = ThreadLocalRandom.current();
-                    buf.order(tlr.nextBoolean()? LITTLE_ENDIAN : BIG_ENDIAN);
                     for (int j = 0; j < tlr.nextInt(0, 8); j++) {
                         buf.writeByte((byte) 1);
                     }
@@ -439,7 +457,7 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
     @MethodSource("allocators")
     public void splitPartMustContainFirstHalfOfBuffer(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
-             Buffer buf = allocator.allocate(16).order(BIG_ENDIAN)) {
+             Buffer buf = allocator.allocate(16)) {
             buf.writeLong(0x0102030405060708L);
             assertThat(buf.readByte()).isEqualTo((byte) 0x01);
             try (Buffer split = buf.split()) {
@@ -475,7 +493,7 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
     @MethodSource("allocators")
     public void splitPartsMustBeIndividuallySendable(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
-             Buffer buf = allocator.allocate(16).order(BIG_ENDIAN)) {
+             Buffer buf = allocator.allocate(16)) {
             buf.writeLong(0x0102030405060708L);
             assertThat(buf.readByte()).isEqualTo((byte) 0x01);
             try (Buffer sentSplit = buf.split().send().receive()) {
@@ -504,7 +522,7 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
     @MethodSource("allocators")
     public void mustBePossibleToSplitMoreThanOnce(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
-             Buffer buf = allocator.allocate(16).order(BIG_ENDIAN)) {
+             Buffer buf = allocator.allocate(16)) {
             buf.writeLong(0x0102030405060708L);
             try (Buffer a = buf.split()) {
                 a.writerOffset(4);
@@ -532,54 +550,19 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
     @MethodSource("allocators")
     public void mustBePossibleToSplitCopies(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator()) {
-            Buffer buf = allocator.allocate(16).order(BIG_ENDIAN);
+            Buffer buf = allocator.allocate(16);
             buf.writeLong(0x0102030405060708L);
             try (Buffer copy = buf.copy()) {
                 buf.close();
                 assertTrue(isOwned((ResourceSupport<?, ?>) copy));
                 try (Buffer split = copy.split(4)) {
-                    split.reset().ensureWritable(Long.BYTES);
-                    copy.reset().ensureWritable(Long.BYTES);
+                    split.resetOffsets().ensureWritable(Long.BYTES);
+                    copy.resetOffsets().ensureWritable(Long.BYTES);
                     assertThat(split.capacity()).isEqualTo(Long.BYTES);
                     assertThat(copy.capacity()).isEqualTo(Long.BYTES);
                     assertThat(split.getLong(0)).isEqualTo(0x01020304_00000000L);
                     assertThat(copy.getLong(0)).isEqualTo(0x05060708_00000000L);
                 }
-            }
-        }
-    }
-
-    @ParameterizedTest
-    @MethodSource("allocators")
-    public void splitBufferMustHaveSameByteOrderAsParent(Fixture fixture) {
-        try (BufferAllocator allocator = fixture.createAllocator();
-             Buffer buf = allocator.allocate(8).order(BIG_ENDIAN)) {
-            buf.writeLong(0x0102030405060708L);
-            try (Buffer a = buf.split()) {
-                assertThat(a.order()).isEqualTo(BIG_ENDIAN);
-                a.order(LITTLE_ENDIAN);
-                a.writerOffset(4);
-                try (Buffer b = a.split()) {
-                    assertThat(b.order()).isEqualTo(LITTLE_ENDIAN);
-                    assertThat(buf.order()).isEqualTo(BIG_ENDIAN);
-                }
-            }
-        }
-    }
-
-    @ParameterizedTest
-    @MethodSource("allocators")
-    public void splitMustPreserveByteOrder(Fixture fixture) {
-        try (BufferAllocator allocator = fixture.createAllocator()) {
-            try (Buffer a = allocator.allocate(8).order(BIG_ENDIAN);
-                 Buffer b = a.split(4)) {
-                assertThat(a.order()).isEqualTo(BIG_ENDIAN);
-                assertThat(b.order()).isEqualTo(BIG_ENDIAN);
-            }
-            try (Buffer a = allocator.allocate(8).order(LITTLE_ENDIAN);
-                 Buffer b = a.split(4)) {
-                assertThat(a.order()).isEqualTo(LITTLE_ENDIAN);
-                assertThat(b.order()).isEqualTo(LITTLE_ENDIAN);
             }
         }
     }
@@ -607,7 +590,7 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
     @MethodSource("allocators")
     public void ensureWritableOnSplitBuffersWithOddOffsets(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
-             Buffer buf = allocator.allocate(10).order(BIG_ENDIAN)) {
+             Buffer buf = allocator.allocate(10)) {
             buf.writeLong(0x0102030405060708L);
             buf.writeByte((byte) 0x09);
             buf.readByte();
@@ -625,17 +608,9 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
     }
 
     @Test
-    public void splitOnEmptyBigEndianCompositeBuffer() {
-        try (BufferAllocator allocator = BufferAllocator.heap();
-             Buffer buf = CompositeBuffer.compose(allocator).order(BIG_ENDIAN)) {
-            verifySplitEmptyCompositeBuffer(buf);
-        }
-    }
-
-    @Test
-    public void splitOnEmptyLittleEndianCompositeBuffer() {
-        try (BufferAllocator allocator = BufferAllocator.heap();
-             Buffer buf = CompositeBuffer.compose(allocator).order(LITTLE_ENDIAN)) {
+    public void splitOnEmptyCompositeBuffer() {
+        try (BufferAllocator allocator = BufferAllocator.onHeapUnpooled();
+             Buffer buf = CompositeBuffer.compose(allocator)) {
             verifySplitEmptyCompositeBuffer(buf);
         }
     }
@@ -674,19 +649,6 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    public void copyOfReadOnlyBufferMustBeReadOnly(Fixture fixture) {
-        try (BufferAllocator allocator = fixture.createAllocator();
-             Buffer buf = allocator.allocate(8)) {
-            buf.writeLong(0x0102030405060708L);
-            buf.makeReadOnly();
-            try (Buffer copy = buf.copy()) {
-                assertTrue(copy.readOnly());
-            }
-        }
-    }
-
-    @ParameterizedTest
-    @MethodSource("allocators")
     public void splitOfReadOnlyBufferMustBeReadOnly(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(16)) {
@@ -697,5 +659,18 @@ public class BufferReferenceCountingTest extends BufferTestSupport {
                 assertTrue(buf.readOnly());
             }
         }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    public void allocatingOnClosedAllocatorMustThrow(Fixture fixture) {
+        BufferAllocator allocator = fixture.createAllocator();
+        Supplier<Buffer> supplier = allocator.constBufferSupplier(new byte[8]);
+        allocator.close();
+        assertThrows(IllegalStateException.class, () -> allocator.allocate(8));
+        assertThrows(IllegalStateException.class, () -> allocator.constBufferSupplier(EmptyArrays.EMPTY_BYTES));
+        assertThrows(IllegalStateException.class, () -> allocator.constBufferSupplier(new byte[8]));
+        // Existing const suppliers continue to work because they hold on to static memory allocation.
+        supplier.get().close();
     }
 }

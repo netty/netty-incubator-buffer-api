@@ -1,3 +1,5 @@
+import io.netty.buffer.api.MemoryManager;
+
 /*
  * Copyright 2021 The Netty Project
  *
@@ -20,8 +22,7 @@ open module netty.incubator.buffer.tests {
     // Optional dependencies, needed for some examples.
     requires static java.logging;
 
-    requires netty.incubator.buffer;
     // We need to require memseg in order for its implementation to be service loaded.
     // Just having it on the module path is not enough.
-    requires netty.incubator.buffer.memseg;
+    requires static netty.incubator.buffer.memseg;
 }

@@ -15,25 +15,21 @@
  */
 package io.netty.buffer.api.memseg;
 
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.api.BufferAllocator;
-import io.netty.buffer.api.BufferReadOnlyException;
-import io.netty.buffer.api.adaptor.BufferIntegratable;
-import io.netty.buffer.api.adaptor.ByteBufAdaptor;
-import io.netty.buffer.api.adaptor.ByteBufAllocatorAdaptor;
-import io.netty.buffer.api.internal.ArcDrop;
-import io.netty.buffer.api.internal.Statics;
 import io.netty.buffer.api.AllocatorControl;
 import io.netty.buffer.api.Buffer;
+import io.netty.buffer.api.BufferAllocator;
+import io.netty.buffer.api.BufferReadOnlyException;
 import io.netty.buffer.api.ByteCursor;
+import io.netty.buffer.api.Drop;
+import io.netty.buffer.api.Owned;
 import io.netty.buffer.api.ReadableComponent;
 import io.netty.buffer.api.ReadableComponentProcessor;
 import io.netty.buffer.api.WritableComponent;
 import io.netty.buffer.api.WritableComponentProcessor;
-import io.netty.buffer.api.Drop;
-import io.netty.buffer.api.Owned;
-import io.netty.buffer.api.internal.ResourceSupport;
-import io.netty.util.IllegalReferenceCountException;
+import io.netty.buffer.api.adaptor.BufferIntegratable;
+import io.netty.buffer.api.internal.AdaptableBuffer;
+import io.netty.buffer.api.internal.ArcDrop;
+import io.netty.buffer.api.internal.Statics;
 import jdk.incubator.foreign.MemorySegment;
 import jdk.incubator.foreign.ResourceScope;
 
@@ -57,7 +53,7 @@ import static jdk.incubator.foreign.MemoryAccess.setIntAtOffset;
 import static jdk.incubator.foreign.MemoryAccess.setLongAtOffset;
 import static jdk.incubator.foreign.MemoryAccess.setShortAtOffset;
 
-class MemSegBuffer extends ResourceSupport<Buffer, MemSegBuffer> implements Buffer, ReadableComponent,
+class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements Buffer, ReadableComponent,
         WritableComponent, BufferIntegratable {
     private static final MemorySegment CLOSED_SEGMENT;
     private static final MemorySegment ZERO_OFFHEAP_SEGMENT;
@@ -105,7 +101,7 @@ class MemSegBuffer extends ResourceSupport<Buffer, MemSegBuffer> implements Buff
         this.base = base;
         seg = view;
         wseg = view;
-        order = ByteOrder.nativeOrder();
+        order = ByteOrder.BIG_ENDIAN;
     }
 
     /**
@@ -120,7 +116,6 @@ class MemSegBuffer extends ResourceSupport<Buffer, MemSegBuffer> implements Buff
         order = parent.order;
         roff = parent.roff;
         woff = parent.woff;
-        adaptor = null;
         constBuffer = true;
     }
 
@@ -170,17 +165,6 @@ class MemSegBuffer extends ResourceSupport<Buffer, MemSegBuffer> implements Buff
     @Override
     protected RuntimeException createResourceClosedException() {
         return bufferIsClosed(this);
-    }
-
-    @Override
-    public Buffer order(ByteOrder order) {
-        this.order = order;
-        return this;
-    }
-
-    @Override
-    public ByteOrder order() {
-        return order;
     }
 
     @Override
@@ -333,7 +317,7 @@ class MemSegBuffer extends ResourceSupport<Buffer, MemSegBuffer> implements Buff
         MemorySegment segment = memory.memory();
         Buffer copy = new MemSegBuffer(segment, segment, memory.drop(), control);
         copyInto(offset, copy, 0, length);
-        copy.writerOffset(length).order(order());
+        copy.writerOffset(length);
         if (readOnly()) {
             copy = copy.makeReadOnly();
         }
@@ -369,14 +353,13 @@ class MemSegBuffer extends ResourceSupport<Buffer, MemSegBuffer> implements Buff
 
     @Override
     public void copyInto(int srcPos, Buffer dest, int destPos, int length) {
-        if (dest instanceof MemSegBuffer) {
-            var memSegBuf = (MemSegBuffer) dest;
+        if (dest instanceof MemSegBuffer memSegBuf) {
             memSegBuf.checkSet(destPos, length);
             copyInto(srcPos, memSegBuf.seg, destPos, length);
             return;
         }
 
-        Statics.copyToViaReverseCursor(this, srcPos, dest, destPos, length);
+        Statics.copyToViaReverseLoop(this, srcPos, dest, destPos, length);
     }
 
     @Override
@@ -406,7 +389,6 @@ class MemSegBuffer extends ResourceSupport<Buffer, MemSegBuffer> implements Buff
             long longValue = -1;
             byte byteValue = -1;
 
-            @Override
             public boolean readLong() {
                 if (index + Long.BYTES <= end) {
                     longValue = getLongAtOffset(segment, index, ByteOrder.BIG_ENDIAN);
@@ -416,7 +398,6 @@ class MemSegBuffer extends ResourceSupport<Buffer, MemSegBuffer> implements Buff
                 return false;
             }
 
-            @Override
             public long getLong() {
                 return longValue;
             }
@@ -479,7 +460,6 @@ class MemSegBuffer extends ResourceSupport<Buffer, MemSegBuffer> implements Buff
             long longValue = -1;
             byte byteValue = -1;
 
-            @Override
             public boolean readLong() {
                 if (index - Long.BYTES >= end) {
                     index -= 7;
@@ -490,7 +470,6 @@ class MemSegBuffer extends ResourceSupport<Buffer, MemSegBuffer> implements Buff
                 return false;
             }
 
-            @Override
             public long getLong() {
                 return longValue;
             }
@@ -523,7 +502,7 @@ class MemSegBuffer extends ResourceSupport<Buffer, MemSegBuffer> implements Buff
     }
 
     @Override
-    public void ensureWritable(int size, int minimumGrowth, boolean allowCompaction) {
+    public Buffer ensureWritable(int size, int minimumGrowth, boolean allowCompaction) {
         if (!isAccessible()) {
             throw bufferIsClosed(this);
         }
@@ -542,18 +521,17 @@ class MemSegBuffer extends ResourceSupport<Buffer, MemSegBuffer> implements Buff
         }
         if (writableBytes() >= size) {
             // We already have enough space.
-            return;
+            return this;
         }
 
         if (allowCompaction && writableBytes() + readerOffset() >= size) {
             // We can solve this with compaction.
-            compact();
-            return;
+            return compact();
         }
 
         // Allocate a bigger buffer.
         long newSize = capacity() + (long) Math.max(size - writableBytes(), minimumGrowth);
-        BufferAllocator.checkSize(newSize);
+        Statics.assertValidBufferSize(newSize);
         var untethered = control.allocateUntethered(this, (int) newSize);
         MemorySegment newSegment = untethered.memory();
 
@@ -564,6 +542,7 @@ class MemSegBuffer extends ResourceSupport<Buffer, MemSegBuffer> implements Buff
         Drop<MemSegBuffer> drop = untethered.drop();
         disconnectDrop(drop);
         attachNewMemorySegment(newSegment, drop);
+        return this;
     }
 
     private void disconnectDrop(Drop<MemSegBuffer> newDrop) {
@@ -606,7 +585,6 @@ class MemSegBuffer extends ResourceSupport<Buffer, MemSegBuffer> implements Buff
         var splitBuffer = new MemSegBuffer(base, splitSegment, new ArcDrop<>(drop.increment()), control);
         splitBuffer.woff = Math.min(woff, splitOffset);
         splitBuffer.roff = Math.min(roff, splitOffset);
-        splitBuffer.order(order);
         boolean readOnly = readOnly();
         if (readOnly) {
             splitBuffer.makeReadOnly();
@@ -623,7 +601,7 @@ class MemSegBuffer extends ResourceSupport<Buffer, MemSegBuffer> implements Buff
     }
 
     @Override
-    public void compact() {
+    public Buffer compact() {
         if (!isOwned()) {
             throw attachTrace(new IllegalStateException("Buffer must be owned in order to compact."));
         }
@@ -632,11 +610,12 @@ class MemSegBuffer extends ResourceSupport<Buffer, MemSegBuffer> implements Buff
         }
         int distance = roff;
         if (distance == 0) {
-            return;
+            return this;
         }
         seg.copyFrom(seg.asSlice(roff, woff - roff));
         roff -= distance;
         woff -= distance;
+        return this;
     }
 
     @Override
@@ -1238,67 +1217,4 @@ class MemSegBuffer extends ResourceSupport<Buffer, MemSegBuffer> implements Buff
     Object recoverableMemory() {
         return base;
     }
-
-    // <editor-fold name="BufferIntegratable methods">
-    private ByteBufAdaptor adaptor;
-    @Override
-    public ByteBuf asByteBuf() {
-        ByteBufAdaptor bba = adaptor;
-        if (bba == null) {
-            ByteBufAllocatorAdaptor alloc = new ByteBufAllocatorAdaptor(
-                    BufferAllocator.heap(), BufferAllocator.direct());
-            return adaptor = new ByteBufAdaptor(alloc, this);
-        }
-        return bba;
-    }
-
-    @Override
-    public MemSegBuffer retain(int increment) {
-        for (int i = 0; i < increment; i++) {
-            acquire();
-        }
-        return this;
-    }
-
-    @Override
-    public int refCnt() {
-        return isAccessible()? 1 + countBorrows() : 0;
-    }
-
-    @Override
-    public MemSegBuffer retain() {
-        return retain(1);
-    }
-
-    @Override
-    public MemSegBuffer touch() {
-        return this;
-    }
-
-    @Override
-    public MemSegBuffer touch(Object hint) {
-        return this;
-    }
-
-    @Override
-    public boolean release() {
-        return release(1);
-    }
-
-    @Override
-    public boolean release(int decrement) {
-        int refCount = 1 + countBorrows();
-        if (!isAccessible() || decrement > refCount) {
-            throw new IllegalReferenceCountException(refCount, -decrement);
-        }
-        for (int i = 0; i < decrement; i++) {
-            try {
-                close();
-            } catch (RuntimeException e) {
-                throw new IllegalReferenceCountException(e);
-            }
-        }
-        return !isAccessible();
-    }
-    // </editor-fold>
 }

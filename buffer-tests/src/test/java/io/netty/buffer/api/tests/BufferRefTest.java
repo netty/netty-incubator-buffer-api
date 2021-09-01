@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 The Netty Project
+ * Copyright 2021 The Netty Project
  *
  * The Netty Project licenses this file to you under the Apache License,
  * version 2.0 (the "License"); you may not use this file except in compliance
@@ -30,33 +30,33 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 class BufferRefTest {
     @Test
     public void closingBufRefMustCloseOwnedBuf() {
-        try (BufferAllocator allocator = BufferAllocator.heap()) {
+        try (BufferAllocator allocator = BufferAllocator.onHeapUnpooled()) {
             BufferRef ref;
             try (Buffer b = allocator.allocate(8)) {
                 ref = new BufferRef(b.send());
             }
-            ref.contents().writeInt(42);
-            assertThat(ref.contents().readInt()).isEqualTo(42);
+            ref.content().writeInt(42);
+            assertThat(ref.content().readInt()).isEqualTo(42);
             ref.close();
-            assertThrows(BufferClosedException.class, () -> ref.contents().writeInt(32));
+            assertThrows(BufferClosedException.class, () -> ref.content().writeInt(32));
         }
     }
 
     @Test
     public void closingBufRefMustCloseOwnedBufFromSend() {
-        try (BufferAllocator allocator = BufferAllocator.heap();
+        try (BufferAllocator allocator = BufferAllocator.onHeapUnpooled();
              Buffer buf = allocator.allocate(8)) {
             BufferRef ref = new BufferRef(buf.send());
-            ref.contents().writeInt(42);
-            assertThat(ref.contents().readInt()).isEqualTo(42);
+            ref.content().writeInt(42);
+            assertThat(ref.content().readInt()).isEqualTo(42);
             ref.close();
-            assertThrows(BufferClosedException.class, () -> ref.contents().writeInt(32));
+            assertThrows(BufferClosedException.class, () -> ref.content().writeInt(32));
         }
     }
 
     @Test
     public void mustCloseOwnedBufferWhenReplacedFromSend() {
-        try (BufferAllocator allocator = BufferAllocator.heap()) {
+        try (BufferAllocator allocator = BufferAllocator.onHeapUnpooled()) {
             AtomicReference<Buffer> orig = new AtomicReference<>();
             BufferRef ref;
             Send<Buffer> s = allocator.allocate(8).send();
@@ -67,29 +67,29 @@ class BufferRefTest {
             }));
 
             orig.get().writeInt(42);
-            assertThat(ref.contents().readInt()).isEqualTo(42);
+            assertThat(ref.content().readInt()).isEqualTo(42);
 
             try (Buffer buf = allocator.allocate(8)) {
                 ref.replace(buf.send()); // Pass replacement via send().
             }
 
             assertThrows(BufferClosedException.class, () -> orig.get().writeInt(32));
-            ref.contents().writeInt(42);
-            assertThat(ref.contents().readInt()).isEqualTo(42);
+            ref.content().writeInt(42);
+            assertThat(ref.content().readInt()).isEqualTo(42);
             ref.close();
-            assertThrows(BufferClosedException.class, () -> ref.contents().writeInt(32));
+            assertThrows(BufferClosedException.class, () -> ref.content().writeInt(32));
         }
     }
 
     @Test
     public void sendingRefMustSendBuffer() {
-        try (BufferAllocator allocator = BufferAllocator.heap();
+        try (BufferAllocator allocator = BufferAllocator.onHeapUnpooled();
              BufferRef refA = new BufferRef(allocator.allocate(8).send())) {
-            refA.contents().writeInt(42);
+            refA.content().writeInt(42);
             Send<BufferRef> send = refA.send();
-            assertThrows(BufferClosedException.class, () -> refA.contents().readInt());
+            assertThrows(BufferClosedException.class, () -> refA.content().readInt());
             try (BufferRef refB = send.receive()) {
-                assertThat(refB.contents().readInt()).isEqualTo(42);
+                assertThat(refB.content().readInt()).isEqualTo(42);
             }
         }
     }

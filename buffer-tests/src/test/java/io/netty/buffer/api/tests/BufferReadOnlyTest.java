@@ -25,11 +25,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
-import java.nio.ByteOrder;
 import java.util.function.Supplier;
 
 import static io.netty.buffer.api.internal.Statics.isOwned;
-import static java.nio.ByteOrder.BIG_ENDIAN;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -92,7 +90,7 @@ public class BufferReadOnlyTest extends BufferTestSupport {
 
     @Test
     public void readOnlyBufferMustRemainReadOnlyAfterSendForEmptyCompositeBuffer() {
-        try (BufferAllocator allocator = BufferAllocator.heap();
+        try (BufferAllocator allocator = BufferAllocator.onHeapUnpooled();
              Buffer buf = CompositeBuffer.compose(allocator)) {
             buf.makeReadOnly();
             var send = buf.send();
@@ -144,6 +142,7 @@ public class BufferReadOnlyTest extends BufferTestSupport {
             dest.makeReadOnly();
             try (Buffer src = allocator.allocate(8)) {
                 assertThrows(BufferReadOnlyException.class, () -> src.copyInto(0, dest, 0, 1));
+                assertThrows(BufferReadOnlyException.class, () -> src.copyInto(0, dest, 0, 0));
             }
         }
     }
@@ -158,12 +157,11 @@ public class BufferReadOnlyTest extends BufferTestSupport {
     }
 
     @ParameterizedTest
-    @MethodSource("initialNoConstAllocators")
+    @MethodSource("initialCombinations")
     public void constBufferInitialState(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.constBufferSupplier(new byte[] {1, 2, 3, 4}).get()) {
             assertTrue(buf.readOnly());
-            assertThat(buf.order()).isEqualTo(ByteOrder.nativeOrder());
             assertThat(buf.readerOffset()).isZero();
             assertThat(buf.capacity()).isEqualTo(4);
             assertThat(buf.writerOffset()).isEqualTo(4);
@@ -178,7 +176,7 @@ public class BufferReadOnlyTest extends BufferTestSupport {
     }
 
     @ParameterizedTest
-    @MethodSource("initialNoConstAllocators")
+    @MethodSource("initialCombinations")
     public void constBuffersCanBeSplit(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator()) {
             Supplier<Buffer> supplier = allocator.constBufferSupplier(new byte[16]);
@@ -198,7 +196,7 @@ public class BufferReadOnlyTest extends BufferTestSupport {
             assertThat(a.capacity()).isEqualTo(8);
             assertThat(b.capacity()).isEqualTo(8);
             try (Buffer c = b.copy()) {
-                assertTrue(c.readOnly());
+                assertFalse(c.readOnly()); // Buffer copies are never read-only.
                 assertTrue(isOwned((ResourceSupport<?, ?>) c));
                 assertTrue(isOwned((ResourceSupport<?, ?>) b));
                 assertThat(c.capacity()).isEqualTo(8);
@@ -207,7 +205,7 @@ public class BufferReadOnlyTest extends BufferTestSupport {
     }
 
     @ParameterizedTest
-    @MethodSource("initialNoConstAllocators")
+    @MethodSource("initialCombinations")
     public void compactOnConstBufferMustNotImpactSiblings(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator()) {
             Supplier<Buffer> supplier = allocator.constBufferSupplier(new byte[] {1, 2, 3, 4});
@@ -228,7 +226,7 @@ public class BufferReadOnlyTest extends BufferTestSupport {
 
                 assertEquals(1, c.readByte());
                 assertEquals(2, c.readByte());
-                assertThrows(BufferReadOnlyException.class, () -> c.compact()); // Can't compact read-only buffer.
+                c.compact(); // Copies are not read-only, so we can compact this one.
                 assertEquals(3, c.readByte());
                 assertEquals(4, c.readByte());
             }
@@ -236,7 +234,7 @@ public class BufferReadOnlyTest extends BufferTestSupport {
     }
 
     @ParameterizedTest
-    @MethodSource("initialNoConstAllocators")
+    @MethodSource("initialCombinations")
     public void constBuffersMustBeSendable(Fixture fixture) throws Exception {
         try (BufferAllocator allocator = fixture.createAllocator()) {
             Supplier<Buffer> supplier = allocator.constBufferSupplier(new byte[] {1, 2, 3, 4});
@@ -244,11 +242,25 @@ public class BufferReadOnlyTest extends BufferTestSupport {
                 Send<Buffer> send = buffer.send();
                 var future = executor.submit(() -> {
                     try (Buffer receive = send.receive()) {
-                        return receive.order(BIG_ENDIAN).readInt();
+                        return receive.readInt();
                     }
                 });
                 assertEquals(0x01020304, future.get());
             }
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    public void copyOfReadOnlyBufferIsNotReadOnly(Fixture fixture) {
+        try (BufferAllocator allocator = fixture.createAllocator();
+             Buffer buf = allocator.allocate(8).writeLong(0x0102030405060708L).makeReadOnly();
+             Buffer copy = buf.copy()) {
+            assertFalse(copy.readOnly());
+            assertReadableEquals(buf, copy);
+            assertEquals(8, copy.readerOffset());
+            copy.setLong(0, 0xA1A2A3A4A5A6A7A8L);
+            assertEquals(0xA1A2A3A4A5A6A7A8L, copy.getLong(0));
         }
     }
 }

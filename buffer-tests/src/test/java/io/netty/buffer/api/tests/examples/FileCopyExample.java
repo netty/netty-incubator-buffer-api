@@ -35,7 +35,7 @@ public final class FileCopyExample {
     public static void main(String[] args) throws Exception {
         ExecutorService executor = Executors.newFixedThreadPool(2);
         ArrayBlockingQueue<Send<Buffer>> queue = new ArrayBlockingQueue<>(8);
-        try (BufferAllocator allocator = BufferAllocator.pooledDirect();
+        try (BufferAllocator allocator = BufferAllocator.offHeapPooled();
              var input = FileChannel.open(Path.of("/dev/urandom"), READ);
              var output = FileChannel.open(Path.of("random.bin"), CREATE, TRUNCATE_EXISTING, WRITE)) {
             Send<Buffer> done = CompositeBuffer.compose(allocator).send();

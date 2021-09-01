@@ -15,39 +15,35 @@
  */
 package io.netty.buffer.api.tests;
 
-import io.netty.buffer.api.MemoryManagers;
+import io.netty.buffer.api.MemoryManager;
 import io.netty.buffer.api.internal.Statics;
-import org.junit.jupiter.api.condition.DisabledForJreRange;
-import org.junit.jupiter.api.condition.JRE;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static io.netty.buffer.api.MemoryManagers.using;
+import static io.netty.buffer.api.MemoryManager.using;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 public class BufferCleanerTest extends BufferTestSupport {
-    @SuppressWarnings("OptionalGetWithoutIsPresent")
-    static Fixture[] memorySegmentAllocators() {
-        MemoryManagers managers = MemoryManagers.getAllManagers()
-                .map(p -> p.get())
-                .filter(mm -> "MS".equals(mm.toString()))
-                .findFirst().get();
+    static Fixture[] unsafeAllocators() {
+        Optional<MemoryManager> maybeManager = MemoryManager.lookupImplementation("Unsafe");
+        assumeTrue(maybeManager.isPresent());
+        MemoryManager manager = maybeManager.get();
         List<Fixture> initFixtures = initialAllocators().stream().flatMap(f -> {
             Stream.Builder<Fixture> builder = Stream.builder();
-            builder.add(new Fixture(f + "/" + managers, () -> using(managers, f), f.getProperties()));
+            builder.add(new Fixture(f + "/" + manager, () -> using(manager, f), f.getProperties()));
             return builder.build();
         }).collect(Collectors.toList());
         return fixtureCombinations(initFixtures).filter(f -> f.isDirect()).toArray(Fixture[]::new);
     }
 
-    // Only run this one on JDK 17.
-    @DisabledForJreRange(min = JRE.JAVA_11, max = JRE.JAVA_16)
     @ParameterizedTest
-    @MethodSource("memorySegmentAllocators")
+    @MethodSource("unsafeAllocators")
     public void bufferMustBeClosedByCleaner(Fixture fixture) throws InterruptedException {
         var initial = Statics.MEM_USAGE_NATIVE.sum();
         int allocationSize = 1024;

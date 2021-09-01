@@ -31,7 +31,7 @@ public class SendExample {
         public static void main(String[] args) throws Exception {
             ExecutorService executor =
                     newSingleThreadExecutor();
-            BufferAllocator allocator = BufferAllocator.heap();
+            BufferAllocator allocator = BufferAllocator.onHeapUnpooled();
 
             var future = beginTask(executor, allocator);
             future.get();
@@ -68,7 +68,7 @@ public class SendExample {
     static final class Ex2 {
         public static void main(String[] args) throws Exception {
             ExecutorService executor = newSingleThreadExecutor();
-            BufferAllocator allocator = BufferAllocator.heap();
+            BufferAllocator allocator = BufferAllocator.onHeapUnpooled();
 
             var future = beginTask(executor, allocator);
             future.get();
@@ -105,7 +105,7 @@ public class SendExample {
     static final class Ex3 {
         public static void main(String[] args) throws Exception {
             ExecutorService executor = newFixedThreadPool(4);
-            BufferAllocator allocator = BufferAllocator.heap();
+            BufferAllocator allocator = BufferAllocator.onHeapUnpooled();
 
             try (Buffer buf = allocator.allocate(4096)) {
                 var futA = executor.submit(new Task(buf.writerOffset(1024).split().send()));

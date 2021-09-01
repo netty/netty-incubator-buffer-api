@@ -13,14 +13,13 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-import io.netty.buffer.api.MemoryManagers;
+import io.netty.buffer.api.MemoryManager;
 import io.netty.buffer.api.memseg.SegmentMemoryManagers;
 
 module netty.incubator.buffer.memseg {
     requires jdk.incubator.foreign;
     requires io.netty.common;
     requires io.netty.buffer;
-    requires netty.incubator.buffer;
 
     // Optional dependencies, needed for some examples.
     requires static java.logging;
@@ -29,6 +28,6 @@ module netty.incubator.buffer.memseg {
     // Also means we don't have to make all test methods etc. public for JUnit to access them.
     opens io.netty.buffer.api.memseg;
 
-    provides MemoryManagers with
+    provides MemoryManager with
             SegmentMemoryManagers;
 }

@@ -100,7 +100,7 @@ public class BufferSendTest extends BufferTestSupport {
             var send = orig.send();
             verifyInaccessible(orig);
             try (Buffer receive = send.receive()) {
-                assertEquals(42, receive.readInt());
+                assertEquals(42, receive.readLong());
             }
         }
     }
@@ -143,7 +143,7 @@ public class BufferSendTest extends BufferTestSupport {
 
     @Test
     public void isSendOfMustCheckObjectTypes() {
-        try (BufferAllocator allocator = BufferAllocator.heap()) {
+        try (BufferAllocator allocator = BufferAllocator.onHeapUnpooled()) {
             Send<Buffer> bufferSend = allocator.allocate(8).send();
             Send<BufferRef> bufferRefSend = new BufferRef(allocator.allocate(8).send()).send();
             try {
@@ -154,8 +154,8 @@ public class BufferSendTest extends BufferTestSupport {
                 assertFalse(Send.isSendOf(Buffer.class, new Object()));
                 assertFalse(Send.isSendOf(Object.class, new Object()));
             } finally {
-                bufferSend.discard();
-                bufferRefSend.discard();
+                bufferSend.close();
+                bufferRefSend.close();
             }
             // Type checks must still pass after the sends have been received.
             assertTrue(Send.isSendOf(Buffer.class, bufferSend));

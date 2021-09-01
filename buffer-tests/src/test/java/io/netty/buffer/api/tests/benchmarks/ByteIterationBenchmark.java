@@ -52,22 +52,22 @@ public class ByteIterationBenchmark {
     public void setUp() {
         switch (type) {
         case "heap":
-            allocator = BufferAllocator.heap();
+            allocator = BufferAllocator.onHeapUnpooled();
             buf = allocator.allocate(SIZE);
             break;
         case "direct":
-            allocator = BufferAllocator.direct();
+            allocator = BufferAllocator.offHeapUnpooled();
             buf = allocator.allocate(SIZE);
             break;
         case "composite-heap":
-            allocator = BufferAllocator.heap();
+            allocator = BufferAllocator.onHeapUnpooled();
             try (var a = allocator.allocate(SIZE / 2);
                  var b = allocator.allocate(SIZE / 2)) {
                 buf = CompositeBuffer.compose(allocator, a.send(), b.send());
             }
             break;
         case "composite-direct":
-            allocator = BufferAllocator.direct();
+            allocator = BufferAllocator.offHeapUnpooled();
             try (var a = allocator.allocate(SIZE / 2);
                  var b = allocator.allocate(SIZE / 2)) {
                 buf = CompositeBuffer.compose(allocator, a.send(), b.send());
@@ -95,9 +95,6 @@ public class ByteIterationBenchmark {
     public long sum() {
         var itr = buf.openCursor();
         long sum = 0;
-        while (itr.readLong()) {
-            sum += itr.getLong();
-        }
         while (itr.readByte()) {
             sum += itr.getByte();
         }
@@ -108,9 +105,6 @@ public class ByteIterationBenchmark {
     public long sumReverse() {
         var itr = buf.openReverseCursor();
         long sum = 0;
-        while (itr.readLong()) {
-            sum += itr.getLong();
-        }
         while (itr.readByte()) {
             sum += itr.getByte();
         }

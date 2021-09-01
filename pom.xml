@@ -73,40 +73,16 @@
     <!-- Java version for source and bytecode compatibility. -->
     <java.compatibility>11</java.compatibility>
     <!-- Java version actually used to perform the build; compiling and testing. -->
-    <java.version>11</java.version>
+    <java.version>17</java.version>
     <junit.version>5.7.0</junit.version>
     <surefire.version>3.0.0-M5</surefire.version>
+    <argLine.mod>--add-modules jdk.incubator.foreign</argLine.mod>
   </properties>
 
   <modules>
-    <module>buffer-api</module>
+    <module>buffer-memseg</module>
     <module>buffer-tests</module>
   </modules>
-
-  <profiles>
-    <profile>
-      <id>Java 17 support</id>
-      <activation>
-        <jdk>17</jdk>
-      </activation>
-      <properties>
-        <java.version>17</java.version>
-        <argLine.mod>--add-modules jdk.incubator.foreign</argLine.mod>
-      </properties>
-      <modules>
-        <module>buffer-memseg</module>
-      </modules>
-    </profile>
-    <profile>
-      <id>Java 11 support for tests</id>
-      <activation>
-        <jdk>!17</jdk>
-      </activation>
-      <modules>
-        <module>buffer-memseg-dummy</module>
-      </modules>
-    </profile>
-  </profiles>
 
   <build>
     <extensions>

@@ -17,15 +17,12 @@ package io.netty.buffer.api.tests;
 
 import io.netty.buffer.api.Buffer;
 import io.netty.buffer.api.BufferAllocator;
-import io.netty.buffer.api.CompositeBuffer;
-import io.netty.buffer.api.Scope;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import java.nio.ByteBuffer;
 
-import static java.nio.ByteOrder.BIG_ENDIAN;
-import static java.nio.ByteOrder.LITTLE_ENDIAN;
+import static io.netty.buffer.api.CompositeBuffer.compose;
 import static org.assertj.core.api.Assertions.assertThat;
 
 public class BufferBulkAccessTest extends BufferTestSupport {
@@ -46,18 +43,14 @@ public class BufferBulkAccessTest extends BufferTestSupport {
     void copyIntoByteArray(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(8)) {
-            buf.order(BIG_ENDIAN).writeLong(0x0102030405060708L);
+            buf.writeLong(0x0102030405060708L);
             byte[] array = new byte[8];
             buf.copyInto(0, array, 0, array.length);
             assertThat(array).containsExactly(0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08);
 
-            buf.writerOffset(0).order(LITTLE_ENDIAN).writeLong(0x0102030405060708L);
-            buf.copyInto(0, array, 0, array.length);
-            assertThat(array).containsExactly(0x08, 0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01);
-
             array = new byte[6];
             buf.copyInto(1, array, 1, 3);
-            assertThat(array).containsExactly(0x00, 0x07, 0x06, 0x05, 0x00, 0x00);
+            assertThat(array).containsExactly(0x00, 0x02, 0x03, 0x04, 0x00, 0x00);
         }
     }
 
@@ -76,26 +69,26 @@ public class BufferBulkAccessTest extends BufferTestSupport {
     @ParameterizedTest
     @MethodSource("allocators")
     void copyIntoOnHeapBuf(Fixture fixture) {
-        testCopyIntoBuf(fixture, BufferAllocator.heap()::allocate);
+        testCopyIntoBuf(fixture, BufferAllocator.onHeapUnpooled()::allocate);
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
     void copyIntoOffHeapBuf(Fixture fixture) {
-        testCopyIntoBuf(fixture, BufferAllocator.direct()::allocate);
+        testCopyIntoBuf(fixture, BufferAllocator.offHeapUnpooled()::allocate);
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
     void copyIntoCompositeOnHeapOnHeapBuf(Fixture fixture) {
-        try (var a = BufferAllocator.heap();
-             var b = BufferAllocator.heap()) {
+        try (var a = BufferAllocator.onHeapUnpooled();
+             var b = BufferAllocator.onHeapUnpooled()) {
             testCopyIntoBuf(fixture, size -> {
                 int first = size / 2;
                 int second = size - first;
                 try (var bufFirst = a.allocate(first);
                      var bufSecond = b.allocate(second)) {
-                    return CompositeBuffer.compose(a, bufFirst.send(), bufSecond.send());
+                    return compose(a, bufFirst.send(), bufSecond.send());
                 }
             });
         }
@@ -104,14 +97,14 @@ public class BufferBulkAccessTest extends BufferTestSupport {
     @ParameterizedTest
     @MethodSource("allocators")
     void copyIntoCompositeOnHeapOffHeapBuf(Fixture fixture) {
-        try (var a = BufferAllocator.heap();
-             var b = BufferAllocator.direct()) {
+        try (var a = BufferAllocator.onHeapUnpooled();
+             var b = BufferAllocator.offHeapUnpooled()) {
             testCopyIntoBuf(fixture, size -> {
                 int first = size / 2;
                 int second = size - first;
                 try (var bufFirst = a.allocate(first);
                      var bufSecond = b.allocate(second)) {
-                    return CompositeBuffer.compose(a, bufFirst.send(), bufSecond.send());
+                    return compose(a, bufFirst.send(), bufSecond.send());
                 }
             });
         }
@@ -120,14 +113,14 @@ public class BufferBulkAccessTest extends BufferTestSupport {
     @ParameterizedTest
     @MethodSource("allocators")
     void copyIntoCompositeOffHeapOnHeapBuf(Fixture fixture) {
-        try (var a = BufferAllocator.direct();
-             var b = BufferAllocator.heap()) {
+        try (var a = BufferAllocator.offHeapUnpooled();
+             var b = BufferAllocator.onHeapUnpooled()) {
             testCopyIntoBuf(fixture, size -> {
                 int first = size / 2;
                 int second = size - first;
                 try (var bufFirst = a.allocate(first);
                      var bufSecond = b.allocate(second)) {
-                    return CompositeBuffer.compose(a, bufFirst.send(), bufSecond.send());
+                    return compose(a, bufFirst.send(), bufSecond.send());
                 }
             });
         }
@@ -136,14 +129,14 @@ public class BufferBulkAccessTest extends BufferTestSupport {
     @ParameterizedTest
     @MethodSource("allocators")
     void copyIntoCompositeOffHeapOffHeapBuf(Fixture fixture) {
-        try (var a = BufferAllocator.direct();
-             var b = BufferAllocator.direct()) {
+        try (var a = BufferAllocator.offHeapUnpooled();
+             var b = BufferAllocator.offHeapUnpooled()) {
             testCopyIntoBuf(fixture, size -> {
                 int first = size / 2;
                 int second = size - first;
                 try (var bufFirst = a.allocate(first);
                      var bufSecond = b.allocate(second)) {
-                    return CompositeBuffer.compose(a, bufFirst.send(), bufSecond.send());
+                    return compose(a, bufFirst.send(), bufSecond.send());
                 }
             });
         }
@@ -152,15 +145,14 @@ public class BufferBulkAccessTest extends BufferTestSupport {
     @ParameterizedTest
     @MethodSource("allocators")
     void copyIntoCompositeOnHeapOnHeapBufCopy(Fixture fixture) {
-        try (var a = BufferAllocator.heap();
-             var b = BufferAllocator.heap();
-             var scope = new Scope()) {
+        try (var a = BufferAllocator.onHeapUnpooled();
+             var b = BufferAllocator.onHeapUnpooled()) {
             testCopyIntoBuf(fixture, size -> {
                 int first = size / 2;
                 int second = size - first;
                 try (var bufFirst = a.allocate(first);
                      var bufSecond = b.allocate(second)) {
-                    return scope.add(CompositeBuffer.compose(a, bufFirst.send(), bufSecond.send())).writerOffset(size).copy();
+                    return compose(a, bufFirst.send(), bufSecond.send()).writerOffset(size).copy();
                 }
             });
         }
@@ -169,15 +161,14 @@ public class BufferBulkAccessTest extends BufferTestSupport {
     @ParameterizedTest
     @MethodSource("allocators")
     void copyIntoCompositeOnHeapOffHeapBufCopy(Fixture fixture) {
-        try (var a = BufferAllocator.heap();
-             var b = BufferAllocator.direct();
-             var scope = new Scope()) {
+        try (var a = BufferAllocator.onHeapUnpooled();
+             var b = BufferAllocator.offHeapUnpooled()) {
             testCopyIntoBuf(fixture, size -> {
                 int first = size / 2;
                 int second = size - first;
                 try (var bufFirst = a.allocate(first);
                      var bufSecond = b.allocate(second)) {
-                    return scope.add(CompositeBuffer.compose(a, bufFirst.send(), bufSecond.send())).writerOffset(size).copy();
+                    return compose(a, bufFirst.send(), bufSecond.send()).writerOffset(size).copy();
                 }
             });
         }
@@ -186,15 +177,14 @@ public class BufferBulkAccessTest extends BufferTestSupport {
     @ParameterizedTest
     @MethodSource("allocators")
     void copyIntoCompositeOffHeapOnHeapBufCopy(Fixture fixture) {
-        try (var a = BufferAllocator.direct();
-             var b = BufferAllocator.heap();
-             var scope = new Scope()) {
+        try (var a = BufferAllocator.offHeapUnpooled();
+             var b = BufferAllocator.onHeapUnpooled()) {
             testCopyIntoBuf(fixture, size -> {
                 int first = size / 2;
                 int second = size - first;
                 try (var bufFirst = a.allocate(first);
                      var bufSecond = b.allocate(second)) {
-                    return scope.add(CompositeBuffer.compose(a, bufFirst.send(), bufSecond.send())).writerOffset(size).copy();
+                    return compose(a, bufFirst.send(), bufSecond.send()).writerOffset(size).copy();
                 }
             });
         }
@@ -203,15 +193,14 @@ public class BufferBulkAccessTest extends BufferTestSupport {
     @ParameterizedTest
     @MethodSource("allocators")
     void copyIntoCompositeOffHeapOffHeapBufCopy(Fixture fixture) {
-        try (var a = BufferAllocator.direct();
-             var b = BufferAllocator.direct();
-             var scope = new Scope()) {
+        try (var a = BufferAllocator.offHeapUnpooled();
+             var b = BufferAllocator.offHeapUnpooled()) {
             testCopyIntoBuf(fixture, size -> {
                 int first = size / 2;
                 int second = size - first;
                 try (var bufFirst = a.allocate(first);
                      var bufSecond = b.allocate(second)) {
-                    return scope.add(CompositeBuffer.compose(a, bufFirst.send(), bufSecond.send())).writerOffset(size).copy();
+                    return compose(a, bufFirst.send(), bufSecond.send()).writerOffset(size).copy();
                 }
             });
         }
@@ -219,48 +208,22 @@ public class BufferBulkAccessTest extends BufferTestSupport {
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void byteIterationOfBigEndianBuffers(Fixture fixture) {
+    void byteIterationOfBuffers(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
-             Buffer buf = allocator.allocate(0x28)) {
-            buf.order(BIG_ENDIAN); // The byte order should have no impact.
+             Buffer buf = allocator.allocate(8)) {
             checkByteIteration(buf);
-            buf.reset();
+            buf.resetOffsets();
             checkByteIterationOfRegion(buf);
         }
     }
 
     @ParameterizedTest
     @MethodSource("allocators")
-    void byteIterationOfLittleEndianBuffers(Fixture fixture) {
+    void reverseByteIterationOfBuffers(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
              Buffer buf = allocator.allocate(0x28)) {
-            buf.order(LITTLE_ENDIAN); // The byte order should have no impact.
-            checkByteIteration(buf);
-            buf.reset();
-            checkByteIterationOfRegion(buf);
-        }
-    }
-
-    @ParameterizedTest
-    @MethodSource("allocators")
-    void reverseByteIterationOfBigEndianBuffers(Fixture fixture) {
-        try (BufferAllocator allocator = fixture.createAllocator();
-             Buffer buf = allocator.allocate(0x28)) {
-            buf.order(BIG_ENDIAN); // The byte order should have no impact.
             checkReverseByteIteration(buf);
-            buf.reset();
-            checkReverseByteIterationOfRegion(buf);
-        }
-    }
-
-    @ParameterizedTest
-    @MethodSource("allocators")
-    void reverseByteIterationOfLittleEndianBuffers(Fixture fixture) {
-        try (BufferAllocator allocator = fixture.createAllocator();
-             Buffer buf = allocator.allocate(0x28)) {
-            buf.order(LITTLE_ENDIAN); // The byte order should have no impact.
-            checkReverseByteIteration(buf);
-            buf.reset();
+            buf.resetOffsets();
             checkReverseByteIterationOfRegion(buf);
         }
     }
@@ -293,6 +256,19 @@ public class BufferBulkAccessTest extends BufferTestSupport {
             assertThat(buffer.writerOffset()).isEqualTo(7);
             assertThat(buffer.readerOffset()).isZero();
             assertThat(toByteArray(buffer)).containsExactly(1, 2, 3, 4, 5, 6, 7, 0);
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("allocators")
+    public void writeBytesWithOffsetMustWriteAllBytesFromByteArray(Fixture fixture) {
+        try (BufferAllocator allocator = fixture.createAllocator();
+             Buffer buffer = allocator.allocate(3)) {
+            buffer.writeByte((byte) 1);
+            buffer.writeBytes(new byte[] {2, 3, 4, 5, 6, 7}, 1, 2);
+            assertThat(buffer.writerOffset()).isEqualTo(3);
+            assertThat(buffer.readerOffset()).isZero();
+            assertThat(toByteArray(buffer)).containsExactly(1, 3, 4);
         }
     }
 }

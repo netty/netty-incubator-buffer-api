@@ -22,7 +22,7 @@ RUN curl https://downloads.apache.org/maven/maven-3/3.6.3/binaries/apache-maven-
 ENV PATH=/home/build/apache-maven-3.6.3/bin:$PATH
 
 # Prepare a snapshot of Netty 5
-RUN git clone --depth 1 -b master https://github.com/netty/netty.git netty \
+RUN git clone --depth 1 -b main https://github.com/netty/netty.git netty \
     && cd netty \
     && mvn install -DskipTests -T1C -B -am \
     && cd .. \
@@ -31,7 +31,6 @@ RUN git clone --depth 1 -b master https://github.com/netty/netty.git netty \
 # Prepare our own build
 RUN mkdir buffer-api && mkdir buffer-memseg && mkdir buffer-tests
 COPY pom.xml pom.xml
-COPY buffer-api/pom.xml buffer-api/pom.xml
 COPY buffer-memseg/pom.xml buffer-memseg/pom.xml
 COPY buffer-tests/pom.xml buffer-tests/pom.xml
 RUN mvn install dependency:go-offline surefire:test checkstyle:check -ntp

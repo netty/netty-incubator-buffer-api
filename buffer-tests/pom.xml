@@ -128,8 +128,12 @@
 
     <dependencies>
         <dependency>
+            <groupId>io.netty</groupId>
+            <artifactId>netty-buffer</artifactId>
+        </dependency>
+        <dependency>
             <groupId>io.netty.incubator</groupId>
-            <artifactId>netty-incubator-buffer-api</artifactId>
+            <artifactId>netty-incubator-buffer-memseg</artifactId>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
@@ -189,31 +193,4 @@
             <artifactId>jmh-generator-annprocess</artifactId>
         </dependency>
     </dependencies>
-
-    <profiles>
-        <profile>
-            <id>Java 17 support</id>
-            <activation>
-                <jdk>17</jdk>
-            </activation>
-            <dependencies>
-                <dependency>
-                    <groupId>io.netty.incubator</groupId>
-                    <artifactId>netty-incubator-buffer-memseg</artifactId>
-                </dependency>
-            </dependencies>
-        </profile>
-        <profile>
-            <id>Java 11 support for tests</id>
-            <activation>
-                <jdk>!17</jdk>
-            </activation>
-            <dependencies>
-                <dependency>
-                    <groupId>io.netty.incubator</groupId>
-                    <artifactId>netty-incubator-buffer-memseg-dummy</artifactId>
-                </dependency>
-            </dependencies>
-        </profile>
-    </profiles>
 </project>

@@ -17,7 +17,7 @@ package io.netty.buffer.api.tests.examples.http.snoop;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
-import io.netty.channel.ChannelFutureListener;
+import io.netty.channel.ChannelFutureListeners;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.DecoderResult;
@@ -129,7 +129,7 @@ public class HttpSnoopServerHandler extends SimpleChannelInboundHandler<Object> 
 
                 if (!writeResponse(trailer, ctx)) {
                     // If keep-alive is off, close the connection once the content is fully written.
-                    ctx.writeAndFlush(Unpooled.EMPTY_BUFFER).addListener(ChannelFutureListener.CLOSE);
+                    ctx.writeAndFlush(Unpooled.EMPTY_BUFFER).addListener(ctx, ChannelFutureListeners.CLOSE);
                 }
             }
         }

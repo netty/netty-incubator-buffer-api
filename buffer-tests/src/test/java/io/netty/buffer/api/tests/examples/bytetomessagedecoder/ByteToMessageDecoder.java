@@ -16,18 +16,15 @@
 package io.netty.buffer.api.tests.examples.bytetomessagedecoder;
 
 import io.netty.buffer.ByteBufAllocator;
+import io.netty.buffer.api.Buffer;
 import io.netty.buffer.api.BufferAllocator;
 import io.netty.buffer.api.CompositeBuffer;
-import io.netty.buffer.api.Buffer;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelConfig;
-import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerAdapter;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPipeline;
-import io.netty.channel.ChannelProgressivePromise;
-import io.netty.channel.ChannelPromise;
 import io.netty.channel.socket.ChannelInputShutdownEvent;
 import io.netty.handler.codec.DecoderException;
 import io.netty.handler.codec.DelimiterBasedFrameDecoder;
@@ -37,6 +34,8 @@ import io.netty.handler.codec.LineBasedFrameDecoder;
 import io.netty.util.Attribute;
 import io.netty.util.AttributeKey;
 import io.netty.util.concurrent.EventExecutor;
+import io.netty.util.concurrent.Future;
+import io.netty.util.concurrent.Promise;
 import io.netty.util.internal.MathUtil;
 import io.netty.util.internal.StringUtil;
 
@@ -225,7 +224,7 @@ public abstract class ByteToMessageDecoder extends ChannelHandlerAdapter {
     }
 
     private static Buffer newEmptyBuffer() {
-        return CompositeBuffer.compose(BufferAllocator.heap());
+        return CompositeBuffer.compose(BufferAllocator.onHeapUnpooled());
     }
 
     @Override
@@ -271,7 +270,7 @@ public abstract class ByteToMessageDecoder extends ChannelHandlerAdapter {
                     cumulation = data;
                 } else {
 //                    ByteBufAllocator alloc = ctx.alloc(); // TODO this API integration needs more work
-                    BufferAllocator alloc = BufferAllocator.heap();
+                    BufferAllocator alloc = BufferAllocator.onHeapUnpooled();
                     cumulation = cumulator.cumulate(alloc, cumulation, data);
                 }
                 assert context.ctx == ctx || ctx == context;
@@ -470,7 +469,7 @@ public abstract class ByteToMessageDecoder extends ChannelHandlerAdapter {
 
     private static Buffer expandCumulation(BufferAllocator alloc, Buffer oldCumulation, Buffer in) {
         int newSize = MathUtil.safeFindNextPositivePowerOfTwo(oldCumulation.readableBytes() + in.readableBytes());
-        Buffer newCumulation = alloc.allocate(newSize, oldCumulation.order());
+        Buffer newCumulation = alloc.allocate(newSize);
         Buffer toRelease = newCumulation;
         try {
             newCumulation.writeBytes(oldCumulation);
@@ -598,6 +597,11 @@ public abstract class ByteToMessageDecoder extends ChannelHandlerAdapter {
         }
 
         @Override
+        public Future<Void> write(Object msg) {
+            return ctx.write(msg);
+        }
+
+        @Override
         public ChannelHandlerContext flush() {
             ctx.flush();
             return this;
@@ -626,118 +630,58 @@ public abstract class ByteToMessageDecoder extends ChannelHandlerAdapter {
         }
 
         @Override
-        public ChannelFuture bind(SocketAddress localAddress) {
+        public Future<Void> bind(SocketAddress localAddress) {
             return ctx.bind(localAddress);
         }
 
         @Override
-        public ChannelFuture connect(SocketAddress remoteAddress) {
+        public Future<Void> connect(SocketAddress remoteAddress) {
             return ctx.connect(remoteAddress);
         }
 
         @Override
-        public ChannelFuture connect(SocketAddress remoteAddress, SocketAddress localAddress) {
+        public Future<Void> connect(SocketAddress remoteAddress, SocketAddress localAddress) {
             return ctx.connect(remoteAddress, localAddress);
         }
 
         @Override
-        public ChannelFuture disconnect() {
+        public Future<Void> disconnect() {
             return ctx.disconnect();
         }
 
         @Override
-        public ChannelFuture close() {
+        public Future<Void> close() {
             return ctx.close();
         }
 
         @Override
-        public ChannelFuture deregister() {
+        public Future<Void> deregister() {
             return ctx.deregister();
         }
 
         @Override
-        public ChannelFuture bind(SocketAddress localAddress, ChannelPromise promise) {
-            return ctx.bind(localAddress, promise);
-        }
-
-        @Override
-        public ChannelFuture connect(SocketAddress remoteAddress, ChannelPromise promise) {
-            return ctx.connect(remoteAddress, promise);
-        }
-
-        @Override
-        public ChannelFuture connect(SocketAddress remoteAddress, SocketAddress localAddress, ChannelPromise promise) {
-            return ctx.connect(remoteAddress, localAddress, promise);
-        }
-
-        @Override
-        public ChannelFuture disconnect(ChannelPromise promise) {
-            return ctx.disconnect(promise);
-        }
-
-        @Override
-        public ChannelFuture close(ChannelPromise promise) {
-            return ctx.close(promise);
-        }
-
-        @Override
-        public ChannelFuture register() {
+        public Future<Void> register() {
             return ctx.register();
         }
 
         @Override
-        public ChannelFuture register(ChannelPromise promise) {
-            return ctx.register(promise);
-        }
-
-        @Override
-        public ChannelFuture deregister(ChannelPromise promise) {
-            return ctx.deregister(promise);
-        }
-
-        @Override
-        public ChannelFuture write(Object msg) {
-            return ctx.write(msg);
-        }
-
-        @Override
-        public ChannelFuture write(Object msg, ChannelPromise promise) {
-            return ctx.write(msg, promise);
-        }
-
-        @Override
-        public ChannelFuture writeAndFlush(Object msg, ChannelPromise promise) {
-            return ctx.writeAndFlush(msg, promise);
-        }
-
-        @Override
-        public ChannelFuture writeAndFlush(Object msg) {
+        public Future<Void> writeAndFlush(Object msg) {
             return ctx.writeAndFlush(msg);
         }
 
         @Override
-        public ChannelPromise newPromise() {
+        public Promise<Void> newPromise() {
             return ctx.newPromise();
         }
 
         @Override
-        public ChannelProgressivePromise newProgressivePromise() {
-            return ctx.newProgressivePromise();
-        }
-
-        @Override
-        public ChannelFuture newSucceededFuture() {
+        public Future<Void> newSucceededFuture() {
             return ctx.newSucceededFuture();
         }
 
         @Override
-        public ChannelFuture newFailedFuture(Throwable cause) {
+        public Future<Void> newFailedFuture(Throwable cause) {
             return ctx.newFailedFuture(cause);
-        }
-
-        @Override
-        public ChannelPromise voidPromise() {
-            return ctx.voidPromise();
         }
     }
 }

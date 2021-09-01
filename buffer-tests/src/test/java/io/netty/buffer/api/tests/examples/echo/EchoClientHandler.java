@@ -15,8 +15,8 @@
  */
 package io.netty.buffer.api.tests.examples.echo;
 
-import io.netty.buffer.api.BufferAllocator;
 import io.netty.buffer.api.Buffer;
+import io.netty.buffer.api.BufferAllocator;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 
@@ -33,7 +33,7 @@ public class EchoClientHandler implements ChannelHandler {
      * Creates a client-side handler.
      */
     public EchoClientHandler() {
-        firstMessage = BufferAllocator.heap().allocate(EchoClient.SIZE);
+        firstMessage = BufferAllocator.onHeapUnpooled().allocate(EchoClient.SIZE);
         for (int i = 0; i < firstMessage.capacity(); i ++) {
             firstMessage.writeByte((byte) i);
         }

@@ -45,10 +45,6 @@
 
     <dependencies>
         <dependency>
-            <groupId>io.netty.incubator</groupId>
-            <artifactId>netty-incubator-buffer-api</artifactId>
-        </dependency>
-        <dependency>
             <groupId>io.netty</groupId>
             <artifactId>netty-common</artifactId>
         </dependency>

@@ -22,7 +22,6 @@ import io.netty.buffer.api.Buffer;
 import io.netty.buffer.api.BufferAllocator;
 import io.netty.buffer.api.adaptor.ByteBufAllocatorAdaptor;
 import io.netty.buffer.api.tests.examples.echo.EchoServerHandler;
-import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInitializer;
@@ -69,8 +68,8 @@ public class EchoIT {
                   });
 
             // Start the server.
-            ChannelFuture bind = server.bind("localhost", 0).sync();
-            InetSocketAddress serverAddress = (InetSocketAddress) bind.channel().localAddress();
+            var bind = server.bind("localhost", 0).sync().getNow();
+            InetSocketAddress serverAddress = (InetSocketAddress) bind.localAddress();
 
             // Configure the client.
             EventLoopGroup group = new MultithreadEventLoopGroup(NioHandler.newFactory());
@@ -89,17 +88,17 @@ public class EchoIT {
                  });
 
                 // Start the client.
-                ChannelFuture f = b.connect(serverAddress).sync();
+                var channel = b.connect(serverAddress).sync().getNow();
 
                 // Wait until the connection is closed.
-                f.channel().closeFuture().sync();
+                channel.closeFuture().sync();
             } finally {
                 // Shut down the event loop to terminate all threads.
                 group.shutdownGracefully();
             }
 
             // Shut down the server.
-            bind.channel().close().sync();
+            bind.close().sync();
         } finally {
             // Shut down all event loops to terminate all threads.
             bossGroup.shutdownGracefully();
@@ -116,7 +115,7 @@ public class EchoIT {
          * Creates a client-side handler.
          */
         EchoClientHandler() {
-            firstMessage = BufferAllocator.heap().allocate(SIZE);
+            firstMessage = BufferAllocator.onHeapUnpooled().allocate(SIZE);
             for (int i = 0; i < SIZE; i++) {
                 firstMessage.writeByte((byte) i);
             }

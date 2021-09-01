@@ -15,8 +15,8 @@
 */
 package io.netty.buffer.api.memseg.benchmarks;
 
-import io.netty.buffer.api.BufferAllocator;
 import io.netty.buffer.api.Buffer;
+import io.netty.buffer.api.BufferAllocator;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
@@ -43,13 +43,13 @@ public class MemSegBufAccessBenchmark {
         DIRECT {
             @Override
             Buffer newBuffer() {
-                return BufferAllocator.direct().allocate(64);
+                return BufferAllocator.offHeapUnpooled().allocate(64);
             }
         },
         HEAP {
             @Override
             Buffer newBuffer() {
-                return BufferAllocator.heap().allocate(64);
+                return BufferAllocator.onHeapUnpooled().allocate(64);
             }
         },
 //        COMPOSITE {

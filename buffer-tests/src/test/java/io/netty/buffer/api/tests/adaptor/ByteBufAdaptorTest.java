@@ -17,7 +17,7 @@ package io.netty.buffer.api.tests.adaptor;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.api.BufferAllocator;
-import io.netty.buffer.api.MemoryManagers;
+import io.netty.buffer.api.MemoryManager;
 import io.netty.buffer.api.adaptor.ByteBufAllocatorAdaptor;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Disabled;
@@ -30,10 +30,10 @@ public abstract class ByteBufAdaptorTest extends AbstractByteBufTest {
     static ByteBufAllocatorAdaptor alloc;
 
     static void setUpAllocator(String name) {
-        Optional<MemoryManagers> managers = MemoryManagers.lookupImplementation(name);
+        Optional<MemoryManager> managers = MemoryManager.lookupImplementation(name);
         assumeTrue(managers.isPresent(), () -> "Memory implementation '" + name + "' not found.");
-        BufferAllocator onheap = MemoryManagers.using(managers.get(), BufferAllocator::pooledHeap);
-        BufferAllocator offheap = MemoryManagers.using(managers.get(), BufferAllocator::pooledHeap);
+        BufferAllocator onheap = MemoryManager.using(managers.get(), BufferAllocator::onHeapPooled);
+        BufferAllocator offheap = MemoryManager.using(managers.get(), BufferAllocator::onHeapPooled);
         alloc = new ByteBufAllocatorAdaptor(onheap, offheap);
     }
 
@@ -46,7 +46,7 @@ public abstract class ByteBufAdaptorTest extends AbstractByteBufTest {
 
     @Override
     protected ByteBuf newBuffer(int capacity, int maxCapacity) {
-        return alloc.buffer(capacity, capacity);
+        return alloc.buffer(capacity, maxCapacity);
     }
 
     @Disabled("This test codifies that asking to reading 0 bytes from an empty but unclosed stream should return -1, " +

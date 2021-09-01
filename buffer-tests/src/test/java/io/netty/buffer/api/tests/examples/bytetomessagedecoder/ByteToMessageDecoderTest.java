@@ -15,8 +15,8 @@
  */
 package io.netty.buffer.api.tests.examples.bytetomessagedecoder;
 
-import io.netty.buffer.api.BufferAllocator;
 import io.netty.buffer.api.Buffer;
+import io.netty.buffer.api.BufferAllocator;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.embedded.EmbeddedChannel;
@@ -29,12 +29,12 @@ import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Supplier;
 
-import static io.netty.buffer.api.tests.BufferTestSupport.assertEquals;
+import static io.netty.buffer.api.BufferAllocator.onHeapUnpooled;
 import static io.netty.buffer.api.CompositeBuffer.compose;
+import static io.netty.buffer.api.tests.BufferTestSupport.assertEquals;
 import static io.netty.buffer.api.tests.BufferTestSupport.assertReadableEquals;
-import static java.nio.ByteOrder.BIG_ENDIAN;
-import static java.nio.ByteOrder.LITTLE_ENDIAN;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
@@ -61,7 +61,7 @@ public class ByteToMessageDecoderTest {
             }
         });
 
-        channel.writeInbound(BufferAllocator.heap().allocate(4, BIG_ENDIAN).writeInt(0x01020304));
+        channel.writeInbound(onHeapUnpooled().allocate(4).writeInt(0x01020304));
         try (Buffer b = channel.readInbound()) {
             assertEquals(3, b.readableBytes());
             assertEquals(0x02, b.readByte());
@@ -72,7 +72,7 @@ public class ByteToMessageDecoderTest {
 
     @Test
     public void testRemoveItselfWriteBuffer() {
-        try (Buffer buf = BufferAllocator.heap().allocate(5, BIG_ENDIAN).writeInt(0x01020304)) {
+        try (Buffer buf = onHeapUnpooled().allocate(5).writeInt(0x01020304)) {
             EmbeddedChannel channel = new EmbeddedChannel(new ByteToMessageDecoder() {
                 private boolean removed;
 
@@ -89,7 +89,7 @@ public class ByteToMessageDecoderTest {
             });
 
             channel.writeInbound(buf.copy());
-            try (Buffer expected = BufferAllocator.heap().allocate(3, BIG_ENDIAN).writeShort((short) 0x0203).writeByte((byte) 0x04);
+            try (Buffer expected = onHeapUnpooled().allocate(3).writeShort((short) 0x0203).writeByte((byte) 0x04);
                  Buffer actual = channel.readInbound()) {
                 assertReadableEquals(expected, actual);
             }
@@ -98,7 +98,7 @@ public class ByteToMessageDecoderTest {
 
     @Test
     public void testRemoveItselfWriteBuffer2() {
-        Buffer buf = BufferAllocator.heap().allocate(5, BIG_ENDIAN).writeInt(0x01020304);
+        Buffer buf = onHeapUnpooled().allocate(5).writeInt(0x01020304);
         EmbeddedChannel channel = new EmbeddedChannel(new ByteToMessageDecoder() {
             private boolean removed;
 
@@ -115,7 +115,7 @@ public class ByteToMessageDecoderTest {
         });
 
         channel.writeInbound(buf);
-        try (Buffer expected = BufferAllocator.heap().allocate(4, BIG_ENDIAN).writeInt(0x02030405);
+        try (Buffer expected = onHeapUnpooled().allocate(4).writeInt(0x02030405);
              Buffer actual = channel.readInbound()) {
             assertReadableEquals(expected, actual);
         }
@@ -127,7 +127,7 @@ public class ByteToMessageDecoderTest {
      */
     @Test
     public void testInternalBufferClearReadAll() {
-        Buffer buf = BufferAllocator.heap().allocate(1).writeByte((byte) 'a');
+        Buffer buf = onHeapUnpooled().allocate(1).writeByte((byte) 'a');
         EmbeddedChannel channel = newInternalBufferTestChannel();
         assertFalse(channel.writeInbound(buf));
         assertFalse(channel.finish());
@@ -139,11 +139,11 @@ public class ByteToMessageDecoderTest {
      */
     @Test
     public void testInternalBufferClearReadPartly() {
-        final Buffer buf = BufferAllocator.heap().allocate(2, BIG_ENDIAN).writeShort((short) 0x0102);
+        final Buffer buf = onHeapUnpooled().allocate(2).writeShort((short) 0x0102);
         EmbeddedChannel channel = newInternalBufferTestChannel();
         assertTrue(channel.writeInbound(buf));
         assertTrue(channel.finish());
-        try (Buffer expected = BufferAllocator.heap().allocate(1).writeByte((byte) 0x02);
+        try (Buffer expected = onHeapUnpooled().allocate(1).writeByte((byte) 0x02);
              Buffer actual = channel.readInbound()) {
             assertReadableEquals(expected, actual);
             assertNull(channel.readInbound());
@@ -185,7 +185,7 @@ public class ByteToMessageDecoderTest {
         byte[] bytes = new byte[1024];
         ThreadLocalRandom.current().nextBytes(bytes);
 
-        Buffer buffer = BufferAllocator.heap().allocate(bytes.length);
+        Buffer buffer = onHeapUnpooled().allocate(bytes.length);
         for (byte b : bytes) {
             buffer.writeByte(b);
         }
@@ -232,7 +232,7 @@ public class ByteToMessageDecoderTest {
                 }
             }
         });
-        Buffer buf = BufferAllocator.heap().allocate(2, BIG_ENDIAN).writeShort((short) 0x0102);
+        Buffer buf = onHeapUnpooled().allocate(2).writeShort((short) 0x0102);
         assertFalse(channel.writeInbound(buf));
         channel.finish();
         assertEquals(1, queue.take());
@@ -265,7 +265,7 @@ public class ByteToMessageDecoderTest {
             }
         });
 
-        try (Buffer buf = BufferAllocator.heap().allocate(4, BIG_ENDIAN).writeInt(0x01020304)) {
+        try (Buffer buf = onHeapUnpooled().allocate(4).writeInt(0x01020304)) {
             assertTrue(channel.writeInbound(buf.copy()));
             try (Buffer expected = buf.copy(1, 3);
                  Buffer actual = channel.readInbound()) {
@@ -288,7 +288,7 @@ public class ByteToMessageDecoderTest {
         byte[] bytes = new byte[1024];
         ThreadLocalRandom.current().nextBytes(bytes);
 
-        try (Buffer buf = BufferAllocator.heap().allocate(bytes.length)) {
+        try (Buffer buf = onHeapUnpooled().allocate(bytes.length)) {
             for (byte b : bytes) {
                 buf.writeByte(b);
             }
@@ -328,7 +328,7 @@ public class ByteToMessageDecoderTest {
         });
         byte[] bytes = new byte[1024];
         ThreadLocalRandom.current().nextBytes(bytes);
-        Buffer buf = BufferAllocator.heap().allocate(bytes.length, BIG_ENDIAN).writeBytes(bytes);
+        Buffer buf = onHeapUnpooled().allocate(bytes.length).writeBytes(bytes);
         try (Buffer part1 = buf.copy(0, bytes.length - 1);
              Buffer part2 = buf.copy(bytes.length - 1, 1)) {
             assertTrue(channel.writeInbound(buf));
@@ -350,8 +350,8 @@ public class ByteToMessageDecoderTest {
             @Override
             protected void decode(ChannelHandlerContext ctx, Buffer in) { }
         });
-        assertFalse(channel.writeInbound(BufferAllocator.heap().allocate(8).writeByte((byte) 1).makeReadOnly()));
-        assertFalse(channel.writeInbound(BufferAllocator.heap().allocate(1).writeByte((byte) 2)));
+        assertFalse(channel.writeInbound(onHeapUnpooled().allocate(8).writeByte((byte) 1).makeReadOnly()));
+        assertFalse(channel.writeInbound(onHeapUnpooled().allocate(1).writeByte((byte) 2)));
         assertFalse(channel.finish());
     }
 
@@ -359,11 +359,11 @@ public class ByteToMessageDecoderTest {
     public void releaseWhenMergeCumulateThrows() {
         Buffer oldCumulation = writeFailingCumulation(1, 64);
         oldCumulation.writeByte((byte) 0);
-        Buffer in = BufferAllocator.heap().allocate(12, BIG_ENDIAN).writerOffset(12);
+        Buffer in = onHeapUnpooled().allocate(12).writerOffset(12);
 
         Throwable thrown = null;
         try {
-            ByteToMessageDecoder.MERGE_CUMULATOR.cumulate(BufferAllocator.heap(), oldCumulation, in);
+            ByteToMessageDecoder.MERGE_CUMULATOR.cumulate(onHeapUnpooled(), oldCumulation, in);
         } catch (Throwable t) {
             thrown = t;
         }
@@ -375,7 +375,7 @@ public class ByteToMessageDecoderTest {
     }
 
     private static Buffer writeFailingCumulation(int untilFailure, int capacity) {
-        Buffer realBuffer = BufferAllocator.heap().allocate(capacity, BIG_ENDIAN);
+        Buffer realBuffer = onHeapUnpooled().allocate(capacity);
         Answer<Object> callRealBuffer = inv -> {
             Object result = inv.getMethod().invoke(realBuffer, inv.getArguments());
             if (result == realBuffer) {
@@ -403,7 +403,7 @@ public class ByteToMessageDecoderTest {
     }
 
     private static void releaseWhenMergeCumulateThrowsInExpand(int untilFailure, boolean shouldFail) {
-        Buffer oldCumulation = BufferAllocator.heap().allocate(8, BIG_ENDIAN).writeByte((byte) 0);
+        Buffer oldCumulation = onHeapUnpooled().allocate(8).writeByte((byte) 0);
         Buffer newCumulation = writeFailingCumulation(untilFailure, 16);
 
         BufferAllocator allocator = new BufferAllocator() {
@@ -411,9 +411,20 @@ public class ByteToMessageDecoderTest {
             public Buffer allocate(int capacity) {
                 return newCumulation;
             }
+
+            @Override
+            public Supplier<Buffer> constBufferSupplier(byte[] bytes) {
+                fail();
+                return null;
+            }
+
+            @Override
+            public void close() {
+                fail();
+            }
         };
 
-        Buffer in = BufferAllocator.heap().allocate(12, BIG_ENDIAN).writerOffset(12);
+        Buffer in = onHeapUnpooled().allocate(12).writerOffset(12);
         Throwable thrown = null;
         try {
             ByteToMessageDecoder.MERGE_CUMULATOR.cumulate(allocator, oldCumulation, in);
@@ -438,9 +449,9 @@ public class ByteToMessageDecoderTest {
 
     @Test
     public void releaseWhenCompositeCumulateThrows() {
-        Buffer in = BufferAllocator.heap().allocate(12, LITTLE_ENDIAN).writerOffset(12);
-        try (Buffer cumulation = compose(BufferAllocator.heap(), BufferAllocator.heap().allocate(1, BIG_ENDIAN).writeByte((byte) 0).send())) {
-            ByteToMessageDecoder.COMPOSITE_CUMULATOR.cumulate(BufferAllocator.heap(), cumulation, in);
+        Buffer in = onHeapUnpooled().allocate(12).writerOffset(12);
+        try (Buffer cumulation = compose(onHeapUnpooled(), onHeapUnpooled().allocate(1).writeByte((byte) 0).send())) {
+            ByteToMessageDecoder.COMPOSITE_CUMULATOR.cumulate(onHeapUnpooled(), cumulation, in);
             fail();
         } catch (IllegalArgumentException expected) {
             assertThat(expected).hasMessageContaining("byte order");
@@ -467,30 +478,30 @@ public class ByteToMessageDecoderTest {
         assertEquals(0, interceptor.readsTriggered);
 
         // 0 complete frames, 1 partial frame: SHOULD trigger a read
-        channel.writeInbound(BufferAllocator.heap().allocate(2, BIG_ENDIAN).writeShort((short) 0x0001));
+        channel.writeInbound(onHeapUnpooled().allocate(2).writeShort((short) 0x0001));
         assertEquals(1, interceptor.readsTriggered);
 
         // 2 complete frames, 0 partial frames: should NOT trigger a read
-        channel.writeInbound(BufferAllocator.heap().allocate(1).writeByte((byte) 2),
-                BufferAllocator.heap().allocate(3).writeByte((byte) 3).writeByte((byte) 4).writeByte((byte) 5));
+        channel.writeInbound(onHeapUnpooled().allocate(1).writeByte((byte) 2),
+                onHeapUnpooled().allocate(3).writeByte((byte) 3).writeByte((byte) 4).writeByte((byte) 5));
         assertEquals(1, interceptor.readsTriggered);
 
         // 1 complete frame, 1 partial frame: should NOT trigger a read
-        channel.writeInbound(BufferAllocator.heap().allocate(3).writeByte((byte) 6).writeByte((byte) 7).writeByte((byte) 8),
-                BufferAllocator.heap().allocate(1).writeByte((byte) 9));
+        channel.writeInbound(onHeapUnpooled().allocate(3).writeByte((byte) 6).writeByte((byte) 7).writeByte((byte) 8),
+                onHeapUnpooled().allocate(1).writeByte((byte) 9));
         assertEquals(1, interceptor.readsTriggered);
 
         // 1 complete frame, 1 partial frame: should NOT trigger a read
-        channel.writeInbound(BufferAllocator.heap().allocate(2).writeByte((byte) 10).writeByte((byte) 11),
-                BufferAllocator.heap().allocate(1).writeByte((byte) 12));
+        channel.writeInbound(onHeapUnpooled().allocate(2).writeByte((byte) 10).writeByte((byte) 11),
+                onHeapUnpooled().allocate(1).writeByte((byte) 12));
         assertEquals(1, interceptor.readsTriggered);
 
         // 0 complete frames, 1 partial frame: SHOULD trigger a read
-        channel.writeInbound(BufferAllocator.heap().allocate(1).writeByte((byte) 13));
+        channel.writeInbound(onHeapUnpooled().allocate(1).writeByte((byte) 13));
         assertEquals(2, interceptor.readsTriggered);
 
         // 1 complete frame, 0 partial frames: should NOT trigger a read
-        channel.writeInbound(BufferAllocator.heap().allocate(1).writeByte((byte) 14));
+        channel.writeInbound(onHeapUnpooled().allocate(1).writeByte((byte) 14));
         assertEquals(2, interceptor.readsTriggered);
 
         for (int i = 0; i < 5; i++) {
@@ -519,7 +530,7 @@ public class ByteToMessageDecoderTest {
         };
         EmbeddedChannel channel = new EmbeddedChannel(decoder);
         byte[] bytes = {1, 2, 3, 4, 5};
-        Buffer buf = BufferAllocator.heap().allocate(bytes.length);
+        Buffer buf = onHeapUnpooled().allocate(bytes.length);
         for (byte b : bytes) {
             buf.writeByte(b);
         }
@@ -549,7 +560,7 @@ public class ByteToMessageDecoderTest {
         });
         byte[] bytes = new byte[1024];
         ThreadLocalRandom.current().nextBytes(bytes);
-        try (Buffer buf = BufferAllocator.heap().allocate(bytes.length).writeBytes(bytes)) {
+        try (Buffer buf = onHeapUnpooled().allocate(bytes.length).writeBytes(bytes)) {
             assertFalse(channel.writeInbound(buf.copy()));
             assertNull(channel.readInbound());
             removeHandler.set(true);

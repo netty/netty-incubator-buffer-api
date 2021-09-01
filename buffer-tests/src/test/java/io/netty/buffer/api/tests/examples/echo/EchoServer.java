@@ -17,7 +17,7 @@ package io.netty.buffer.api.tests.examples.echo;
 
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.buffer.api.adaptor.ByteBufAllocatorAdaptor;
-import io.netty.channel.ChannelFuture;
+import io.netty.channel.Channel;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.ChannelPipeline;
@@ -75,10 +75,10 @@ public final class EchoServer {
              });
 
             // Start the server.
-            ChannelFuture f = b.bind(PORT).sync();
+            Channel channel = b.bind(PORT).sync().getNow();
 
             // Wait until the server socket is closed.
-            f.channel().closeFuture().sync();
+            channel.closeFuture().sync();
         } finally {
             // Shut down all event loops to terminate all threads.
             bossGroup.shutdownGracefully();

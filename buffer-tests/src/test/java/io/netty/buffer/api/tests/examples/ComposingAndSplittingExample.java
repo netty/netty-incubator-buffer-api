@@ -18,13 +18,12 @@ package io.netty.buffer.api.tests.examples;
 import io.netty.buffer.api.Buffer;
 import io.netty.buffer.api.BufferAllocator;
 import io.netty.buffer.api.CompositeBuffer;
-import io.netty.buffer.api.Scope;
 
 import java.util.concurrent.ThreadLocalRandom;
 
 public final class ComposingAndSplittingExample {
     public static void main(String[] args) {
-        try (BufferAllocator allocator = BufferAllocator.pooledDirect();
+        try (BufferAllocator allocator = BufferAllocator.offHeapPooled();
              Buffer buf = createBigBuffer(allocator)) {
 
             ThreadLocalRandom tlr = ThreadLocalRandom.current();

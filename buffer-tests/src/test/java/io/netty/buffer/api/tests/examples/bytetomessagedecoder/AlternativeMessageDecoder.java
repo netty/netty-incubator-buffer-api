@@ -15,10 +15,10 @@
  */
 package io.netty.buffer.api.tests.examples.bytetomessagedecoder;
 
+import io.netty.buffer.api.Buffer;
 import io.netty.buffer.api.BufferAllocator;
 import io.netty.buffer.api.CompositeBuffer;
 import io.netty.buffer.api.Send;
-import io.netty.buffer.api.Buffer;
 import io.netty.channel.ChannelHandlerAdapter;
 import io.netty.channel.ChannelHandlerContext;
 
@@ -35,7 +35,7 @@ public abstract class AlternativeMessageDecoder extends ChannelHandlerAdapter {
     }
 
     protected BufferAllocator initAllocator() {
-        return BufferAllocator.heap();
+        return BufferAllocator.onHeapUnpooled();
     }
 
     protected Buffer initCollector(BufferAllocator allocator, int defaultChunkSize) {
@@ -85,8 +85,7 @@ public abstract class AlternativeMessageDecoder extends ChannelHandlerAdapter {
     private void processRead(ChannelHandlerContext ctx, Buffer input) {
         if (CompositeBuffer.isComposite(collector)
                 && (collector.writableBytes() == 0 || input.writerOffset() == 0)
-                && (collector.readableBytes() == 0 || input.readerOffset() == 0)
-                && collector.order() == input.order()) {
+                && (collector.readableBytes() == 0 || input.readerOffset() == 0)) {
             ((CompositeBuffer) collector).extendWith(input.send());
             drainCollector(ctx);
             return;
