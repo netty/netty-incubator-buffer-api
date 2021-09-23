@@ -70,8 +70,8 @@
     <javaModuleName>io.netty.incubator.buffer</javaModuleName>
     <netty.version>5.0.0.Final-SNAPSHOT</netty.version>
     <netty.build.version>29</netty.build.version>
-    <!-- Java version for source and bytecode compatibility. -->
-    <java.compatibility>11</java.compatibility>
+    <!-- Java version for bytecode compatibility. -->
+    <java.compatibility>17</java.compatibility>
     <!-- Java version actually used to perform the build; compiling and testing. -->
     <java.version>17</java.version>
     <junit.version>5.7.0</junit.version>

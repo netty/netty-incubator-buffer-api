@@ -26,7 +26,6 @@ import io.netty.buffer.api.ReadableComponent;
 import io.netty.buffer.api.ReadableComponentProcessor;
 import io.netty.buffer.api.WritableComponent;
 import io.netty.buffer.api.WritableComponentProcessor;
-import io.netty.buffer.api.adaptor.BufferIntegratable;
 import io.netty.buffer.api.internal.AdaptableBuffer;
 import io.netty.buffer.api.internal.ArcDrop;
 import io.netty.buffer.api.internal.Statics;
@@ -53,8 +52,7 @@ import static jdk.incubator.foreign.MemoryAccess.setIntAtOffset;
 import static jdk.incubator.foreign.MemoryAccess.setLongAtOffset;
 import static jdk.incubator.foreign.MemoryAccess.setShortAtOffset;
 
-class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements Buffer, ReadableComponent,
-        WritableComponent, BufferIntegratable {
+class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComponent, WritableComponent {
     private static final MemorySegment CLOSED_SEGMENT;
     private static final MemorySegment ZERO_OFFHEAP_SEGMENT;
     private static final MemorySegment ZERO_ONHEAP_SEGMENT;
@@ -96,7 +94,7 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements Buffer, Read
     private boolean constBuffer;
 
     MemSegBuffer(MemorySegment base, MemorySegment view, Drop<MemSegBuffer> drop, AllocatorControl control) {
-        super(new MakeInaccisbleOnDrop(ArcDrop.wrap(drop)));
+        super(ArcDrop.wrap(drop));
         this.control = control;
         this.base = base;
         seg = view;
@@ -108,7 +106,7 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements Buffer, Read
      * Constructor for {@linkplain BufferAllocator#constBufferSupplier(byte[]) const buffers}.
      */
     MemSegBuffer(MemSegBuffer parent) {
-        super(new MakeInaccisbleOnDrop(new ArcDrop<>(ArcDrop.acquire(parent.unsafeGetDrop()))));
+        super(new ArcDrop<>(ArcDrop.acquire(parent.unsafeGetDrop())));
         control = parent.control;
         base = parent.base;
         seg = parent.seg;
@@ -117,44 +115,6 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements Buffer, Read
         roff = parent.roff;
         woff = parent.woff;
         constBuffer = true;
-    }
-
-    private static final class MakeInaccisbleOnDrop implements Drop<MemSegBuffer> {
-        final Drop<MemSegBuffer> delegate;
-
-        private MakeInaccisbleOnDrop(Drop<MemSegBuffer> delegate) {
-            this.delegate = delegate;
-        }
-
-        @Override
-        public void drop(MemSegBuffer buf) {
-            try {
-                delegate.drop(buf);
-            } finally {
-                buf.makeInaccessible();
-            }
-        }
-
-        @Override
-        public void attach(MemSegBuffer buf) {
-            delegate.attach(buf);
-        }
-
-        @Override
-        public String toString() {
-            return "MemSegDrop(" + delegate + ')';
-        }
-    }
-
-    @Override
-    protected Drop<MemSegBuffer> unsafeGetDrop() {
-        MakeInaccisbleOnDrop drop = (MakeInaccisbleOnDrop) super.unsafeGetDrop();
-        return drop.delegate;
-    }
-
-    @Override
-    protected void unsafeSetDrop(Drop<MemSegBuffer> replacement) {
-        super.unsafeSetDrop(new MakeInaccisbleOnDrop(replacement));
     }
 
     @Override
@@ -273,8 +233,7 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements Buffer, Read
     }
     // </editor-fold>
 
-    @Override
-    public long nativeAddress() {
+    private long nativeAddress() {
         if (!isAccessible()) {
             throw bufferIsClosed(this);
         }
@@ -386,21 +345,7 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements Buffer, Read
             final MemorySegment segment = seg;
             int index = fromOffset;
             final int end = index + length;
-            long longValue = -1;
             byte byteValue = -1;
-
-            public boolean readLong() {
-                if (index + Long.BYTES <= end) {
-                    longValue = getLongAtOffset(segment, index, ByteOrder.BIG_ENDIAN);
-                    index += Long.BYTES;
-                    return true;
-                }
-                return false;
-            }
-
-            public long getLong() {
-                return longValue;
-            }
 
             @Override
             public boolean readByte() {
@@ -457,22 +402,7 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements Buffer, Read
             final MemorySegment segment = seg;
             int index = fromOffset;
             final int end = index - length;
-            long longValue = -1;
             byte byteValue = -1;
-
-            public boolean readLong() {
-                if (index - Long.BYTES >= end) {
-                    index -= 7;
-                    longValue = getLongAtOffset(segment, index, ByteOrder.LITTLE_ENDIAN);
-                    index--;
-                    return true;
-                }
-                return false;
-            }
-
-            public long getLong() {
-                return longValue;
-            }
 
             @Override
             public boolean readByte() {
@@ -1139,7 +1069,8 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements Buffer, Read
         };
     }
 
-    void makeInaccessible() {
+    @Override
+    protected void makeInaccessible() {
         base = CLOSED_SEGMENT;
         seg = CLOSED_SEGMENT;
         wseg = CLOSED_SEGMENT;

@@ -618,6 +618,11 @@ public abstract class ByteToMessageDecoder extends ChannelHandlerAdapter {
         }
 
         @Override
+        public BufferAllocator bufferAllocator() {
+            return ctx.bufferAllocator();
+        }
+
+        @Override
         @Deprecated
         public <T> Attribute<T> attr(AttributeKey<T> key) {
             return ctx.attr(key);

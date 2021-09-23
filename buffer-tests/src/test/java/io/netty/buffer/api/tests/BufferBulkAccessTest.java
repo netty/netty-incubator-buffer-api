@@ -229,24 +229,6 @@ public class BufferBulkAccessTest extends BufferTestSupport {
     }
 
     @ParameterizedTest
-    @MethodSource("heapAllocators")
-    public void heapBufferMustHaveZeroAddress(Fixture fixture) {
-        try (BufferAllocator allocator = fixture.createAllocator();
-             Buffer buf = allocator.allocate(8)) {
-            assertThat(buf.nativeAddress()).isZero();
-        }
-    }
-
-    @ParameterizedTest
-    @MethodSource("directAllocators")
-    public void directBufferMustHaveNonZeroAddress(Fixture fixture) {
-        try (BufferAllocator allocator = fixture.createAllocator();
-             Buffer buf = allocator.allocate(8)) {
-            assertThat(buf.nativeAddress()).isNotZero();
-        }
-    }
-
-    @ParameterizedTest
     @MethodSource("allocators")
     public void writeBytesMustWriteAllBytesFromByteArray(Fixture fixture) {
         try (BufferAllocator allocator = fixture.createAllocator();
