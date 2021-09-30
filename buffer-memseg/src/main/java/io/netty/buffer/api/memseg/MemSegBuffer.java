@@ -31,26 +31,12 @@ import io.netty.buffer.api.internal.ArcDrop;
 import io.netty.buffer.api.internal.Statics;
 import jdk.incubator.foreign.MemorySegment;
 import jdk.incubator.foreign.ResourceScope;
+import jdk.incubator.foreign.ValueLayout;
 
 import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 
 import static io.netty.buffer.api.internal.Statics.bufferIsClosed;
 import static io.netty.buffer.api.internal.Statics.bufferIsReadOnly;
-import static jdk.incubator.foreign.MemoryAccess.getByteAtOffset;
-import static jdk.incubator.foreign.MemoryAccess.getCharAtOffset;
-import static jdk.incubator.foreign.MemoryAccess.getDoubleAtOffset;
-import static jdk.incubator.foreign.MemoryAccess.getFloatAtOffset;
-import static jdk.incubator.foreign.MemoryAccess.getIntAtOffset;
-import static jdk.incubator.foreign.MemoryAccess.getLongAtOffset;
-import static jdk.incubator.foreign.MemoryAccess.getShortAtOffset;
-import static jdk.incubator.foreign.MemoryAccess.setByteAtOffset;
-import static jdk.incubator.foreign.MemoryAccess.setCharAtOffset;
-import static jdk.incubator.foreign.MemoryAccess.setDoubleAtOffset;
-import static jdk.incubator.foreign.MemoryAccess.setFloatAtOffset;
-import static jdk.incubator.foreign.MemoryAccess.setIntAtOffset;
-import static jdk.incubator.foreign.MemoryAccess.setLongAtOffset;
-import static jdk.incubator.foreign.MemoryAccess.setShortAtOffset;
 
 class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComponent, WritableComponent {
     private static final MemorySegment CLOSED_SEGMENT;
@@ -66,15 +52,24 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
             MemorySegment segment = MemorySegment.allocateNative(1, scope);
             CLOSED_SEGMENT = segment.asSlice(0, 0);
         }
-        ZERO_OFFHEAP_SEGMENT = MemorySegment.allocateNative(1, ResourceScope.newImplicitScope()).asSlice(0, 0);
+        ZERO_OFFHEAP_SEGMENT = MemorySegment.allocateNative(1, ResourceScope.globalScope()).asSlice(0, 0);
         ZERO_ONHEAP_SEGMENT = MemorySegment.ofArray(new byte[0]);
         SEGMENT_CLOSE = new Drop<MemSegBuffer>() {
             @Override
             public void drop(MemSegBuffer buf) {
                 ResourceScope scope = buf.base.scope();
-                if (!scope.isImplicit()) {
+                if (scope != ResourceScope.globalScope()) {
                     scope.close();
                 }
+            }
+
+            @Override
+            public Drop<MemSegBuffer> fork() {
+                return this;
+            }
+
+            @Override
+            public void attach(MemSegBuffer obj) {
             }
 
             @Override
@@ -88,30 +83,27 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
     private MemorySegment base;
     private MemorySegment seg;
     private MemorySegment wseg;
-    private ByteOrder order;
     private int roff;
     private int woff;
     private boolean constBuffer;
 
     MemSegBuffer(MemorySegment base, MemorySegment view, Drop<MemSegBuffer> drop, AllocatorControl control) {
-        super(ArcDrop.wrap(drop));
+        super(drop, control);
         this.control = control;
         this.base = base;
         seg = view;
         wseg = view;
-        order = ByteOrder.BIG_ENDIAN;
     }
 
     /**
      * Constructor for {@linkplain BufferAllocator#constBufferSupplier(byte[]) const buffers}.
      */
     MemSegBuffer(MemSegBuffer parent) {
-        super(new ArcDrop<>(ArcDrop.acquire(parent.unsafeGetDrop())));
+        super(parent.unsafeGetDrop(), parent.control);
         control = parent.control;
         base = parent.base;
         seg = parent.seg;
         wseg = parent.wseg;
-        order = parent.order;
         roff = parent.roff;
         woff = parent.woff;
         constBuffer = true;
@@ -197,7 +189,7 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
         var buffer = seg.asByteBuffer();
         buffer = buffer.asReadOnlyBuffer();
         buffer = buffer.position(readerOffset()).limit(readerOffset() + readableBytes());
-        return buffer.order(order);
+        return buffer;
     }
 
     @Override
@@ -229,7 +221,7 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
     public ByteBuffer writableBuffer() {
         var buffer = wseg.asByteBuffer();
         buffer = buffer.position(writerOffset()).limit(writerOffset() + writableBytes());
-        return buffer.order(order);
+        return buffer;
     }
     // </editor-fold>
 
@@ -269,7 +261,7 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
             } else {
                 zero = ZERO_OFFHEAP_SEGMENT;
             }
-            return new MemSegBuffer(zero, zero, Statics.noOpDrop(), control);
+            return new MemSegBuffer(zero, zero, SEGMENT_CLOSE, control);
         }
 
         AllocatorControl.UntetheredMemory memory = control.allocateUntethered(this, length);
@@ -350,7 +342,7 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
             @Override
             public boolean readByte() {
                 if (index < end) {
-                    byteValue = getByteAtOffset(segment, index);
+                    byteValue = segment.get(ValueLayout.JAVA_BYTE, index);
                     index++;
                     return true;
                 }
@@ -407,7 +399,7 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
             @Override
             public boolean readByte() {
                 if (index > end) {
-                    byteValue = getByteAtOffset(segment, index);
+                    byteValue = segment.get(ValueLayout.JAVA_BYTE, index);
                     index--;
                     return true;
                 }
@@ -578,6 +570,62 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
     }
 
     // <editor-fold defaultstate="collapsed" desc="Primitive accessors implementation.">
+    private static byte getByteAtOffset(MemorySegment seg, int roff) {
+        return seg.get(ValueLayout.JAVA_BYTE, roff);
+    }
+
+    private static void setByteAtOffset(MemorySegment seg, int woff, byte value) {
+        seg.set(ValueLayout.JAVA_BYTE, woff, value);
+    }
+
+    private static short getShortAtOffset(MemorySegment seg, int roff) {
+        return seg.get(ValueLayout.JAVA_SHORT, roff);
+    }
+
+    private static void setShortAtOffset(MemorySegment seg, int woff, short value) {
+        seg.set(ValueLayout.JAVA_SHORT, woff, value);
+    }
+
+    private static char getCharAtOffset(MemorySegment seg, int roff) {
+        return seg.get(ValueLayout.JAVA_CHAR, roff);
+    }
+
+    private static void setCharAtOffset(MemorySegment seg, int woff, char value) {
+        seg.set(ValueLayout.JAVA_CHAR, woff, value);
+    }
+
+    private static int getIntAtOffset(MemorySegment seg, int roff) {
+        return seg.get(ValueLayout.JAVA_INT, roff);
+    }
+
+    private static void setIntAtOffset(MemorySegment seg, int woff, int value) {
+        seg.set(ValueLayout.JAVA_INT, woff, value);
+    }
+
+    private static float getFloatAtOffset(MemorySegment seg, int roff) {
+        return seg.get(ValueLayout.JAVA_FLOAT, roff);
+    }
+
+    private static void setFloatAtOffset(MemorySegment seg, int woff, float value) {
+        seg.set(ValueLayout.JAVA_FLOAT, woff, value);
+    }
+
+    private static long getLongAtOffset(MemorySegment seg, int roff) {
+        return seg.get(ValueLayout.JAVA_LONG, roff);
+    }
+
+    private static void setLongAtOffset(MemorySegment seg, int woff, long value) {
+        seg.set(ValueLayout.JAVA_LONG, woff, value);
+    }
+
+    private static double getDoubleAtOffset(MemorySegment seg, int roff) {
+        return seg.get(ValueLayout.JAVA_DOUBLE, roff);
+    }
+
+    private static void setDoubleAtOffset(MemorySegment seg, int woff, double value) {
+        seg.set(ValueLayout.JAVA_DOUBLE, woff, value);
+    }
+
     @Override
     public byte readByte() {
         checkRead(roff, Byte.BYTES);
@@ -651,7 +699,7 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
     @Override
     public char readChar() {
         checkRead(roff, 2);
-        char value = getCharAtOffset(seg, roff, order);
+        char value = getCharAtOffset(seg, roff);
         roff += 2;
         return value;
     }
@@ -659,13 +707,13 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
     @Override
     public char getChar(int roff) {
         checkGet(roff, 2);
-        return getCharAtOffset(seg, roff, order);
+        return getCharAtOffset(seg, roff);
     }
 
     @Override
     public Buffer writeChar(char value) {
         try {
-            setCharAtOffset(wseg, woff, order, value);
+            setCharAtOffset(wseg, woff, value);
             woff += 2;
             return this;
         } catch (IndexOutOfBoundsException e) {
@@ -676,7 +724,7 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
     @Override
     public Buffer setChar(int woff, char value) {
         try {
-            setCharAtOffset(wseg, woff, order, value);
+            setCharAtOffset(wseg, woff, value);
             return this;
         } catch (IndexOutOfBoundsException e) {
             throw checkWriteState(e);
@@ -686,7 +734,7 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
     @Override
     public short readShort() {
         checkRead(roff, Short.BYTES);
-        short value = getShortAtOffset(seg, roff, order);
+        short value = getShortAtOffset(seg, roff);
         roff += Short.BYTES;
         return value;
     }
@@ -694,13 +742,13 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
     @Override
     public short getShort(int roff) {
         checkGet(roff, Short.BYTES);
-        return getShortAtOffset(seg, roff, order);
+        return getShortAtOffset(seg, roff);
     }
 
     @Override
     public int readUnsignedShort() {
         checkRead(roff, Short.BYTES);
-        int value = getShortAtOffset(seg, roff, order) & 0xFFFF;
+        int value = getShortAtOffset(seg, roff) & 0xFFFF;
         roff += Short.BYTES;
         return value;
     }
@@ -708,13 +756,13 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
     @Override
     public int getUnsignedShort(int roff) {
         checkGet(roff, Short.BYTES);
-        return getShortAtOffset(seg, roff, order) & 0xFFFF;
+        return getShortAtOffset(seg, roff) & 0xFFFF;
     }
 
     @Override
     public Buffer writeShort(short value) {
         try {
-            setShortAtOffset(wseg, woff, order, value);
+            setShortAtOffset(wseg, woff, value);
             woff += Short.BYTES;
             return this;
         } catch (IndexOutOfBoundsException e) {
@@ -725,7 +773,7 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
     @Override
     public Buffer setShort(int woff, short value) {
         try {
-            setShortAtOffset(wseg, woff, order, value);
+            setShortAtOffset(wseg, woff, value);
             return this;
         } catch (IndexOutOfBoundsException e) {
             throw checkWriteState(e);
@@ -735,7 +783,7 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
     @Override
     public Buffer writeUnsignedShort(int value) {
         try {
-            setShortAtOffset(wseg, woff, order, (short) (value & 0xFFFF));
+            setShortAtOffset(wseg, woff, (short) (value & 0xFFFF));
             woff += Short.BYTES;
             return this;
         } catch (IndexOutOfBoundsException e) {
@@ -746,7 +794,7 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
     @Override
     public Buffer setUnsignedShort(int woff, int value) {
         try {
-            setShortAtOffset(wseg, woff, order, (short) (value & 0xFFFF));
+            setShortAtOffset(wseg, woff, (short) (value & 0xFFFF));
             return this;
         } catch (IndexOutOfBoundsException e) {
             throw checkWriteState(e);
@@ -756,13 +804,9 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
     @Override
     public int readMedium() {
         checkRead(roff, 3);
-        int value = order == ByteOrder.BIG_ENDIAN?
-                getByteAtOffset(seg, roff) << 16 |
+        int value = getByteAtOffset(seg, roff) << 16 |
                 (getByteAtOffset(seg, roff + 1) & 0xFF) << 8 |
-                getByteAtOffset(seg, roff + 2) & 0xFF :
-                getByteAtOffset(seg, roff) & 0xFF |
-                (getByteAtOffset(seg, roff + 1) & 0xFF) << 8 |
-                getByteAtOffset(seg, roff + 2) << 16;
+                getByteAtOffset(seg, roff + 2) & 0xFF;
         roff += 3;
         return value;
     }
@@ -770,25 +814,17 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
     @Override
     public int getMedium(int roff) {
         checkGet(roff, 3);
-        return order == ByteOrder.BIG_ENDIAN?
-                getByteAtOffset(seg, roff) << 16 |
+        return getByteAtOffset(seg, roff) << 16 |
                 (getByteAtOffset(seg, roff + 1) & 0xFF) << 8 |
-                getByteAtOffset(seg, roff + 2) & 0xFF :
-                getByteAtOffset(seg, roff) & 0xFF |
-                (getByteAtOffset(seg, roff + 1) & 0xFF) << 8 |
-                getByteAtOffset(seg, roff + 2) << 16;
+                getByteAtOffset(seg, roff + 2) & 0xFF;
     }
 
     @Override
     public int readUnsignedMedium() {
         checkRead(roff, 3);
-        int value = order == ByteOrder.BIG_ENDIAN?
-                (getByteAtOffset(seg, roff) << 16 |
+        int value = (getByteAtOffset(seg, roff) << 16 |
                 (getByteAtOffset(seg, roff + 1) & 0xFF) << 8 |
-                getByteAtOffset(seg, roff + 2) & 0xFF) & 0xFFFFFF :
-                (getByteAtOffset(seg, roff) & 0xFF |
-                (getByteAtOffset(seg, roff + 1) & 0xFF) << 8 |
-                getByteAtOffset(seg, roff + 2) << 16) & 0xFFFFFF;
+                getByteAtOffset(seg, roff + 2) & 0xFF) & 0xFFFFFF;
         roff += 3;
         return value;
     }
@@ -796,27 +832,17 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
     @Override
     public int getUnsignedMedium(int roff) {
         checkGet(roff, 3);
-        return order == ByteOrder.BIG_ENDIAN?
-                (getByteAtOffset(seg, roff) << 16 |
+        return (getByteAtOffset(seg, roff) << 16 |
                 (getByteAtOffset(seg, roff + 1) & 0xFF) << 8 |
-                getByteAtOffset(seg, roff + 2) & 0xFF) & 0xFFFFFF :
-                (getByteAtOffset(seg, roff) & 0xFF |
-                (getByteAtOffset(seg, roff + 1) & 0xFF) << 8 |
-                getByteAtOffset(seg, roff + 2) << 16) & 0xFFFFFF;
+                getByteAtOffset(seg, roff + 2) & 0xFF) & 0xFFFFFF;
     }
 
     @Override
     public Buffer writeMedium(int value) {
         checkWrite(woff, 3);
-        if (order == ByteOrder.BIG_ENDIAN) {
-            setByteAtOffset(wseg, woff, (byte) (value >> 16));
-            setByteAtOffset(wseg, woff + 1, (byte) (value >> 8 & 0xFF));
-            setByteAtOffset(wseg, woff + 2, (byte) (value & 0xFF));
-        } else {
-            setByteAtOffset(wseg, woff, (byte) (value & 0xFF));
-            setByteAtOffset(wseg, woff + 1, (byte) (value >> 8 & 0xFF));
-            setByteAtOffset(wseg, woff + 2, (byte) (value >> 16 & 0xFF));
-        }
+        setByteAtOffset(wseg, woff, (byte) (value >> 16));
+        setByteAtOffset(wseg, woff + 1, (byte) (value >> 8 & 0xFF));
+        setByteAtOffset(wseg, woff + 2, (byte) (value & 0xFF));
         woff += 3;
         return this;
     }
@@ -824,30 +850,18 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
     @Override
     public Buffer setMedium(int woff, int value) {
         checkSet(woff, 3);
-        if (order == ByteOrder.BIG_ENDIAN) {
-            setByteAtOffset(wseg, woff, (byte) (value >> 16));
-            setByteAtOffset(wseg, woff + 1, (byte) (value >> 8 & 0xFF));
-            setByteAtOffset(wseg, woff + 2, (byte) (value & 0xFF));
-        } else {
-            setByteAtOffset(wseg, woff, (byte) (value & 0xFF));
-            setByteAtOffset(wseg, woff + 1, (byte) (value >> 8 & 0xFF));
-            setByteAtOffset(wseg, woff + 2, (byte) (value >> 16 & 0xFF));
-        }
+        setByteAtOffset(wseg, woff, (byte) (value >> 16));
+        setByteAtOffset(wseg, woff + 1, (byte) (value >> 8 & 0xFF));
+        setByteAtOffset(wseg, woff + 2, (byte) (value & 0xFF));
         return this;
     }
 
     @Override
     public Buffer writeUnsignedMedium(int value) {
         checkWrite(woff, 3);
-        if (order == ByteOrder.BIG_ENDIAN) {
-            setByteAtOffset(wseg, woff, (byte) (value >> 16));
-            setByteAtOffset(wseg, woff + 1, (byte) (value >> 8 & 0xFF));
-            setByteAtOffset(wseg, woff + 2, (byte) (value & 0xFF));
-        } else {
-            setByteAtOffset(wseg, woff, (byte) (value & 0xFF));
-            setByteAtOffset(wseg, woff + 1, (byte) (value >> 8 & 0xFF));
-            setByteAtOffset(wseg, woff + 2, (byte) (value >> 16 & 0xFF));
-        }
+        setByteAtOffset(wseg, woff, (byte) (value >> 16));
+        setByteAtOffset(wseg, woff + 1, (byte) (value >> 8 & 0xFF));
+        setByteAtOffset(wseg, woff + 2, (byte) (value & 0xFF));
         woff += 3;
         return this;
     }
@@ -855,22 +869,16 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
     @Override
     public Buffer setUnsignedMedium(int woff, int value) {
         checkSet(woff, 3);
-        if (order == ByteOrder.BIG_ENDIAN) {
-            setByteAtOffset(wseg, woff, (byte) (value >> 16));
-            setByteAtOffset(wseg, woff + 1, (byte) (value >> 8 & 0xFF));
-            setByteAtOffset(wseg, woff + 2, (byte) (value & 0xFF));
-        } else {
-            setByteAtOffset(wseg, woff, (byte) (value & 0xFF));
-            setByteAtOffset(wseg, woff + 1, (byte) (value >> 8 & 0xFF));
-            setByteAtOffset(wseg, woff + 2, (byte) (value >> 16 & 0xFF));
-        }
+        setByteAtOffset(wseg, woff, (byte) (value >> 16));
+        setByteAtOffset(wseg, woff + 1, (byte) (value >> 8 & 0xFF));
+        setByteAtOffset(wseg, woff + 2, (byte) (value & 0xFF));
         return this;
     }
 
     @Override
     public int readInt() {
         checkRead(roff, Integer.BYTES);
-        int value = getIntAtOffset(seg, roff, order);
+        int value = getIntAtOffset(seg, roff);
         roff += Integer.BYTES;
         return value;
     }
@@ -878,13 +886,13 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
     @Override
     public int getInt(int roff) {
         checkGet(roff, Integer.BYTES);
-        return getIntAtOffset(seg, roff, order);
+        return getIntAtOffset(seg, roff);
     }
 
     @Override
     public long readUnsignedInt() {
         checkRead(roff, Integer.BYTES);
-        long value = getIntAtOffset(seg, roff, order) & 0xFFFFFFFFL;
+        long value = getIntAtOffset(seg, roff) & 0xFFFFFFFFL;
         roff += Integer.BYTES;
         return value;
     }
@@ -892,13 +900,13 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
     @Override
     public long getUnsignedInt(int roff) {
         checkGet(roff, Integer.BYTES);
-        return getIntAtOffset(seg, roff, order) & 0xFFFFFFFFL;
+        return getIntAtOffset(seg, roff) & 0xFFFFFFFFL;
     }
 
     @Override
     public Buffer writeInt(int value) {
         try {
-            setIntAtOffset(wseg, woff, order, value);
+            setIntAtOffset(wseg, woff, value);
             woff += Integer.BYTES;
             return this;
         } catch (IndexOutOfBoundsException e) {
@@ -909,7 +917,7 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
     @Override
     public Buffer setInt(int woff, int value) {
         try {
-            setIntAtOffset(wseg, woff, order, value);
+            setIntAtOffset(wseg, woff, value);
             return this;
         } catch (IndexOutOfBoundsException e) {
             throw checkWriteState(e);
@@ -919,7 +927,7 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
     @Override
     public Buffer writeUnsignedInt(long value) {
         try {
-            setIntAtOffset(wseg, woff, order, (int) (value & 0xFFFFFFFFL));
+            setIntAtOffset(wseg, woff, (int) (value & 0xFFFFFFFFL));
             woff += Integer.BYTES;
             return this;
         } catch (IndexOutOfBoundsException e) {
@@ -930,7 +938,7 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
     @Override
     public Buffer setUnsignedInt(int woff, long value) {
         try {
-            setIntAtOffset(wseg, woff, order, (int) (value & 0xFFFFFFFFL));
+            setIntAtOffset(wseg, woff, (int) (value & 0xFFFFFFFFL));
             return this;
         } catch (IndexOutOfBoundsException e) {
             throw checkWriteState(e);
@@ -940,7 +948,7 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
     @Override
     public float readFloat() {
         checkRead(roff, Float.BYTES);
-        float value = getFloatAtOffset(seg, roff, order);
+        float value = getFloatAtOffset(seg, roff);
         roff += Float.BYTES;
         return value;
     }
@@ -948,13 +956,13 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
     @Override
     public float getFloat(int roff) {
         checkGet(roff, Float.BYTES);
-        return getFloatAtOffset(seg, roff, order);
+        return getFloatAtOffset(seg, roff);
     }
 
     @Override
     public Buffer writeFloat(float value) {
         try {
-            setFloatAtOffset(wseg, woff, order, value);
+            setFloatAtOffset(wseg, woff, value);
             woff += Float.BYTES;
             return this;
         } catch (IndexOutOfBoundsException e) {
@@ -965,7 +973,7 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
     @Override
     public Buffer setFloat(int woff, float value) {
         try {
-            setFloatAtOffset(wseg, woff, order, value);
+            setFloatAtOffset(wseg, woff, value);
             return this;
         } catch (IndexOutOfBoundsException e) {
             throw checkWriteState(e);
@@ -975,7 +983,7 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
     @Override
     public long readLong() {
         checkRead(roff, Long.BYTES);
-        long value = getLongAtOffset(seg, roff, order);
+        long value = getLongAtOffset(seg, roff);
         roff += Long.BYTES;
         return value;
     }
@@ -983,13 +991,13 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
     @Override
     public long getLong(int roff) {
         checkGet(roff, Long.BYTES);
-        return getLongAtOffset(seg, roff, order);
+        return getLongAtOffset(seg, roff);
     }
 
     @Override
     public Buffer writeLong(long value) {
         try {
-            setLongAtOffset(wseg, woff, order, value);
+            setLongAtOffset(wseg, woff, value);
             woff += Long.BYTES;
             return this;
         } catch (IndexOutOfBoundsException e) {
@@ -1000,7 +1008,7 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
     @Override
     public Buffer setLong(int woff, long value) {
         try {
-            setLongAtOffset(wseg, woff, order, value);
+            setLongAtOffset(wseg, woff, value);
             return this;
         } catch (IndexOutOfBoundsException e) {
             throw checkWriteState(e);
@@ -1010,7 +1018,7 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
     @Override
     public double readDouble() {
         checkRead(roff, Double.BYTES);
-        double value = getDoubleAtOffset(seg, roff, order);
+        double value = getDoubleAtOffset(seg, roff);
         roff += Double.BYTES;
         return value;
     }
@@ -1018,13 +1026,13 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
     @Override
     public double getDouble(int roff) {
         checkGet(roff, Double.BYTES);
-        return getDoubleAtOffset(seg, roff, order);
+        return getDoubleAtOffset(seg, roff);
     }
 
     @Override
     public Buffer writeDouble(double value) {
         try {
-            setDoubleAtOffset(wseg, woff, order, value);
+            setDoubleAtOffset(wseg, woff, value);
             woff += Double.BYTES;
             return this;
         } catch (IndexOutOfBoundsException e) {
@@ -1035,7 +1043,7 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
     @Override
     public Buffer setDouble(int woff, double value) {
         try {
-            setDoubleAtOffset(wseg, woff, order, value);
+            setDoubleAtOffset(wseg, woff, value);
             return this;
         } catch (IndexOutOfBoundsException e) {
             throw checkWriteState(e);
@@ -1045,7 +1053,6 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
 
     @Override
     protected Owned<MemSegBuffer> prepareSend() {
-        var order = this.order;
         var roff = this.roff;
         var woff = this.woff;
         var readOnly = readOnly();
@@ -1057,7 +1064,6 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
             @Override
             public MemSegBuffer transferOwnership(Drop<MemSegBuffer> drop) {
                 MemSegBuffer copy = new MemSegBuffer(base, transferSegment, drop, control);
-                copy.order = order;
                 copy.roff = roff;
                 copy.woff = woff;
                 if (readOnly) {
@@ -1076,16 +1082,6 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
         wseg = CLOSED_SEGMENT;
         roff = 0;
         woff = 0;
-    }
-
-    @Override
-    public boolean isOwned() {
-        return super.isOwned() && ((ArcDrop<MemSegBuffer>) unsafeGetDrop()).isOwned();
-    }
-
-    @Override
-    public int countBorrows() {
-        return super.countBorrows() + ((ArcDrop<MemSegBuffer>) unsafeGetDrop()).countBorrows();
     }
 
     private void checkRead(int index, int size) {

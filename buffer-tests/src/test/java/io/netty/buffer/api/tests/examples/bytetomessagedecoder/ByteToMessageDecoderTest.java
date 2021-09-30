@@ -15,6 +15,7 @@
  */
 package io.netty.buffer.api.tests.examples.bytetomessagedecoder;
 
+import io.netty.buffer.api.AllocationType;
 import io.netty.buffer.api.Buffer;
 import io.netty.buffer.api.BufferAllocator;
 import io.netty.channel.ChannelHandler;
@@ -407,6 +408,16 @@ public class ByteToMessageDecoderTest {
         Buffer newCumulation = writeFailingCumulation(untilFailure, 16);
 
         BufferAllocator allocator = new BufferAllocator() {
+            @Override
+            public boolean isPooling() {
+                return false;
+            }
+
+            @Override
+            public AllocationType getAllocationType() {
+                return null;
+            }
+
             @Override
             public Buffer allocate(int capacity) {
                 return newCumulation;

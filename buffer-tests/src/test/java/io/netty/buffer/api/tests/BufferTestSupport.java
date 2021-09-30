@@ -15,6 +15,7 @@
  */
 package io.netty.buffer.api.tests;
 
+import io.netty.buffer.api.AllocationType;
 import io.netty.buffer.api.Buffer;
 import io.netty.buffer.api.BufferAllocator;
 import io.netty.buffer.api.BufferClosedException;
@@ -184,6 +185,17 @@ public abstract class BufferTestSupport {
                     return new TestAllocator() {
                         final BufferAllocator a = first.get();
                         final BufferAllocator b = second.get();
+
+                        @Override
+                        public boolean isPooling() {
+                            return a.isPooling();
+                        }
+
+                        @Override
+                        public AllocationType getAllocationType() {
+                            return a.getAllocationType();
+                        }
+
                         @Override
                         public Buffer allocate(int size) {
                             int half = size / 2;
@@ -207,6 +219,17 @@ public abstract class BufferTestSupport {
         builder.add(new Fixture("compose(heap,heap,heap)", () -> {
             return new TestAllocator() {
                 final BufferAllocator alloc = BufferAllocator.onHeapUnpooled();
+
+                @Override
+                public boolean isPooling() {
+                    return alloc.isPooling();
+                }
+
+                @Override
+                public AllocationType getAllocationType() {
+                    return alloc.getAllocationType();
+                }
+
                 @Override
                 public Buffer allocate(int size) {
                     int part = size / 3;
@@ -228,6 +251,17 @@ public abstract class BufferTestSupport {
             builder.add(new Fixture(fixture + ".ensureWritable", () -> {
                 return new TestAllocator() {
                     final BufferAllocator allocator = fixture.createAllocator();
+
+                    @Override
+                    public boolean isPooling() {
+                        return allocator.isPooling();
+                    }
+
+                    @Override
+                    public AllocationType getAllocationType() {
+                        return allocator.getAllocationType();
+                    }
+
                     @Override
                     public Buffer allocate(int size) {
                         if (size < 2) {
@@ -247,6 +281,17 @@ public abstract class BufferTestSupport {
             builder.add(new Fixture(fixture + ".compose.ensureWritable", () -> {
                 return new TestAllocator() {
                     final BufferAllocator allocator = fixture.createAllocator();
+
+                    @Override
+                    public boolean isPooling() {
+                        return allocator.isPooling();
+                    }
+
+                    @Override
+                    public AllocationType getAllocationType() {
+                        return allocator.getAllocationType();
+                    }
+
                     @Override
                     public Buffer allocate(int size) {
                         if (size < 2) {
@@ -275,6 +320,17 @@ public abstract class BufferTestSupport {
         builder.add(new Fixture(f + ".split", () -> {
             return new TestAllocator() {
                 final BufferAllocator allocatorBase = f.get();
+
+                @Override
+                public boolean isPooling() {
+                    return allocatorBase.isPooling();
+                }
+
+                @Override
+                public AllocationType getAllocationType() {
+                    return allocatorBase.getAllocationType();
+                }
+
                 @Override
                 public Buffer allocate(int size) {
                     try (Buffer buf = allocatorBase.allocate(size + 1)) {

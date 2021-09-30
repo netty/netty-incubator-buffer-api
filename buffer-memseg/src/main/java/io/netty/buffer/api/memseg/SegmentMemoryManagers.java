@@ -53,12 +53,12 @@ public class SegmentMemoryManagers implements MemoryManager {
     }
 
     @Override
-    public Buffer allocateShared(AllocatorControl allocatorControl, long size, Drop<Buffer> drop, Cleaner cleaner,
+    public Buffer allocateShared(AllocatorControl allocatorControl, long size, Drop<Buffer> drop,
                                  AllocationType type) {
         if (type instanceof StandardAllocationTypes stype) {
             var segment = switch (stype) {
                 case ON_HEAP -> createHeapSegment(size);
-                case OFF_HEAP -> createNativeSegment(size, cleaner);
+                case OFF_HEAP -> createNativeSegment(size, null);
             };
             return new MemSegBuffer(segment, segment, Statics.convert(drop), allocatorControl);
         }
