@@ -49,11 +49,11 @@ jobs:
       # Run the make script
       - name: Make build
         run: make build
-      - name: Upload Java 17 Test Results
+      - name: Upload Java 18 Test Results
         if: always()
         uses: actions/upload-artifact@v2
         with:
-          name: test-results-java17
+          name: test-results-java18
           path: '**/target/surefire-reports/TEST-*.xml'
       - name: Upload build artefacts
         uses: actions/upload-artifact@v2
