@@ -51,7 +51,6 @@ public final class EchoServer {
         }
 
         // Configure the server.
-        ByteBufAllocatorAdaptor allocator = new ByteBufAllocatorAdaptor();
         EventLoopGroup bossGroup = new MultithreadEventLoopGroup(1, NioHandler.newFactory());
         EventLoopGroup workerGroup = new MultithreadEventLoopGroup(NioHandler.newFactory());
         final EchoServerHandler serverHandler = new EchoServerHandler();
@@ -59,7 +58,7 @@ public final class EchoServer {
             ServerBootstrap b = new ServerBootstrap();
             b.group(bossGroup, workerGroup)
              .channel(NioServerSocketChannel.class)
-             .childOption(ChannelOption.ALLOCATOR, allocator)
+             .childOption(ChannelOption.ALLOCATOR, ByteBufAllocatorAdaptor.DEFAULT_INSTANCE)
              .option(ChannelOption.SO_BACKLOG, 100)
              .handler(new LoggingHandler(LogLevel.INFO))
              .childHandler(new ChannelInitializer<SocketChannel>() {
@@ -83,7 +82,6 @@ public final class EchoServer {
             // Shut down all event loops to terminate all threads.
             bossGroup.shutdownGracefully();
             workerGroup.shutdownGracefully();
-            allocator.close();
         }
     }
 }

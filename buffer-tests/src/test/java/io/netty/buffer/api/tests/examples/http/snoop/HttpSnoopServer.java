@@ -49,16 +49,15 @@ public final class HttpSnoopServer {
         }
 
         // Configure the server.
-        ByteBufAllocatorAdaptor allocator = new ByteBufAllocatorAdaptor();
         EventLoopGroup bossGroup = new MultithreadEventLoopGroup(1, NioHandler.newFactory());
         EventLoopGroup workerGroup = new MultithreadEventLoopGroup(NioHandler.newFactory());
         try {
             ServerBootstrap b = new ServerBootstrap();
             b.group(bossGroup, workerGroup)
              .channel(NioServerSocketChannel.class)
-             .childOption(ChannelOption.ALLOCATOR, allocator)
+             .childOption(ChannelOption.ALLOCATOR, ByteBufAllocatorAdaptor.DEFAULT_INSTANCE)
              .handler(new LoggingHandler(LogLevel.INFO))
-             .childHandler(new HttpSnoopServerInitializer(sslCtx, allocator));
+             .childHandler(new HttpSnoopServerInitializer(sslCtx, ByteBufAllocatorAdaptor.DEFAULT_INSTANCE));
 
             Channel ch = b.bind(PORT).sync().getNow();
 

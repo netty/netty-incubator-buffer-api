@@ -314,6 +314,44 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
     }
 
     @Override
+    public int bytesBefore(byte needle) {
+        // For the details of this algorithm, see Hacker's Delight, Chapter 6, Searching Words.
+        // Richard Startin also describes this on his blog: https://richardstartin.github.io/posts/finding-bytes
+        if (!isAccessible()) {
+            throw bufferIsClosed(this);
+        }
+        int offset = roff;
+        final int length = woff - roff;
+        final int end = woff;
+
+        if (length > 7) {
+            final long pattern = (needle & 0xFFL) * 0x101010101010101L;
+            for (final int longEnd = offset + (length >>> 3) * Long.BYTES;
+                 offset < longEnd;
+                 offset += Long.BYTES) {
+                final long word = getLongAtOffset(seg, offset);
+
+                long input = word ^ pattern;
+                long tmp = (input & 0x7F7F7F7F7F7F7F7FL) + 0x7F7F7F7F7F7F7F7FL;
+                tmp = ~(tmp | input | 0x7F7F7F7F7F7F7F7FL);
+                final int binaryPosition = Long.numberOfLeadingZeros(tmp);
+
+                int index = binaryPosition >>> 3;
+                if (index < Long.BYTES) {
+                    return offset + index - roff;
+                }
+            }
+        }
+        for (; offset < end; offset++) {
+            if (getByteAtOffset(seg, offset) == needle) {
+                return offset - roff;
+            }
+        }
+
+        return -1;
+    }
+
+    @Override
     public ByteCursor openCursor() {
         return openCursor(readerOffset(), readableBytes());
     }

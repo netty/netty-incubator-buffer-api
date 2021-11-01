@@ -103,7 +103,6 @@ public final class HttpUploadClient {
         }
 
         // Configure the client.
-        ByteBufAllocatorAdaptor allocator = new ByteBufAllocatorAdaptor();
         EventLoopGroup group = new MultithreadEventLoopGroup(NioHandler.newFactory());
 
         // setup the factory: here using a mixed memory/disk based on size threshold
@@ -117,7 +116,7 @@ public final class HttpUploadClient {
         try {
             Bootstrap b = new Bootstrap();
             b.group(group).channel(NioSocketChannel.class)
-                    .option(ChannelOption.ALLOCATOR, allocator)
+                    .option(ChannelOption.ALLOCATOR, ByteBufAllocatorAdaptor.DEFAULT_INSTANCE)
                     .handler(new HttpUploadClientInitializer(sslCtx));
 
             // Simple Get form: no factory used (not usable)

@@ -75,14 +75,13 @@ public final class HttpSnoopClient {
         }
 
         // Configure the client.
-        ByteBufAllocatorAdaptor allocator = new ByteBufAllocatorAdaptor();
         EventLoopGroup group = new MultithreadEventLoopGroup(NioHandler.newFactory());
         try {
             Bootstrap b = new Bootstrap();
             b.group(group)
-             .option(ChannelOption.ALLOCATOR, allocator)
+             .option(ChannelOption.ALLOCATOR, ByteBufAllocatorAdaptor.DEFAULT_INSTANCE)
              .channel(NioSocketChannel.class)
-             .handler(new HttpSnoopClientInitializer(sslCtx, allocator));
+             .handler(new HttpSnoopClientInitializer(sslCtx, ByteBufAllocatorAdaptor.DEFAULT_INSTANCE));
 
             // Make the connection attempt.
             Channel ch = b.connect(host, port).sync().getNow();

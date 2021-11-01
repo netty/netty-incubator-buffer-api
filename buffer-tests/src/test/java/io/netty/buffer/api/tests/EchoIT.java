@@ -47,7 +47,6 @@ public class EchoIT {
 
     @Test
     void echoServerMustReplyWithSameData() throws Exception {
-        ByteBufAllocatorAdaptor allocator = new ByteBufAllocatorAdaptor();
         EventLoopGroup bossGroup = new MultithreadEventLoopGroup(1, NioHandler.newFactory());
         EventLoopGroup workerGroup = new MultithreadEventLoopGroup(NioHandler.newFactory());
         final EchoServerHandler serverHandler = new EchoServerHandler();
@@ -55,7 +54,7 @@ public class EchoIT {
             ServerBootstrap server = new ServerBootstrap();
             server.group(bossGroup, workerGroup)
                   .channel(NioServerSocketChannel.class)
-                  .childOption(ChannelOption.ALLOCATOR, allocator)
+                  .childOption(ChannelOption.ALLOCATOR, ByteBufAllocatorAdaptor.DEFAULT_INSTANCE)
                   .option(ChannelOption.SO_BACKLOG, 100)
                   .handler(new LoggingHandler(LogLevel.INFO))
                   .childHandler(new ChannelInitializer<SocketChannel>() {
@@ -103,7 +102,6 @@ public class EchoIT {
             // Shut down all event loops to terminate all threads.
             bossGroup.shutdownGracefully();
             workerGroup.shutdownGracefully();
-            allocator.close();
         }
     }
 

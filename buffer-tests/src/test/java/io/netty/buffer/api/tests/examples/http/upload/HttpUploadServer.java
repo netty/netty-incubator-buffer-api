@@ -47,14 +47,13 @@ public final class HttpUploadServer {
             sslCtx = null;
         }
 
-        ByteBufAllocatorAdaptor allocator = new ByteBufAllocatorAdaptor();
         EventLoopGroup bossGroup = new MultithreadEventLoopGroup(1, NioHandler.newFactory());
         EventLoopGroup workerGroup = new MultithreadEventLoopGroup(NioHandler.newFactory());
         try {
             ServerBootstrap b = new ServerBootstrap();
             b.group(bossGroup, workerGroup);
             b.channel(NioServerSocketChannel.class);
-            b.childOption(ChannelOption.ALLOCATOR, allocator);
+            b.childOption(ChannelOption.ALLOCATOR, ByteBufAllocatorAdaptor.DEFAULT_INSTANCE);
             b.handler(new LoggingHandler(LogLevel.INFO));
             b.childHandler(new HttpUploadServerInitializer(sslCtx));
 
