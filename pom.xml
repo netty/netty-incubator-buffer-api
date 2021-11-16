@@ -73,7 +73,7 @@
     <!-- Java version for bytecode compatibility. -->
     <java.compatibility>17</java.compatibility>
     <!-- Java version actually used to perform the build; compiling and testing. -->
-    <java.version>17</java.version>
+    <java.version>18</java.version>
     <junit.version>5.7.0</junit.version>
     <surefire.version>3.0.0-M5</surefire.version>
     <argLine.mod>--add-modules jdk.incubator.foreign</argLine.mod>
