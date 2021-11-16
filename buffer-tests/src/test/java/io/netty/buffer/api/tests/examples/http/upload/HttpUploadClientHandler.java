@@ -53,7 +53,7 @@ public class HttpUploadClientHandler extends SimpleChannelInboundHandler<HttpObj
             }
         }
         if (msg instanceof HttpContent chunk) {
-            System.err.println(chunk.content().toString(CharsetUtil.UTF_8));
+            System.err.println(chunk.payload().toString(CharsetUtil.UTF_8));
 
             if (chunk instanceof LastHttpContent) {
                 if (readingChunks) {
@@ -63,7 +63,7 @@ public class HttpUploadClientHandler extends SimpleChannelInboundHandler<HttpObj
                 }
                 readingChunks = false;
             } else {
-                System.err.println(chunk.content().toString(CharsetUtil.UTF_8));
+                System.err.println(chunk.payload().toString(CharsetUtil.UTF_8));
             }
         }
     }

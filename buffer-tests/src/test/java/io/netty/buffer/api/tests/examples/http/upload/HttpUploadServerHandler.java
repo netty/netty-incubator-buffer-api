@@ -16,6 +16,8 @@
 package io.netty.buffer.api.tests.examples.http.upload;
 
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.api.Buffer;
+import io.netty.buffer.api.DefaultGlobalBufferAllocator;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFutureListeners;
 import io.netty.channel.ChannelHandlerContext;
@@ -52,6 +54,7 @@ import io.netty.util.CharsetUtil;
 
 import java.io.IOException;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -72,8 +75,9 @@ public class HttpUploadServerHandler extends SimpleChannelInboundHandler<HttpObj
 
     private final StringBuilder responseContent = new StringBuilder();
 
-    private static final HttpDataFactory factory =
-            new DefaultHttpDataFactory(DefaultHttpDataFactory.MINSIZE); // Disk if size exceed
+    private static final HttpDataFactory factory = new DefaultHttpDataFactory(
+            DefaultGlobalBufferAllocator.DEFAULT_GLOBAL_BUFFER_ALLOCATOR,
+            DefaultHttpDataFactory.MINSIZE); // Disk if size exceed
 
     private HttpPostRequestDecoder decoder;
 
@@ -150,7 +154,7 @@ public class HttpUploadServerHandler extends SimpleChannelInboundHandler<HttpObj
                 return;
             }
             try {
-                decoder = new HttpPostRequestDecoder(factory, request);
+                decoder = new HttpPostRequestDecoder(ctx.bufferAllocator(), factory, request);
             } catch (ErrorDataDecoderException e1) {
                 logger.log(Level.WARNING, e1.getMessage(), e1);
                 responseContent.append(e1.getMessage());
@@ -309,7 +313,7 @@ public class HttpUploadServerHandler extends SimpleChannelInboundHandler<HttpObj
 
     private void writeResponse(Channel channel, boolean forceClose) {
         // Convert the response content to a ChannelBuffer.
-        ByteBuf buf = copiedBuffer(responseContent.toString(), CharsetUtil.UTF_8);
+        Buffer buf = channel.bufferAllocator().copyOf(responseContent.toString().getBytes(StandardCharsets.UTF_8));
         responseContent.setLength(0);
 
         // Decide whether to close the connection or not.
@@ -420,7 +424,7 @@ public class HttpUploadServerHandler extends SimpleChannelInboundHandler<HttpObj
         responseContent.append("</body>");
         responseContent.append("</html>");
 
-        ByteBuf buf = copiedBuffer(responseContent.toString(), CharsetUtil.UTF_8);
+        Buffer buf = ctx.bufferAllocator().copyOf(responseContent.toString().getBytes(StandardCharsets.UTF_8));
         // Build the response object.
         FullHttpResponse response = new DefaultFullHttpResponse(
                 HttpVersion.HTTP_1_1, HttpResponseStatus.OK, buf);

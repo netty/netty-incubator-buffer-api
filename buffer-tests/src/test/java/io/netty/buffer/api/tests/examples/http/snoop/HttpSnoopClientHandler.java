@@ -51,7 +51,7 @@ public class HttpSnoopClientHandler extends SimpleChannelInboundHandler<HttpObje
         }
         if (msg instanceof HttpContent content) {
 
-            System.err.print(content.content().toString(CharsetUtil.UTF_8));
+            System.err.print(content.payload().toString(CharsetUtil.UTF_8));
             System.err.flush();
 
             if (content instanceof LastHttpContent) {

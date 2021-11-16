@@ -71,7 +71,7 @@
     <netty.version>5.0.0.Final-SNAPSHOT</netty.version>
     <netty.build.version>29</netty.build.version>
     <!-- Java version for bytecode compatibility. -->
-    <java.compatibility>17</java.compatibility>
+    <java.compatibility>18</java.compatibility>
     <!-- Java version actually used to perform the build; compiling and testing. -->
     <java.version>18</java.version>
     <junit.version>5.7.0</junit.version>

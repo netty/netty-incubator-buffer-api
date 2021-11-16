@@ -16,7 +16,8 @@
 package io.netty.buffer.api.tests.examples.http.snoop;
 
 import io.netty.bootstrap.Bootstrap;
-import io.netty.buffer.Unpooled;
+import io.netty.buffer.api.BufferAllocator;
+import io.netty.buffer.api.DefaultGlobalBufferAllocator;
 import io.netty.buffer.api.adaptor.ByteBufAllocatorAdaptor;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelOption;
@@ -64,6 +65,8 @@ public final class HttpSnoopClient {
             return;
         }
 
+        BufferAllocator allocator = DefaultGlobalBufferAllocator.DEFAULT_GLOBAL_BUFFER_ALLOCATOR;
+
         // Configure SSL context if necessary.
         final boolean ssl = "https".equalsIgnoreCase(scheme);
         final SslContext sslCtx;
@@ -80,6 +83,7 @@ public final class HttpSnoopClient {
             Bootstrap b = new Bootstrap();
             b.group(group)
              .option(ChannelOption.ALLOCATOR, ByteBufAllocatorAdaptor.DEFAULT_INSTANCE)
+             .option(ChannelOption.BUFFER_ALLOCATOR, allocator)
              .channel(NioSocketChannel.class)
              .handler(new HttpSnoopClientInitializer(sslCtx, ByteBufAllocatorAdaptor.DEFAULT_INSTANCE));
 
@@ -88,7 +92,7 @@ public final class HttpSnoopClient {
 
             // Prepare the HTTP request.
             HttpRequest request = new DefaultFullHttpRequest(
-                    HttpVersion.HTTP_1_1, HttpMethod.GET, uri.getRawPath(), Unpooled.EMPTY_BUFFER);
+                    HttpVersion.HTTP_1_1, HttpMethod.GET, uri.getRawPath(), allocator.allocate(0));
             request.headers().set(HttpHeaderNames.HOST, host);
             request.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
             request.headers().set(HttpHeaderNames.ACCEPT_ENCODING, HttpHeaderValues.GZIP);
