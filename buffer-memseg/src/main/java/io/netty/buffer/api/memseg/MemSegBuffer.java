@@ -33,7 +33,10 @@ import jdk.incubator.foreign.MemorySegment;
 import jdk.incubator.foreign.ResourceScope;
 import jdk.incubator.foreign.ValueLayout;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.channels.ReadableByteChannel;
+import java.nio.channels.WritableByteChannel;
 
 import static io.netty.buffer.api.internal.Statics.bufferIsClosed;
 import static io.netty.buffer.api.internal.Statics.bufferIsReadOnly;
@@ -130,6 +133,11 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
     }
 
     @Override
+    public void skipReadable(int delta) {
+        readerOffset(readerOffset() + delta);
+    }
+
+    @Override
     public MemSegBuffer readerOffset(int offset) {
         checkRead(offset, 0);
         roff = offset;
@@ -142,10 +150,25 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
     }
 
     @Override
+    public void skipWritable(int delta) {
+        writerOffset(writerOffset() + delta);
+    }
+
+    @Override
     public MemSegBuffer writerOffset(int offset) {
         checkWrite(offset, 0);
         woff = offset;
         return this;
+    }
+
+    @Override
+    public int readableBytes() {
+        return writerOffset() - readerOffset();
+    }
+
+    @Override
+    public int writableBytes() {
+        return capacity() - writerOffset();
     }
 
     @Override
@@ -246,6 +269,11 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
         return wseg == CLOSED_SEGMENT && seg != CLOSED_SEGMENT;
     }
 
+//    @Override
+    public boolean isDirect() {
+        return seg.isNative();
+    }
+
     @Override
     public Buffer copy(int offset, int length) {
         checkGet(offset, length);
@@ -311,6 +339,16 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
         }
 
         Statics.copyToViaReverseLoop(this, srcPos, dest, destPos, length);
+    }
+
+    @Override
+    public int transferTo(WritableByteChannel channel, int length) throws IOException {
+        return 0; // todo
+    }
+
+    @Override
+    public int transferFrom(ReadableByteChannel channel, int length) throws IOException {
+        return 0; // todo
     }
 
     @Override
@@ -539,10 +577,9 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
         if (!isOwned()) {
             throw attachTrace(new IllegalStateException("Cannot split a buffer that is not owned."));
         }
-        var drop = (ArcDrop<MemSegBuffer>) unsafeGetDrop();
-        unsafeSetDrop(new ArcDrop<>(drop));
+        var drop = unsafeGetDrop().fork();
         var splitSegment = seg.asSlice(0, splitOffset);
-        var splitBuffer = new MemSegBuffer(base, splitSegment, new ArcDrop<>(drop.increment()), control);
+        var splitBuffer = new MemSegBuffer(base, splitSegment, drop, control);
         splitBuffer.woff = Math.min(woff, splitOffset);
         splitBuffer.roff = Math.min(roff, splitOffset);
         boolean readOnly = readOnly();

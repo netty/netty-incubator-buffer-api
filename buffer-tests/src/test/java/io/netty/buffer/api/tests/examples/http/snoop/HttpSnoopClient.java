@@ -17,7 +17,7 @@ package io.netty.buffer.api.tests.examples.http.snoop;
 
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.api.BufferAllocator;
-import io.netty.buffer.api.DefaultGlobalBufferAllocator;
+import io.netty.buffer.api.DefaultBufferAllocators;
 import io.netty.buffer.api.adaptor.ByteBufAllocatorAdaptor;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelOption;
@@ -65,7 +65,7 @@ public final class HttpSnoopClient {
             return;
         }
 
-        BufferAllocator allocator = DefaultGlobalBufferAllocator.DEFAULT_GLOBAL_BUFFER_ALLOCATOR;
+        BufferAllocator allocator = DefaultBufferAllocators.preferredAllocator();
 
         // Configure SSL context if necessary.
         final boolean ssl = "https".equalsIgnoreCase(scheme);
