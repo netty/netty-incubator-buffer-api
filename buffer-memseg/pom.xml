@@ -40,40 +40,40 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>${surefire.version}</version>
                 <configuration>
-                    <dependenciesToScan>io.netty:netty-buffer:test-jar</dependenciesToScan>
-                    <includes>
-                        <include>io.netty.buffer.api.tests.BufferByteOffsettedAccessorsTest</include>
-                        <include>io.netty.buffer.api.tests.BufferBulkAccessTest</include>
-                        <include>io.netty.buffer.api.tests.BufferAndChannelTest</include>
-                        <include>io.netty.buffer.api.tests.BufferAllocateTest</include>
-                        <include>io.netty.buffer.api.tests.BufferSplitTest</include>
-                        <include>io.netty.buffer.api.tests.EchoIT</include>
-                        <include>io.netty.buffer.api.tests.BufferCharOffsettedAccessorsTest</include>
-                        <include>io.netty.buffer.api.tests.BufferCharSequenceTest</include>
-                        <include>io.netty.buffer.api.tests.BufferCleanerTest</include>
-                        <include>io.netty.buffer.api.tests.BufferCompactTest</include>
-                        <include>io.netty.buffer.api.tests.BufferComponentIterationTest</include>
-                        <include>io.netty.buffer.api.tests.BufferCompositionTest</include>
-                        <include>io.netty.buffer.api.tests.BufferCopyAllocateTest</include>
-                        <include>io.netty.buffer.api.tests.BufferDoubleOffsettedAccessorsTest</include>
-                        <include>io.netty.buffer.api.tests.BufferEnsureWritableTest</include>
-                        <include>io.netty.buffer.api.tests.BufferEqualsTest</include>
-                        <include>io.netty.buffer.api.tests.BufferFloatOffsettedAccessorsTest</include>
-                        <include>io.netty.buffer.api.tests.BufferIntOffsettedAccessorsTest</include>
-                        <include>io.netty.buffer.api.tests.BufferLeakDetectionTest</include>
-                        <include>io.netty.buffer.api.tests.BufferLifeCycleTest</include>
-                        <include>io.netty.buffer.api.tests.BufferLongOffsettedAccessorsTest</include>
-                        <include>io.netty.buffer.api.tests.BufferMediumOffsettedAccessorsTest</include>
-                        <include>io.netty.buffer.api.tests.BufferOffsetsTest</include>
-                        <include>io.netty.buffer.api.tests.BufferPrimitiveRelativeAccessorsTest</include>
-                        <include>io.netty.buffer.api.tests.BufferReadOnlyTest</include>
-                        <include>io.netty.buffer.api.tests.BufferRefTest</include>
-                        <include>io.netty.buffer.api.tests.BufferSearchTest</include>
-                        <include>io.netty.buffer.api.tests.BufferSendTest</include>
-                        <include>io.netty.buffer.api.tests.BufferShortOffsettedAccessorsTest</include>
-                        <include>io.netty.buffer.api.tests.BufferWriteBytesCombinationsTest</include>
-                        <include>io.netty.buffer.api.tests.CleanerDropTest</include>
-                    </includes>
+<!--                    <dependenciesToScan>io.netty:netty-buffer:test-jar</dependenciesToScan>-->
+<!--                    <includes>-->
+<!--                        <include>io.netty.buffer.api.tests.BufferByteOffsettedAccessorsTest</include>-->
+<!--                        <include>io.netty.buffer.api.tests.BufferBulkAccessTest</include>-->
+<!--                        <include>io.netty.buffer.api.tests.BufferAndChannelTest</include>-->
+<!--                        <include>io.netty.buffer.api.tests.BufferAllocateTest</include>-->
+<!--                        <include>io.netty.buffer.api.tests.BufferSplitTest</include>-->
+<!--                        <include>io.netty.buffer.api.tests.EchoIT</include>-->
+<!--                        <include>io.netty.buffer.api.tests.BufferCharOffsettedAccessorsTest</include>-->
+<!--                        <include>io.netty.buffer.api.tests.BufferCharSequenceTest</include>-->
+<!--                        <include>io.netty.buffer.api.tests.BufferCleanerTest</include>-->
+<!--                        <include>io.netty.buffer.api.tests.BufferCompactTest</include>-->
+<!--                        <include>io.netty.buffer.api.tests.BufferComponentIterationTest</include>-->
+<!--                        <include>io.netty.buffer.api.tests.BufferCompositionTest</include>-->
+<!--                        <include>io.netty.buffer.api.tests.BufferCopyAllocateTest</include>-->
+<!--                        <include>io.netty.buffer.api.tests.BufferDoubleOffsettedAccessorsTest</include>-->
+<!--                        <include>io.netty.buffer.api.tests.BufferEnsureWritableTest</include>-->
+<!--                        <include>io.netty.buffer.api.tests.BufferEqualsTest</include>-->
+<!--                        <include>io.netty.buffer.api.tests.BufferFloatOffsettedAccessorsTest</include>-->
+<!--                        <include>io.netty.buffer.api.tests.BufferIntOffsettedAccessorsTest</include>-->
+<!--                        <include>io.netty.buffer.api.tests.BufferLeakDetectionTest</include>-->
+<!--                        <include>io.netty.buffer.api.tests.BufferLifeCycleTest</include>-->
+<!--                        <include>io.netty.buffer.api.tests.BufferLongOffsettedAccessorsTest</include>-->
+<!--                        <include>io.netty.buffer.api.tests.BufferMediumOffsettedAccessorsTest</include>-->
+<!--                        <include>io.netty.buffer.api.tests.BufferOffsetsTest</include>-->
+<!--                        <include>io.netty.buffer.api.tests.BufferPrimitiveRelativeAccessorsTest</include>-->
+<!--                        <include>io.netty.buffer.api.tests.BufferReadOnlyTest</include>-->
+<!--                        <include>io.netty.buffer.api.tests.BufferRefTest</include>-->
+<!--                        <include>io.netty.buffer.api.tests.BufferSearchTest</include>-->
+<!--                        <include>io.netty.buffer.api.tests.BufferSendTest</include>-->
+<!--                        <include>io.netty.buffer.api.tests.BufferShortOffsettedAccessorsTest</include>-->
+<!--                        <include>io.netty.buffer.api.tests.BufferWriteBytesCombinationsTest</include>-->
+<!--                        <include>io.netty.buffer.api.tests.CleanerDropTest</include>-->
+<!--                    </includes>-->
                 </configuration>
             </plugin>
         </plugins>

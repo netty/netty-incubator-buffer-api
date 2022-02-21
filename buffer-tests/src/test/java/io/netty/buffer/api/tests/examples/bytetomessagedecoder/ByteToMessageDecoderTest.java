@@ -33,9 +33,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 
 import static io.netty.buffer.api.BufferAllocator.onHeapUnpooled;
-import static io.netty.buffer.api.CompositeBuffer.compose;
 import static io.netty.buffer.api.tests.BufferTestSupport.assertEquals;
-import static io.netty.buffer.api.tests.BufferTestSupport.assertReadableEquals;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
@@ -92,7 +90,7 @@ public class ByteToMessageDecoderTest {
             channel.writeInbound(buf.copy());
             try (Buffer expected = onHeapUnpooled().allocate(3).writeShort((short) 0x0203).writeByte((byte) 0x04);
                  Buffer actual = channel.readInbound()) {
-                assertReadableEquals(expected, actual);
+                assertThat(actual).isEqualTo(expected);
             }
         }
     }
@@ -118,7 +116,7 @@ public class ByteToMessageDecoderTest {
         channel.writeInbound(buf);
         try (Buffer expected = onHeapUnpooled().allocate(4).writeInt(0x02030405);
              Buffer actual = channel.readInbound()) {
-            assertReadableEquals(expected, actual);
+            assertThat(actual).isEqualTo(expected);
         }
     }
 
@@ -146,7 +144,7 @@ public class ByteToMessageDecoderTest {
         assertTrue(channel.finish());
         try (Buffer expected = onHeapUnpooled().allocate(1).writeByte((byte) 0x02);
              Buffer actual = channel.readInbound()) {
-            assertReadableEquals(expected, actual);
+            assertThat(actual).isEqualTo(expected);
             assertNull(channel.readInbound());
         }
     }
@@ -270,7 +268,7 @@ public class ByteToMessageDecoderTest {
             assertTrue(channel.writeInbound(buf.copy()));
             try (Buffer expected = buf.copy(1, 3);
                  Buffer actual = channel.readInbound()) {
-                assertReadableEquals(expected, actual);
+                assertThat(actual).isEqualTo(expected);
                 assertFalse(channel.finish());
             }
         }
@@ -295,7 +293,7 @@ public class ByteToMessageDecoderTest {
             }
             assertTrue(channel.writeInbound(buf.copy()));
             try (Buffer b = channel.readInbound()) {
-                assertReadableEquals(buf, b);
+                assertThat(b).isEqualTo(buf);
                 assertNull(channel.readInbound());
                 assertFalse(channel.finish());
                 assertNull(channel.readInbound());
@@ -334,12 +332,12 @@ public class ByteToMessageDecoderTest {
              Buffer part2 = buf.copy(bytes.length - 1, 1)) {
             assertTrue(channel.writeInbound(buf));
             try (Buffer actual = channel.readInbound()) {
-                assertEquals(part1, actual);
+                assertThat(actual).isEqualTo(part1);
             }
             assertNull(channel.readInbound());
             assertTrue(channel.finish());
             try (Buffer actual = channel.readInbound()) {
-                assertEquals(part2, actual);
+                assertThat(actual).isEqualTo(part2);
             }
             assertNull(channel.readInbound());
         }
@@ -568,7 +566,7 @@ public class ByteToMessageDecoderTest {
 
             assertTrue(channel.finish());
             try (Buffer actual = channel.readInbound()) {
-                assertReadableEquals(buf, actual);
+                assertThat(actual).isEqualTo(buf);
             }
             assertNull(channel.readInbound());
         }

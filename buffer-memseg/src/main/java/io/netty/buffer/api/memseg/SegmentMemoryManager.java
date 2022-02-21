@@ -23,6 +23,7 @@ import io.netty.buffer.api.MemoryManager;
 import io.netty.buffer.api.StandardAllocationTypes;
 import io.netty.buffer.api.internal.ArcDrop;
 import io.netty.buffer.api.internal.Statics;
+import io.netty.buffer.api.internal.WrappingAllocation;
 import jdk.incubator.foreign.MemorySegment;
 import jdk.incubator.foreign.ResourceScope;
 
@@ -32,7 +33,7 @@ import java.util.function.Function;
 
 import static jdk.incubator.foreign.ResourceScope.newSharedScope;
 
-public class SegmentMemoryManagers implements MemoryManager {
+public class SegmentMemoryManager implements MemoryManager {
     private static final ConcurrentHashMap<Long, Runnable> CLEANUP_ACTIONS = new ConcurrentHashMap<>();
     private static final Function<Long, Runnable> CLEANUP_ACTION_MAKER = s -> new ReduceNativeMemoryUsage(s);
 
@@ -47,7 +48,12 @@ public class SegmentMemoryManagers implements MemoryManager {
     private static MemorySegment createNativeSegment(long size, Cleaner cleaner) {
         final ResourceScope scope = cleaner == null ? newSharedScope() : newSharedScope(cleaner);
         scope.addCloseAction(getCleanupAction(size));
-        var segment = MemorySegment.allocateNative(size, scope);
+        final MemorySegment segment;
+        if (size == 0) {
+            segment = MemorySegment.allocateNative(1, scope).asSlice(0, 0);
+        } else {
+            segment = MemorySegment.allocateNative(size, scope);
+        }
         Statics.MEM_USAGE_NATIVE.add(size);
         return segment;
     }
@@ -60,7 +66,11 @@ public class SegmentMemoryManagers implements MemoryManager {
                 case ON_HEAP -> createHeapSegment(size);
                 case OFF_HEAP -> createNativeSegment(size, null);
             };
-            return new MemSegBuffer(segment, segment, Statics.convert(drop), allocatorControl);
+            return createBuffer(segment, drop, allocatorControl);
+        }
+        if (type instanceof WrappingAllocation allocation) {
+            var seg = MemorySegment.ofArray(allocation.getArray());
+            return createBuffer(seg, drop, allocatorControl);
         }
         throw new IllegalArgumentException("Unknown allocation type: " + type);
     }
@@ -69,7 +79,7 @@ public class SegmentMemoryManagers implements MemoryManager {
     public Buffer allocateConstChild(Buffer readOnlyConstParent) {
         assert readOnlyConstParent.readOnly();
         MemSegBuffer buf = (MemSegBuffer) readOnlyConstParent;
-        return new MemSegBuffer(buf);
+        return buf.newConstChild();
     }
 
     @Override
@@ -86,7 +96,14 @@ public class SegmentMemoryManagers implements MemoryManager {
     @Override
     public Buffer recoverMemory(AllocatorControl allocatorControl, Object recoverableMemory, Drop<Buffer> drop) {
         var segment = (MemorySegment) recoverableMemory;
-        return new MemSegBuffer(segment, segment, Statics.convert(ArcDrop.acquire(drop)), allocatorControl);
+        return createBuffer(segment, drop, allocatorControl);
+    }
+
+    private MemSegBuffer createBuffer(MemorySegment segment, Drop<Buffer> drop, AllocatorControl allocatorControl) {
+        Drop<MemSegBuffer> concreteDrop = Statics.convert(drop);
+        MemSegBuffer buffer = new MemSegBuffer(segment, segment, concreteDrop, allocatorControl);
+        concreteDrop.attach(buffer);
+        return buffer;
     }
 
     @Override

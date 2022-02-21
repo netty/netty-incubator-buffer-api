@@ -14,7 +14,7 @@
  * under the License.
  */
 import io.netty.buffer.api.MemoryManager;
-import io.netty.buffer.api.memseg.SegmentMemoryManagers;
+import io.netty.buffer.api.memseg.SegmentMemoryManager;
 
 module netty.incubator.buffer.memseg {
     requires jdk.incubator.foreign;
@@ -29,5 +29,5 @@ module netty.incubator.buffer.memseg {
     opens io.netty.buffer.api.memseg;
 
     provides MemoryManager with
-            SegmentMemoryManagers;
+            SegmentMemoryManager;
 }

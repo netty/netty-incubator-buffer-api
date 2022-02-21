@@ -27,7 +27,6 @@ import io.netty.buffer.api.ReadableComponentProcessor;
 import io.netty.buffer.api.WritableComponent;
 import io.netty.buffer.api.WritableComponentProcessor;
 import io.netty.buffer.api.internal.AdaptableBuffer;
-import io.netty.buffer.api.internal.ArcDrop;
 import io.netty.buffer.api.internal.Statics;
 import jdk.incubator.foreign.MemorySegment;
 import jdk.incubator.foreign.ResourceScope;
@@ -35,6 +34,8 @@ import jdk.incubator.foreign.ValueLayout;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.ReadOnlyBufferException;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.WritableByteChannel;
 
@@ -42,6 +43,21 @@ import static io.netty.buffer.api.internal.Statics.bufferIsClosed;
 import static io.netty.buffer.api.internal.Statics.bufferIsReadOnly;
 
 class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComponent, WritableComponent {
+    private static final ValueLayout.OfByte JAVA_BYTE =
+            ValueLayout.JAVA_BYTE.withOrder(ByteOrder.BIG_ENDIAN).withBitAlignment(Byte.SIZE);
+    private static final ValueLayout.OfChar JAVA_CHAR =
+            ValueLayout.JAVA_CHAR.withOrder(ByteOrder.BIG_ENDIAN).withBitAlignment(Byte.SIZE);
+    private static final ValueLayout.OfShort JAVA_SHORT =
+            ValueLayout.JAVA_SHORT.withOrder(ByteOrder.BIG_ENDIAN).withBitAlignment(Byte.SIZE);
+    private static final ValueLayout.OfInt JAVA_INT =
+            ValueLayout.JAVA_INT.withOrder(ByteOrder.BIG_ENDIAN).withBitAlignment(Byte.SIZE);
+    private static final ValueLayout.OfFloat JAVA_FLOAT =
+            ValueLayout.JAVA_FLOAT.withOrder(ByteOrder.BIG_ENDIAN).withBitAlignment(Byte.SIZE);
+    private static final ValueLayout.OfLong JAVA_LONG =
+            ValueLayout.JAVA_LONG.withOrder(ByteOrder.BIG_ENDIAN).withBitAlignment(Byte.SIZE);
+    private static final ValueLayout.OfDouble JAVA_DOUBLE =
+            ValueLayout.JAVA_DOUBLE.withOrder(ByteOrder.BIG_ENDIAN).withBitAlignment(Byte.SIZE);
+
     private static final MemorySegment CLOSED_SEGMENT;
     private static final MemorySegment ZERO_OFFHEAP_SEGMENT;
     private static final MemorySegment ZERO_ONHEAP_SEGMENT;
@@ -88,7 +104,6 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
     private MemorySegment wseg;
     private int roff;
     private int woff;
-    private boolean constBuffer;
 
     MemSegBuffer(MemorySegment base, MemorySegment view, Drop<MemSegBuffer> drop, AllocatorControl control) {
         super(drop, control);
@@ -101,15 +116,14 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
     /**
      * Constructor for {@linkplain BufferAllocator#constBufferSupplier(byte[]) const buffers}.
      */
-    MemSegBuffer(MemSegBuffer parent) {
-        super(parent.unsafeGetDrop(), parent.control);
+    MemSegBuffer(MemSegBuffer parent, Drop<MemSegBuffer> drop) {
+        super(drop, parent.control);
         control = parent.control;
         base = parent.base;
         seg = parent.seg;
         wseg = parent.wseg;
         roff = parent.roff;
         woff = parent.woff;
-        constBuffer = true;
     }
 
     @Override
@@ -204,7 +218,7 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
 
     @Override
     public long readableNativeAddress() {
-        return nativeAddress();
+        return nativeAddress(roff);
     }
 
     @Override
@@ -237,7 +251,7 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
 
     @Override
     public long writableNativeAddress() {
-        return nativeAddress();
+        return nativeAddress(woff);
     }
 
     @Override
@@ -248,12 +262,12 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
     }
     // </editor-fold>
 
-    private long nativeAddress() {
+    private long nativeAddress(int offset) {
         if (!isAccessible()) {
             throw bufferIsClosed(this);
         }
         if (seg.isNative()) {
-            return seg.address().toRawLongValue();
+            return seg.address().toRawLongValue() + offset;
         }
         return 0; // This is a heap segment.
     }
@@ -269,7 +283,7 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
         return wseg == CLOSED_SEGMENT && seg != CLOSED_SEGMENT;
     }
 
-//    @Override
+    @Override
     public boolean isDirect() {
         return seg.isNative();
     }
@@ -284,7 +298,7 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
         if (length == 0) {
             // Special case zero-length segments, since allocators don't support allocating empty buffers.
             final MemorySegment zero;
-            if (nativeAddress() == 0) {
+            if (!seg.isNative()) {
                 zero = ZERO_ONHEAP_SEGMENT;
             } else {
                 zero = ZERO_OFFHEAP_SEGMENT;
@@ -310,6 +324,9 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
 
     @Override
     public void copyInto(int srcPos, ByteBuffer dest, int destPos, int length) {
+        if (dest.isReadOnly()) {
+            throw new ReadOnlyBufferException();
+        }
         copyInto(srcPos, MemorySegment.ofByteBuffer(dest.duplicate().clear()), destPos, length);
     }
 
@@ -343,12 +360,37 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
 
     @Override
     public int transferTo(WritableByteChannel channel, int length) throws IOException {
-        return 0; // todo
+        if (!isAccessible()) {
+            throw bufferIsClosed(this);
+        }
+        length = Math.min(readableArrayLength(), length);
+        if (length == 0) {
+            return 0;
+        }
+        checkGet(readerOffset(), length);
+        int bytesWritten = channel.write(readableBuffer().limit(length));
+        skipReadable(bytesWritten);
+        return bytesWritten;
     }
 
     @Override
     public int transferFrom(ReadableByteChannel channel, int length) throws IOException {
-        return 0; // todo
+        if (!isAccessible()) {
+            throw bufferIsClosed(this);
+        }
+        if (readOnly()) {
+            throw bufferIsReadOnly(this);
+        }
+        length = Math.min(writableBytes(), length);
+        if (length == 0) {
+            return 0;
+        }
+        checkSet(writerOffset(), length);
+        int bytesRead = channel.read(writableBuffer().limit(length));
+        if (bytesRead != -1) {
+            skipWritable(bytesRead);
+        }
+        return bytesRead;
     }
 
     @Override
@@ -418,7 +460,7 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
             @Override
             public boolean readByte() {
                 if (index < end) {
-                    byteValue = segment.get(ValueLayout.JAVA_BYTE, index);
+                    byteValue = segment.get(JAVA_BYTE, index);
                     index++;
                     return true;
                 }
@@ -475,7 +517,7 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
             @Override
             public boolean readByte() {
                 if (index > end) {
-                    byteValue = segment.get(ValueLayout.JAVA_BYTE, index);
+                    byteValue = segment.get(JAVA_BYTE, index);
                     index--;
                     return true;
                 }
@@ -549,7 +591,7 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
         int roff = this.roff;
         int woff = this.woff;
         drop.drop(this);
-        unsafeSetDrop(new ArcDrop<>(newDrop));
+        unsafeSetDrop(newDrop);
         this.roff = roff;
         this.woff = woff;
     }
@@ -558,7 +600,6 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
         base = newSegment;
         seg = newSegment;
         wseg = newSegment;
-        constBuffer = false;
         drop.attach(this);
     }
 
@@ -586,8 +627,6 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
         if (readOnly) {
             splitBuffer.makeReadOnly();
         }
-        // Split preserves const-state.
-        splitBuffer.constBuffer = constBuffer;
         seg = seg.asSlice(splitOffset, seg.byteSize() - splitOffset);
         if (!readOnly) {
             wseg = seg;
@@ -646,59 +685,59 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
 
     // <editor-fold defaultstate="collapsed" desc="Primitive accessors implementation.">
     private static byte getByteAtOffset(MemorySegment seg, int roff) {
-        return seg.get(ValueLayout.JAVA_BYTE, roff);
+        return seg.get(JAVA_BYTE, roff);
     }
 
     private static void setByteAtOffset(MemorySegment seg, int woff, byte value) {
-        seg.set(ValueLayout.JAVA_BYTE, woff, value);
+        seg.set(JAVA_BYTE, woff, value);
     }
 
     private static short getShortAtOffset(MemorySegment seg, int roff) {
-        return seg.get(ValueLayout.JAVA_SHORT, roff);
+        return seg.get(JAVA_SHORT, roff);
     }
 
     private static void setShortAtOffset(MemorySegment seg, int woff, short value) {
-        seg.set(ValueLayout.JAVA_SHORT, woff, value);
+        seg.set(JAVA_SHORT, woff, value);
     }
 
     private static char getCharAtOffset(MemorySegment seg, int roff) {
-        return seg.get(ValueLayout.JAVA_CHAR, roff);
+        return seg.get(JAVA_CHAR, roff);
     }
 
     private static void setCharAtOffset(MemorySegment seg, int woff, char value) {
-        seg.set(ValueLayout.JAVA_CHAR, woff, value);
+        seg.set(JAVA_CHAR, woff, value);
     }
 
     private static int getIntAtOffset(MemorySegment seg, int roff) {
-        return seg.get(ValueLayout.JAVA_INT, roff);
+        return seg.get(JAVA_INT, roff);
     }
 
     private static void setIntAtOffset(MemorySegment seg, int woff, int value) {
-        seg.set(ValueLayout.JAVA_INT, woff, value);
+        seg.set(JAVA_INT, woff, value);
     }
 
     private static float getFloatAtOffset(MemorySegment seg, int roff) {
-        return seg.get(ValueLayout.JAVA_FLOAT, roff);
+        return seg.get(JAVA_FLOAT, roff);
     }
 
     private static void setFloatAtOffset(MemorySegment seg, int woff, float value) {
-        seg.set(ValueLayout.JAVA_FLOAT, woff, value);
+        seg.set(JAVA_FLOAT, woff, value);
     }
 
     private static long getLongAtOffset(MemorySegment seg, int roff) {
-        return seg.get(ValueLayout.JAVA_LONG, roff);
+        return seg.get(JAVA_LONG, roff);
     }
 
     private static void setLongAtOffset(MemorySegment seg, int woff, long value) {
-        seg.set(ValueLayout.JAVA_LONG, woff, value);
+        seg.set(JAVA_LONG, woff, value);
     }
 
     private static double getDoubleAtOffset(MemorySegment seg, int roff) {
-        return seg.get(ValueLayout.JAVA_DOUBLE, roff);
+        return seg.get(JAVA_DOUBLE, roff);
     }
 
     private static void setDoubleAtOffset(MemorySegment seg, int woff, double value) {
-        seg.set(ValueLayout.JAVA_DOUBLE, woff, value);
+        seg.set(JAVA_DOUBLE, woff, value);
     }
 
     @Override
@@ -1131,10 +1170,8 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
         var roff = this.roff;
         var woff = this.woff;
         var readOnly = readOnly();
-        var isConst = constBuffer;
         MemorySegment transferSegment = seg;
         MemorySegment base = this.base;
-        makeInaccessible();
         return new Owned<MemSegBuffer>() {
             @Override
             public MemSegBuffer transferOwnership(Drop<MemSegBuffer> drop) {
@@ -1144,7 +1181,6 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
                 if (readOnly) {
                     copy.makeReadOnly();
                 }
-                copy.constBuffer = isConst;
                 return copy;
             }
         };
@@ -1191,6 +1227,14 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
             return bufferIsReadOnly(this);
         }
         return ioobe;
+    }
+
+    Buffer newConstChild() {
+        assert readOnly();
+        Drop<MemSegBuffer> drop = unsafeGetDrop().fork();
+        MemSegBuffer child = new MemSegBuffer(this, drop);
+        drop.attach(child);
+        return child;
     }
 
     private RuntimeException readAccessCheckException(int index) {
