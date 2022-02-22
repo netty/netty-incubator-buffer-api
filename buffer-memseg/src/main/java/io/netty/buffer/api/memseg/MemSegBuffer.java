@@ -299,7 +299,9 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
 
         AllocatorControl.UntetheredMemory memory = control.allocateUntethered(this, length);
         MemorySegment segment = memory.memory();
-        Buffer copy = new MemSegBuffer(segment, segment, control, memory.drop());
+        Drop<MemSegBuffer> drop = memory.drop();
+        MemSegBuffer copy = new MemSegBuffer(segment, segment, control, drop);
+        drop.attach(copy);
         copyInto(offset, copy, 0, length);
         copy.writerOffset(length);
         return copy;
@@ -357,7 +359,7 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
         if (!isAccessible()) {
             throw bufferIsClosed(this);
         }
-        length = Math.min(readableArrayLength(), length);
+        length = Math.min(readableBytes(), length);
         if (length == 0) {
             return 0;
         }
