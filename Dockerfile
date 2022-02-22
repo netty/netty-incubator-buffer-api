@@ -33,6 +33,7 @@ RUN mkdir buffer-api && mkdir buffer-memseg && mkdir buffer-tests
 COPY pom.xml pom.xml
 COPY buffer-memseg/pom.xml buffer-memseg/pom.xml
 COPY buffer-tests/pom.xml buffer-tests/pom.xml
+RUN mvn --version
 RUN mvn install dependency:go-offline surefire:test checkstyle:check -ntp
 
 # Copy over the project code and run our build
