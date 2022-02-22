@@ -59,8 +59,6 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
             ValueLayout.JAVA_DOUBLE.withOrder(ByteOrder.BIG_ENDIAN).withBitAlignment(Byte.SIZE);
 
     private static final MemorySegment CLOSED_SEGMENT;
-    private static final MemorySegment ZERO_OFFHEAP_SEGMENT;
-    private static final MemorySegment ZERO_ONHEAP_SEGMENT;
     static final Drop<MemSegBuffer> SEGMENT_CLOSE;
 
     static {
@@ -71,8 +69,6 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
             MemorySegment segment = MemorySegment.allocateNative(1, scope);
             CLOSED_SEGMENT = segment.asSlice(0, 0);
         }
-        ZERO_OFFHEAP_SEGMENT = MemorySegment.allocateNative(1, ResourceScope.globalScope()).asSlice(0, 0);
-        ZERO_ONHEAP_SEGMENT = MemorySegment.ofArray(new byte[0]);
         SEGMENT_CLOSE = new Drop<MemSegBuffer>() {
             @Override
             public void drop(MemSegBuffer buf) {
@@ -105,7 +101,7 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
     private int roff;
     private int woff;
 
-    MemSegBuffer(MemorySegment base, MemorySegment view, Drop<MemSegBuffer> drop, AllocatorControl control) {
+    MemSegBuffer(MemorySegment base, MemorySegment view, AllocatorControl control, Drop<MemSegBuffer> drop) {
         super(drop, control);
         this.control = control;
         this.base = base;
@@ -170,6 +166,9 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
 
     @Override
     public MemSegBuffer writerOffset(int offset) {
+        if (readOnly()) {
+            throw bufferIsReadOnly(this);
+        }
         checkWrite(offset, 0);
         woff = offset;
         return this;
@@ -290,30 +289,19 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
 
     @Override
     public Buffer copy(int offset, int length) {
+        if (!isAccessible()) {
+            throw attachTrace(bufferIsClosed(this));
+        }
         checkGet(offset, length);
         if (length < 0) {
             throw new IllegalArgumentException("Length cannot be negative: " + length + '.');
         }
 
-        if (length == 0) {
-            // Special case zero-length segments, since allocators don't support allocating empty buffers.
-            final MemorySegment zero;
-            if (!seg.isNative()) {
-                zero = ZERO_ONHEAP_SEGMENT;
-            } else {
-                zero = ZERO_OFFHEAP_SEGMENT;
-            }
-            return new MemSegBuffer(zero, zero, SEGMENT_CLOSE, control);
-        }
-
         AllocatorControl.UntetheredMemory memory = control.allocateUntethered(this, length);
         MemorySegment segment = memory.memory();
-        Buffer copy = new MemSegBuffer(segment, segment, memory.drop(), control);
+        Buffer copy = new MemSegBuffer(segment, segment, control, memory.drop());
         copyInto(offset, copy, 0, length);
         copy.writerOffset(length);
-        if (readOnly()) {
-            copy = copy.makeReadOnly();
-        }
         return copy;
     }
 
@@ -349,6 +337,12 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
 
     @Override
     public void copyInto(int srcPos, Buffer dest, int destPos, int length) {
+        if (!isAccessible()) {
+            throw attachTrace(bufferIsClosed(this));
+        }
+        if (dest.readOnly()) {
+            throw bufferIsReadOnly(dest);
+        }
         if (dest instanceof MemSegBuffer memSegBuf) {
             memSegBuf.checkSet(destPos, length);
             copyInto(srcPos, memSegBuf.seg, destPos, length);
@@ -620,7 +614,8 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
         }
         var drop = unsafeGetDrop().fork();
         var splitSegment = seg.asSlice(0, splitOffset);
-        var splitBuffer = new MemSegBuffer(base, splitSegment, drop, control);
+        var splitBuffer = new MemSegBuffer(base, splitSegment, control, drop);
+        drop.attach(splitBuffer);
         splitBuffer.woff = Math.min(woff, splitOffset);
         splitBuffer.roff = Math.min(roff, splitOffset);
         boolean readOnly = readOnly();
@@ -638,6 +633,9 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
 
     @Override
     public Buffer compact() {
+        if (!isAccessible()) {
+            throw attachTrace(bufferIsClosed(this));
+        }
         if (!isOwned()) {
             throw attachTrace(new IllegalStateException("Buffer must be owned in order to compact."));
         }
@@ -1175,7 +1173,7 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
         return new Owned<MemSegBuffer>() {
             @Override
             public MemSegBuffer transferOwnership(Drop<MemSegBuffer> drop) {
-                MemSegBuffer copy = new MemSegBuffer(base, transferSegment, drop, control);
+                MemSegBuffer copy = new MemSegBuffer(base, transferSegment, control, drop);
                 copy.roff = roff;
                 copy.woff = woff;
                 if (readOnly) {

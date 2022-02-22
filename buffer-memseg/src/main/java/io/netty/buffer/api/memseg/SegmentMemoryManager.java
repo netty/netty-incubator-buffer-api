@@ -21,7 +21,6 @@ import io.netty.buffer.api.Buffer;
 import io.netty.buffer.api.Drop;
 import io.netty.buffer.api.MemoryManager;
 import io.netty.buffer.api.StandardAllocationTypes;
-import io.netty.buffer.api.internal.ArcDrop;
 import io.netty.buffer.api.internal.Statics;
 import io.netty.buffer.api.internal.WrappingAllocation;
 import jdk.incubator.foreign.MemorySegment;
@@ -99,9 +98,9 @@ public class SegmentMemoryManager implements MemoryManager {
         return createBuffer(segment, drop, allocatorControl);
     }
 
-    private MemSegBuffer createBuffer(MemorySegment segment, Drop<Buffer> drop, AllocatorControl allocatorControl) {
+    private static MemSegBuffer createBuffer(MemorySegment segment, Drop<Buffer> drop, AllocatorControl control) {
         Drop<MemSegBuffer> concreteDrop = Statics.convert(drop);
-        MemSegBuffer buffer = new MemSegBuffer(segment, segment, concreteDrop, allocatorControl);
+        MemSegBuffer buffer = new MemSegBuffer(segment, segment, control, concreteDrop);
         concreteDrop.attach(buffer);
         return buffer;
     }
