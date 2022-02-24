@@ -25,8 +25,6 @@ build: image
 	docker start -a build-container || (docker cp build-container:/home/build target/container-output && false)
 	docker wait build-container || (docker cp build-container:/home/build target/container-output && false)
 	docker cp build-container:/home/build/target .
-	docker cp build-container:/home/build/buffer-memseg/target .
-	docker cp build-container:/home/build/buffer-tests/target .
 	docker rm build-container
 
 rebuild: clean clean-layer-cache build

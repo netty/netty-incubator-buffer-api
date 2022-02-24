@@ -24,8 +24,12 @@ on:
     - cron: '30 6 * * 1'  # At 06:30 on Monday, every Monday.
   workflow_dispatch: # This allows us to run the workflow manually from the Actions tab
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  java17:
+  java19:
     runs-on: ubuntu-latest
     steps:
       # http://man7.org/linux/man-pages/man1/date.1.html
@@ -49,11 +53,11 @@ jobs:
       # Run the make script
       - name: Make build
         run: make build
-      - name: Upload Java 18 Test Results
+      - name: Upload Java 19 Test Results
         if: always()
         uses: actions/upload-artifact@v2
         with:
-          name: test-results-java18
+          name: test-results-java19
           path: '**/target/surefire-reports/TEST-*.xml'
       - name: Upload build artefacts
         uses: actions/upload-artifact@v2
