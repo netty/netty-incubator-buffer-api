@@ -18,8 +18,8 @@ ENV JAVA_HOME="/home/jdk"
 
 # Prepare our own build environment
 WORKDIR /home/build
-RUN curl https://downloads.apache.org/maven/maven-3/3.8.4/binaries/apache-maven-3.8.4-bin.tar.gz | tar -xz
-ENV PATH=/home/build/apache-maven-3.8.4/bin:$PATH
+RUN curl https://downloads.apache.org/maven/maven-3/3.8.5/binaries/apache-maven-3.8.5-bin.tar.gz | tar -xz
+ENV PATH=/home/build/apache-maven-3.8.5/bin:$PATH
 
 # Prepare a snapshot of Netty 5
 RUN git clone --depth 1 -b main https://github.com/netty/netty.git netty \
