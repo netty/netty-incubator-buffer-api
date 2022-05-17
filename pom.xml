@@ -68,7 +68,7 @@
 
   <properties>
     <javaModuleName>io.netty.incubator.buffer.memseg</javaModuleName>
-    <netty.version>5.0.0.Final-SNAPSHOT</netty.version>
+    <netty.version>5.0.0.Alpha3-SNAPSHOT</netty.version>
     <netty.build.version>29</netty.build.version>
     <!-- Java version for bytecode compatibility. -->
     <java.compatibility>19</java.compatibility>
