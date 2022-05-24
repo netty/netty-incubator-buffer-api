@@ -15,7 +15,7 @@
  */
 package io.netty5.buffer.api.memseg;
 
-import io.netty.buffer.api.internal.Statics;
+import io.netty5.buffer.api.internal.Statics;
 
 final class ReduceNativeMemoryUsage implements Runnable {
     private final long size;

@@ -15,25 +15,25 @@
  */
 package io.netty5.buffer.api.tests;
 
-import io.netty.bootstrap.Bootstrap;
-import io.netty.bootstrap.ServerBootstrap;
-import io.netty.buffer.api.Buffer;
-import io.netty.buffer.api.BufferAllocator;
-import io.netty.buffer.api.DefaultBufferAllocators;
+import io.netty5.bootstrap.Bootstrap;
+import io.netty5.bootstrap.ServerBootstrap;
+import io.netty5.buffer.api.Buffer;
+import io.netty5.buffer.api.BufferAllocator;
+import io.netty5.buffer.api.DefaultBufferAllocators;
 import io.netty5.buffer.api.tests.examples.echo.EchoServerHandler;
-import io.netty.channel.ChannelHandler;
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelInitializer;
-import io.netty.channel.ChannelOption;
-import io.netty.channel.ChannelPipeline;
-import io.netty.channel.EventLoopGroup;
-import io.netty.channel.MultithreadEventLoopGroup;
-import io.netty.channel.nio.NioHandler;
-import io.netty.channel.socket.SocketChannel;
-import io.netty.channel.socket.nio.NioServerSocketChannel;
-import io.netty.channel.socket.nio.NioSocketChannel;
-import io.netty.handler.logging.LogLevel;
-import io.netty.handler.logging.LoggingHandler;
+import io.netty5.channel.ChannelHandler;
+import io.netty5.channel.ChannelHandlerContext;
+import io.netty5.channel.ChannelInitializer;
+import io.netty5.channel.ChannelOption;
+import io.netty5.channel.ChannelPipeline;
+import io.netty5.channel.EventLoopGroup;
+import io.netty5.channel.MultithreadEventLoopGroup;
+import io.netty5.channel.nio.NioHandler;
+import io.netty5.channel.socket.SocketChannel;
+import io.netty5.channel.socket.nio.NioServerSocketChannel;
+import io.netty5.channel.socket.nio.NioSocketChannel;
+import io.netty5.handler.logging.LogLevel;
+import io.netty5.handler.logging.LoggingHandler;
 import org.junit.jupiter.api.Test;
 
 import java.net.InetSocketAddress;
@@ -54,7 +54,6 @@ public class EchoIT {
             server.group(bossGroup, workerGroup)
                   .channel(NioServerSocketChannel.class)
                   .childOption(ChannelOption.BUFFER_ALLOCATOR, DefaultBufferAllocators.preferredAllocator())
-                  .childOption(ChannelOption.RCVBUF_ALLOCATOR_USE_BUFFER, true)
                   .option(ChannelOption.SO_BACKLOG, 100)
                   .handler(new LoggingHandler(LogLevel.INFO))
                   .childHandler(new ChannelInitializer<SocketChannel>() {
@@ -77,7 +76,6 @@ public class EchoIT {
                 b.group(group)
                  .channel(NioSocketChannel.class)
                  .option(ChannelOption.TCP_NODELAY, true)
-                 .option(ChannelOption.RCVBUF_ALLOCATOR_USE_BUFFER, true)
                  .handler(new ChannelInitializer<SocketChannel>() {
                      @Override
                      public void initChannel(SocketChannel ch) throws Exception {

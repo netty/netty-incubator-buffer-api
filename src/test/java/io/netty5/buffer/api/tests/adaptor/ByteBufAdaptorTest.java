@@ -16,9 +16,9 @@
 package io.netty5.buffer.api.tests.adaptor;
 
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.api.BufferAllocator;
-import io.netty.buffer.api.MemoryManager;
-import io.netty.buffer.api.adaptor.ByteBufAllocatorAdaptor;
+import io.netty5.buffer.api.BufferAllocator;
+import io.netty5.buffer.api.MemoryManager;
+import io.netty5.buffer.api.adaptor.ByteBufAllocatorAdaptor;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Disabled;
 

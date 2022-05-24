@@ -15,37 +15,36 @@
  */
 package io.netty5.buffer.api.tests.examples.http.snoop;
 
-import io.netty.buffer.api.Buffer;
-import io.netty.channel.ChannelFutureListeners;
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.SimpleChannelInboundHandler;
-import io.netty.handler.codec.DecoderResult;
-import io.netty.handler.codec.http.DefaultFullHttpResponse;
-import io.netty.handler.codec.http.FullHttpResponse;
-import io.netty.handler.codec.http.HttpContent;
-import io.netty.handler.codec.http.HttpHeaderNames;
-import io.netty.handler.codec.http.HttpHeaderValues;
-import io.netty.handler.codec.http.HttpHeaders;
-import io.netty.handler.codec.http.HttpObject;
-import io.netty.handler.codec.http.HttpRequest;
-import io.netty.handler.codec.http.HttpUtil;
-import io.netty.handler.codec.http.LastHttpContent;
-import io.netty.handler.codec.http.QueryStringDecoder;
-import io.netty.handler.codec.http.cookie.Cookie;
-import io.netty.handler.codec.http.cookie.ServerCookieDecoder;
-import io.netty.handler.codec.http.cookie.ServerCookieEncoder;
-import io.netty.util.CharsetUtil;
+import io.netty5.buffer.api.Buffer;
+import io.netty5.channel.ChannelFutureListeners;
+import io.netty5.channel.ChannelHandlerContext;
+import io.netty5.channel.SimpleChannelInboundHandler;
+import io.netty5.handler.codec.DecoderResult;
+import io.netty5.handler.codec.http.DefaultFullHttpResponse;
+import io.netty5.handler.codec.http.FullHttpResponse;
+import io.netty5.handler.codec.http.HttpContent;
+import io.netty5.handler.codec.http.HttpHeaderNames;
+import io.netty5.handler.codec.http.HttpHeaderValues;
+import io.netty5.handler.codec.http.HttpHeaders;
+import io.netty5.handler.codec.http.HttpObject;
+import io.netty5.handler.codec.http.HttpRequest;
+import io.netty5.handler.codec.http.HttpUtil;
+import io.netty5.handler.codec.http.LastHttpContent;
+import io.netty5.handler.codec.http.QueryStringDecoder;
+import io.netty5.handler.codec.http.cookie.Cookie;
+import io.netty5.handler.codec.http.cookie.ServerCookieDecoder;
+import io.netty5.handler.codec.http.cookie.ServerCookieEncoder;
 
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
-import static io.netty.handler.codec.http.HttpResponseStatus.BAD_REQUEST;
-import static io.netty.handler.codec.http.HttpResponseStatus.CONTINUE;
-import static io.netty.handler.codec.http.HttpResponseStatus.OK;
-import static io.netty.handler.codec.http.HttpVersion.HTTP_1_1;
+import static io.netty5.handler.codec.http.HttpResponseStatus.BAD_REQUEST;
+import static io.netty5.handler.codec.http.HttpResponseStatus.CONTINUE;
+import static io.netty5.handler.codec.http.HttpResponseStatus.OK;
+import static io.netty5.handler.codec.http.HttpVersion.HTTP_1_1;
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 public class HttpSnoopServerHandler extends SimpleChannelInboundHandler<Object> {
 
@@ -107,7 +106,7 @@ public class HttpSnoopServerHandler extends SimpleChannelInboundHandler<Object> 
             Buffer content = httpContent.payload();
             if (content.readableBytes() > 0) {
                 buf.append("CONTENT: ");
-                buf.append(content.toString(CharsetUtil.UTF_8));
+                buf.append(content.toString(UTF_8));
                 buf.append("\r\n");
                 appendDecoderResult(buf, request);
             }
@@ -152,7 +151,7 @@ public class HttpSnoopServerHandler extends SimpleChannelInboundHandler<Object> 
         // Build the response object.
         FullHttpResponse response = new DefaultFullHttpResponse(
                 HTTP_1_1, currentObj.decoderResult().isSuccess()? OK : BAD_REQUEST,
-                ctx.bufferAllocator().copyOf(buf.toString().getBytes(StandardCharsets.UTF_8)));
+                ctx.bufferAllocator().copyOf(buf.toString().getBytes(UTF_8)));
 
         response.headers().set(HttpHeaderNames.CONTENT_TYPE, "text/plain; charset=UTF-8");
 

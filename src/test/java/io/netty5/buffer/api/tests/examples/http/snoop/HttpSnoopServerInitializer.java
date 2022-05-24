@@ -15,20 +15,20 @@
  */
 package io.netty5.buffer.api.tests.examples.http.snoop;
 
-import io.netty.buffer.ByteBufAllocator;
-import io.netty.channel.ChannelInitializer;
-import io.netty.channel.ChannelPipeline;
-import io.netty.channel.socket.SocketChannel;
-import io.netty.handler.codec.http.HttpRequestDecoder;
-import io.netty.handler.codec.http.HttpResponseEncoder;
-import io.netty.handler.ssl.SslContext;
+import io.netty5.buffer.api.BufferAllocator;
+import io.netty5.channel.ChannelInitializer;
+import io.netty5.channel.ChannelPipeline;
+import io.netty5.channel.socket.SocketChannel;
+import io.netty5.handler.codec.http.HttpRequestDecoder;
+import io.netty5.handler.codec.http.HttpResponseEncoder;
+import io.netty5.handler.ssl.SslContext;
 
 public class HttpSnoopServerInitializer extends ChannelInitializer<SocketChannel> {
 
     private final SslContext sslCtx;
-    private final ByteBufAllocator allocator;
+    private final BufferAllocator allocator;
 
-    public HttpSnoopServerInitializer(SslContext sslCtx, ByteBufAllocator allocator) {
+    public HttpSnoopServerInitializer(SslContext sslCtx, BufferAllocator allocator) {
         this.sslCtx = sslCtx;
         this.allocator = allocator;
     }
@@ -36,7 +36,6 @@ public class HttpSnoopServerInitializer extends ChannelInitializer<SocketChannel
     @Override
     public void initChannel(SocketChannel ch) {
         ChannelPipeline p = ch.pipeline();
-        ch.alloc();
         if (sslCtx != null) {
             p.addLast(sslCtx.newHandler(allocator));
         }

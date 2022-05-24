@@ -15,14 +15,15 @@
  */
 package io.netty5.buffer.api.tests.examples.http.snoop;
 
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.SimpleChannelInboundHandler;
-import io.netty.handler.codec.http.HttpContent;
-import io.netty.handler.codec.http.HttpObject;
-import io.netty.handler.codec.http.HttpResponse;
-import io.netty.handler.codec.http.HttpUtil;
-import io.netty.handler.codec.http.LastHttpContent;
-import io.netty.util.CharsetUtil;
+import io.netty5.channel.ChannelHandlerContext;
+import io.netty5.channel.SimpleChannelInboundHandler;
+import io.netty5.handler.codec.http.HttpContent;
+import io.netty5.handler.codec.http.HttpObject;
+import io.netty5.handler.codec.http.HttpResponse;
+import io.netty5.handler.codec.http.HttpUtil;
+import io.netty5.handler.codec.http.LastHttpContent;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 public class HttpSnoopClientHandler extends SimpleChannelInboundHandler<HttpObject> {
 
@@ -51,7 +52,7 @@ public class HttpSnoopClientHandler extends SimpleChannelInboundHandler<HttpObje
         }
         if (msg instanceof HttpContent content) {
 
-            System.err.print(content.payload().toString(CharsetUtil.UTF_8));
+            System.err.print(content.payload().toString(UTF_8));
             System.err.flush();
 
             if (content instanceof LastHttpContent) {

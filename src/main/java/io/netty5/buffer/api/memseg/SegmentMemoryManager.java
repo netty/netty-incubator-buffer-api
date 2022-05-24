@@ -15,15 +15,15 @@
  */
 package io.netty5.buffer.api.memseg;
 
-import io.netty.buffer.api.AllocationType;
-import io.netty.buffer.api.AllocatorControl;
-import io.netty.buffer.api.Buffer;
-import io.netty.buffer.api.Drop;
-import io.netty.buffer.api.MemoryManager;
-import io.netty.buffer.api.StandardAllocationTypes;
-import io.netty.buffer.api.internal.ArcDrop;
-import io.netty.buffer.api.internal.Statics;
-import io.netty.buffer.api.internal.WrappingAllocation;
+import io.netty5.buffer.api.AllocationType;
+import io.netty5.buffer.api.AllocatorControl;
+import io.netty5.buffer.api.Buffer;
+import io.netty5.buffer.api.Drop;
+import io.netty5.buffer.api.MemoryManager;
+import io.netty5.buffer.api.StandardAllocationTypes;
+import io.netty5.buffer.api.internal.ArcDrop;
+import io.netty5.buffer.api.internal.Statics;
+import io.netty5.buffer.api.internal.WrappingAllocation;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.MemorySession;
 

@@ -15,19 +15,20 @@
  */
 package io.netty5.buffer.api.tests.examples.http.snoop;
 
-import io.netty.bootstrap.ServerBootstrap;
-import io.netty.buffer.api.adaptor.ByteBufAllocatorAdaptor;
-import io.netty.channel.Channel;
-import io.netty.channel.ChannelOption;
-import io.netty.channel.EventLoopGroup;
-import io.netty.channel.MultithreadEventLoopGroup;
-import io.netty.channel.nio.NioHandler;
-import io.netty.channel.socket.nio.NioServerSocketChannel;
-import io.netty.handler.logging.LogLevel;
-import io.netty.handler.logging.LoggingHandler;
-import io.netty.handler.ssl.SslContext;
-import io.netty.handler.ssl.SslContextBuilder;
-import io.netty.handler.ssl.util.SelfSignedCertificate;
+import io.netty5.bootstrap.ServerBootstrap;
+import io.netty5.buffer.api.BufferAllocator;
+import io.netty5.buffer.api.DefaultBufferAllocators;
+import io.netty5.channel.Channel;
+import io.netty5.channel.ChannelOption;
+import io.netty5.channel.EventLoopGroup;
+import io.netty5.channel.MultithreadEventLoopGroup;
+import io.netty5.channel.nio.NioHandler;
+import io.netty5.channel.socket.nio.NioServerSocketChannel;
+import io.netty5.handler.logging.LogLevel;
+import io.netty5.handler.logging.LoggingHandler;
+import io.netty5.handler.ssl.SslContext;
+import io.netty5.handler.ssl.SslContextBuilder;
+import io.netty5.handler.ssl.util.SelfSignedCertificate;
 
 /**
  * An HTTP server that sends back the content of the received HTTP request
@@ -52,12 +53,13 @@ public final class HttpSnoopServer {
         EventLoopGroup bossGroup = new MultithreadEventLoopGroup(1, NioHandler.newFactory());
         EventLoopGroup workerGroup = new MultithreadEventLoopGroup(NioHandler.newFactory());
         try {
+            BufferAllocator allocator = DefaultBufferAllocators.preferredAllocator();
             ServerBootstrap b = new ServerBootstrap();
             b.group(bossGroup, workerGroup)
              .channel(NioServerSocketChannel.class)
-             .childOption(ChannelOption.ALLOCATOR, ByteBufAllocatorAdaptor.DEFAULT_INSTANCE)
+             .childOption(ChannelOption.BUFFER_ALLOCATOR, allocator)
              .handler(new LoggingHandler(LogLevel.INFO))
-             .childHandler(new HttpSnoopServerInitializer(sslCtx, ByteBufAllocatorAdaptor.DEFAULT_INSTANCE));
+             .childHandler(new HttpSnoopServerInitializer(sslCtx, allocator));
 
             Channel ch = b.bind(PORT).sync().getNow();
 

@@ -15,22 +15,22 @@
  */
 package io.netty5.buffer.api.tests.examples.echo;
 
-import io.netty.bootstrap.ServerBootstrap;
-import io.netty.buffer.api.adaptor.ByteBufAllocatorAdaptor;
-import io.netty.channel.Channel;
-import io.netty.channel.ChannelInitializer;
-import io.netty.channel.ChannelOption;
-import io.netty.channel.ChannelPipeline;
-import io.netty.channel.EventLoopGroup;
-import io.netty.channel.MultithreadEventLoopGroup;
-import io.netty.channel.nio.NioHandler;
-import io.netty.channel.socket.SocketChannel;
-import io.netty.channel.socket.nio.NioServerSocketChannel;
-import io.netty.handler.logging.LogLevel;
-import io.netty.handler.logging.LoggingHandler;
-import io.netty.handler.ssl.SslContext;
-import io.netty.handler.ssl.SslContextBuilder;
-import io.netty.handler.ssl.util.SelfSignedCertificate;
+import io.netty5.bootstrap.ServerBootstrap;
+import io.netty5.buffer.api.adaptor.ByteBufAllocatorAdaptor;
+import io.netty5.channel.Channel;
+import io.netty5.channel.ChannelInitializer;
+import io.netty5.channel.ChannelOption;
+import io.netty5.channel.ChannelPipeline;
+import io.netty5.channel.EventLoopGroup;
+import io.netty5.channel.MultithreadEventLoopGroup;
+import io.netty5.channel.nio.NioHandler;
+import io.netty5.channel.socket.SocketChannel;
+import io.netty5.channel.socket.nio.NioServerSocketChannel;
+import io.netty5.handler.logging.LogLevel;
+import io.netty5.handler.logging.LoggingHandler;
+import io.netty5.handler.ssl.SslContext;
+import io.netty5.handler.ssl.SslContextBuilder;
+import io.netty5.handler.ssl.util.SelfSignedCertificate;
 
 /**
  * Echoes back any received data from a client.
@@ -66,7 +66,7 @@ public final class EchoServer {
                  public void initChannel(SocketChannel ch) throws Exception {
                      ChannelPipeline p = ch.pipeline();
                      if (sslCtx != null) {
-                         p.addLast(sslCtx.newHandler(ch.alloc()));
+                         p.addLast(sslCtx.newHandler(ch.bufferAllocator()));
                      }
                      p.addLast(new LoggingHandler(LogLevel.INFO));
                      p.addLast(serverHandler);

@@ -15,9 +15,9 @@
  */
 package io.netty5.buffer.api.tests.benchmarks;
 
-import io.netty.buffer.api.Buffer;
-import io.netty.buffer.api.BufferAllocator;
-import io.netty.buffer.api.CompositeBuffer;
+import io.netty5.buffer.api.Buffer;
+import io.netty5.buffer.api.BufferAllocator;
+import io.netty5.buffer.api.CompositeBuffer;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
@@ -31,6 +31,7 @@ import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Warmup;
 
+import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 
@@ -63,14 +64,14 @@ public class ByteIterationBenchmark {
             allocator = BufferAllocator.onHeapUnpooled();
             try (var a = allocator.allocate(SIZE / 2);
                  var b = allocator.allocate(SIZE / 2)) {
-                buf = CompositeBuffer.compose(allocator, a.send(), b.send());
+                buf = allocator.compose(List.of(a.send(), b.send()));
             }
             break;
         case "composite-direct":
             allocator = BufferAllocator.offHeapUnpooled();
             try (var a = allocator.allocate(SIZE / 2);
                  var b = allocator.allocate(SIZE / 2)) {
-                buf = CompositeBuffer.compose(allocator, a.send(), b.send());
+                buf = allocator.compose(List.of(a.send(), b.send()));
             }
             break;
         default:

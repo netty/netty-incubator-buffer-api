@@ -15,27 +15,27 @@
  */
 package io.netty5.buffer.api.tests.examples.http.snoop;
 
-import io.netty.bootstrap.Bootstrap;
-import io.netty.buffer.api.BufferAllocator;
-import io.netty.buffer.api.DefaultBufferAllocators;
-import io.netty.buffer.api.adaptor.ByteBufAllocatorAdaptor;
-import io.netty.channel.Channel;
-import io.netty.channel.ChannelOption;
-import io.netty.channel.EventLoopGroup;
-import io.netty.channel.MultithreadEventLoopGroup;
-import io.netty.channel.nio.NioHandler;
-import io.netty.channel.socket.nio.NioSocketChannel;
-import io.netty.handler.codec.http.DefaultFullHttpRequest;
-import io.netty.handler.codec.http.HttpHeaderNames;
-import io.netty.handler.codec.http.HttpHeaderValues;
-import io.netty.handler.codec.http.HttpMethod;
-import io.netty.handler.codec.http.HttpRequest;
-import io.netty.handler.codec.http.HttpVersion;
-import io.netty.handler.codec.http.cookie.ClientCookieEncoder;
-import io.netty.handler.codec.http.cookie.DefaultCookie;
-import io.netty.handler.ssl.SslContext;
-import io.netty.handler.ssl.SslContextBuilder;
-import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
+import io.netty5.bootstrap.Bootstrap;
+import io.netty5.buffer.api.BufferAllocator;
+import io.netty5.buffer.api.DefaultBufferAllocators;
+import io.netty5.buffer.api.adaptor.ByteBufAllocatorAdaptor;
+import io.netty5.channel.Channel;
+import io.netty5.channel.ChannelOption;
+import io.netty5.channel.EventLoopGroup;
+import io.netty5.channel.MultithreadEventLoopGroup;
+import io.netty5.channel.nio.NioHandler;
+import io.netty5.channel.socket.nio.NioSocketChannel;
+import io.netty5.handler.codec.http.DefaultFullHttpRequest;
+import io.netty5.handler.codec.http.HttpHeaderNames;
+import io.netty5.handler.codec.http.HttpHeaderValues;
+import io.netty5.handler.codec.http.HttpMethod;
+import io.netty5.handler.codec.http.HttpRequest;
+import io.netty5.handler.codec.http.HttpVersion;
+import io.netty5.handler.codec.http.cookie.ClientCookieEncoder;
+import io.netty5.handler.codec.http.cookie.DefaultCookie;
+import io.netty5.handler.ssl.SslContext;
+import io.netty5.handler.ssl.SslContextBuilder;
+import io.netty5.handler.ssl.util.InsecureTrustManagerFactory;
 
 import java.net.URI;
 

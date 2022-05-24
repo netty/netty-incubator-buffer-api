@@ -15,19 +15,20 @@
  */
 package io.netty5.buffer.api.memseg;
 
-import io.netty.buffer.api.AllocatorControl;
-import io.netty.buffer.api.Buffer;
-import io.netty.buffer.api.BufferAllocator;
-import io.netty.buffer.api.BufferReadOnlyException;
-import io.netty.buffer.api.ByteCursor;
-import io.netty.buffer.api.Drop;
-import io.netty.buffer.api.Owned;
-import io.netty.buffer.api.ReadableComponent;
-import io.netty.buffer.api.ReadableComponentProcessor;
-import io.netty.buffer.api.WritableComponent;
-import io.netty.buffer.api.WritableComponentProcessor;
-import io.netty.buffer.api.internal.AdaptableBuffer;
-import io.netty.buffer.api.internal.Statics;
+import io.netty5.buffer.api.AllocatorControl;
+import io.netty5.buffer.api.Buffer;
+import io.netty5.buffer.api.BufferAllocator;
+import io.netty5.buffer.api.BufferReadOnlyException;
+import io.netty5.buffer.api.ByteCursor;
+import io.netty5.buffer.api.ComponentIterator;
+import io.netty5.buffer.api.Drop;
+import io.netty5.buffer.api.Owned;
+import io.netty5.buffer.api.ReadableComponent;
+import io.netty5.buffer.api.ReadableComponentProcessor;
+import io.netty5.buffer.api.WritableComponent;
+import io.netty5.buffer.api.WritableComponentProcessor;
+import io.netty5.buffer.api.internal.AdaptableBuffer;
+import io.netty5.buffer.api.internal.Statics;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.MemorySession;
 import java.lang.foreign.ValueLayout;
@@ -36,11 +37,12 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.ReadOnlyBufferException;
+import java.nio.channels.FileChannel;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.WritableByteChannel;
 
-import static io.netty.buffer.api.internal.Statics.bufferIsClosed;
-import static io.netty.buffer.api.internal.Statics.bufferIsReadOnly;
+import static io.netty5.buffer.api.internal.Statics.bufferIsClosed;
+import static io.netty5.buffer.api.internal.Statics.bufferIsReadOnly;
 
 class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComponent, WritableComponent {
     private static final ValueLayout.OfByte JAVA_BYTE =
@@ -119,8 +121,9 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
     }
 
     @Override
-    public void skipReadable(int delta) {
+    public MemSegBuffer skipReadable(int delta) {
         readerOffset(readerOffset() + delta);
+        return this;
     }
 
     @Override
@@ -136,8 +139,9 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
     }
 
     @Override
-    public void skipWritable(int delta) {
+    public MemSegBuffer skipWritable(int delta) {
         writerOffset(writerOffset() + delta);
+        return this;
     }
 
     @Override
@@ -264,6 +268,11 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
     }
 
     @Override
+    public Buffer implicitCapacityLimit(int limit) {
+        return null; // TODO
+    }
+
+    @Override
     public Buffer copy(int offset, int length) {
         if (!isAccessible()) {
             throw attachTrace(bufferIsClosed(this));
@@ -277,6 +286,11 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
         copyInto(offset, copy, 0, length);
         copy.writerOffset(length);
         return copy;
+    }
+
+    @Override
+    public Buffer copy(int offset, int length, boolean readOnly) {
+        return null; // TODO
     }
 
     @Override
@@ -342,6 +356,11 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
     }
 
     @Override
+    public int transferFrom(FileChannel channel, long position, int length) throws IOException {
+        return 0; // TODO
+    }
+
+    @Override
     public int transferFrom(ReadableByteChannel channel, int length) throws IOException {
         if (!isAccessible()) {
             throw bufferIsClosed(this);
@@ -397,6 +416,11 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
         }
 
         return -1;
+    }
+
+    @Override
+    public int bytesBefore(Buffer needle) {
+        return 0; // TODO
     }
 
     @Override
@@ -648,10 +672,20 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
     }
 
     @Override
+    public <T extends ReadableComponent & ComponentIterator.Next> ComponentIterator<T> forEachReadable() {
+        return null; // TODO
+    }
+
+    @Override
     public <E extends Exception> int forEachWritable(int initialIndex, WritableComponentProcessor<E> processor)
             throws E {
         checkWrite(writerOffset(), Math.max(1, writableBytes()));
         return processor.process(initialIndex, this)? 1 : -1;
+    }
+
+    @Override
+    public <T extends WritableComponent & ComponentIterator.Next> ComponentIterator<T> forEachWritable() {
+        return null; // TODO
     }
 
     // <editor-fold defaultstate="collapsed" desc="Primitive accessors implementation.">
