@@ -13,20 +13,13 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-import io.netty5.buffer.api.MemoryManager;
-import io.netty5.buffer.api.memseg.SegmentMemoryManager;
+package io.netty5.buffer.api.tests.adaptor;
 
-module netty.incubator.buffer.memseg {
-    requires io.netty.common;
-    requires io.netty.buffer;
+import org.junit.jupiter.api.BeforeAll;
 
-    // Optional dependencies, needed for some examples.
-    requires static java.logging;
-
-    // Permit reflective access to non-public members.
-    // Also means we don't have to make all test methods etc. public for JUnit to access them.
-    opens io.netty.buffer.api.memseg;
-
-    provides MemoryManager with
-            SegmentMemoryManager;
+public class MemSegByteBufAdaptorTest extends ByteBufAdaptorTest {
+    @BeforeAll
+    public static void setUpAllocator() {
+        setUpAllocator("MemorySegment");
+    }
 }

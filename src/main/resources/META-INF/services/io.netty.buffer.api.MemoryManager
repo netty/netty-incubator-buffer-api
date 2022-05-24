@@ -1,1 +1,1 @@
-io.netty.buffer.api.memseg.SegmentMemoryManager
+io.netty5.buffer.api.memseg.SegmentMemoryManager
