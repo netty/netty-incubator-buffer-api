@@ -72,7 +72,7 @@ The same is not the case for `BufferHolder`.
 It is not treated the same as a `ByteBufHolder`.
 --
 
-On the server size, things are more complicated because Netty itself will be allocating the buffers, and the `ByteBufAllocator` API is only capable of returning `ByteBuf` instances.
+On the server side, things are more complicated because Netty itself will be allocating the buffers, and the `ByteBufAllocator` API is only capable of returning `ByteBuf` instances.
 The `ByteBufAllocatorAdaptor` will allocate `ByteBuf` instances that are backed by the new buffers.
 The buffers can then we extracted from the `ByteBuf` instances with the `ByteBufAdaptor.extract` method.
 
