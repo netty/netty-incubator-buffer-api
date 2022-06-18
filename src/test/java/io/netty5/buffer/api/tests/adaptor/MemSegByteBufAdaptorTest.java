@@ -15,11 +15,26 @@
  */
 package io.netty5.buffer.api.tests.adaptor;
 
+import io.netty5.buffer.api.adaptor.ByteBufAllocatorAdaptor;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 
 public class MemSegByteBufAdaptorTest extends ByteBufAdaptorTest {
+    static ByteBufAllocatorAdaptor alloc;
     @BeforeAll
     public static void setUpAllocator() {
-        setUpAllocator("MemorySegment");
+        alloc = setUpAllocator("MemorySegment");
+    }
+
+    @AfterAll
+    public static void tearDownAllocator() throws Exception {
+        if (alloc != null) {
+            alloc.close();
+        }
+    }
+
+    @Override
+    protected ByteBufAllocatorAdaptor alloc() {
+        return alloc;
     }
 }
