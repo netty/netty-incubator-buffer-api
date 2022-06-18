@@ -85,7 +85,7 @@ public final class HttpSnoopClient {
              .option(ChannelOption.ALLOCATOR, ByteBufAllocatorAdaptor.DEFAULT_INSTANCE)
              .option(ChannelOption.BUFFER_ALLOCATOR, allocator)
              .channel(NioSocketChannel.class)
-             .handler(new HttpSnoopClientInitializer(sslCtx, ByteBufAllocatorAdaptor.DEFAULT_INSTANCE));
+             .handler(new HttpSnoopClientInitializer(sslCtx, allocator));
 
             // Make the connection attempt.
             Channel ch = b.connect(host, port).sync().getNow();

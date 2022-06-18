@@ -28,7 +28,9 @@ import io.netty5.buffer.api.ReadableComponentProcessor;
 import io.netty5.buffer.api.WritableComponent;
 import io.netty5.buffer.api.WritableComponentProcessor;
 import io.netty5.buffer.api.internal.AdaptableBuffer;
+import io.netty5.buffer.api.internal.SingleComponentIterator;
 import io.netty5.buffer.api.internal.Statics;
+
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.MemorySession;
 import java.lang.foreign.ValueLayout;
@@ -41,8 +43,13 @@ import java.nio.channels.FileChannel;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.WritableByteChannel;
 
+import static io.netty5.buffer.api.internal.Statics.MAX_BUFFER_SIZE;
 import static io.netty5.buffer.api.internal.Statics.bufferIsClosed;
 import static io.netty5.buffer.api.internal.Statics.bufferIsReadOnly;
+import static io.netty5.buffer.api.internal.Statics.checkImplicitCapacity;
+import static io.netty5.buffer.api.internal.Statics.checkLength;
+import static io.netty5.util.internal.ObjectUtil.checkPositiveOrZero;
+import static io.netty5.util.internal.PlatformDependent.roundToPowerOfTwo;
 
 class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComponent, WritableComponent {
     private static final ValueLayout.OfByte JAVA_BYTE =
@@ -78,6 +85,7 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
     private MemorySegment wseg;
     private int roff;
     private int woff;
+    private int implicitCapacityLimit;
 
     MemSegBuffer(MemorySegment base, MemorySegment view, AllocatorControl control, Drop<MemSegBuffer> drop) {
         super(drop, control);
@@ -85,6 +93,7 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
         this.base = base;
         seg = view;
         wseg = view;
+        implicitCapacityLimit = MAX_BUFFER_SIZE;
     }
 
     /**
@@ -98,6 +107,7 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
         wseg = parent.wseg;
         roff = parent.roff;
         woff = parent.woff;
+        implicitCapacityLimit = parent.implicitCapacityLimit;
     }
 
     @Override
@@ -121,7 +131,7 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
     }
 
     @Override
-    public MemSegBuffer skipReadable(int delta) {
+    public MemSegBuffer skipReadableBytes(int delta) {
         readerOffset(readerOffset() + delta);
         return this;
     }
@@ -139,7 +149,7 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
     }
 
     @Override
-    public MemSegBuffer skipWritable(int delta) {
+    public MemSegBuffer skipWritableBytes(int delta) {
         writerOffset(writerOffset() + delta);
         return this;
     }
@@ -149,7 +159,7 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
         if (readOnly()) {
             throw bufferIsReadOnly(this);
         }
-        checkWrite(offset, 0);
+        checkWrite(offset, 0, false);
         woff = offset;
         return this;
     }
@@ -269,28 +279,41 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
 
     @Override
     public Buffer implicitCapacityLimit(int limit) {
-        return null; // TODO
+        checkImplicitCapacity(limit, capacity());
+        implicitCapacityLimit = limit;
+        return this;
     }
 
     @Override
-    public Buffer copy(int offset, int length) {
-        if (!isAccessible()) {
-            throw attachTrace(bufferIsClosed(this));
-        }
-        checkGet(offset, length);
-        if (length < 0) {
-            throw new IllegalArgumentException("Length cannot be negative: " + length + '.');
-        }
-
-        Buffer copy = control.getAllocator().allocate(length);
-        copyInto(offset, copy, 0, length);
-        copy.writerOffset(length);
-        return copy;
+    public int implicitCapacityLimit() {
+        return implicitCapacityLimit;
     }
 
     @Override
     public Buffer copy(int offset, int length, boolean readOnly) {
-        return null; // TODO
+        checkLength(length);
+        checkGet(offset, length);
+        if (readOnly && readOnly()) {
+            // If both this buffer and the copy are read-only, they can safely share the memory.
+            MemSegBuffer copy = newConstChild();
+            copy.seg = seg.asSlice(offset, length);
+            copy.roff = 0;
+            copy.woff = length;
+            return copy;
+        }
+
+        Buffer copy = control.getAllocator().allocate(length);
+        try {
+            copyInto(offset, copy, 0, length);
+            copy.writerOffset(length);
+            if (readOnly) {
+                copy.makeReadOnly();
+            }
+            return copy;
+        } catch (Throwable e) {
+            copy.close();
+            throw e;
+        }
     }
 
     @Override
@@ -351,13 +374,30 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
         }
         checkGet(readerOffset(), length);
         int bytesWritten = channel.write(readableBuffer().limit(length));
-        skipReadable(bytesWritten);
+        skipReadableBytes(bytesWritten);
         return bytesWritten;
     }
 
     @Override
     public int transferFrom(FileChannel channel, long position, int length) throws IOException {
-        return 0; // TODO
+        checkPositiveOrZero(position, "position");
+        checkPositiveOrZero(length, "length");
+        if (!isAccessible()) {
+            throw bufferIsClosed(this);
+        }
+        if (readOnly()) {
+            throw bufferIsReadOnly(this);
+        }
+        length = Math.min(writableBytes(), length);
+        if (length == 0) {
+            return 0;
+        }
+        checkSet(writerOffset(), length);
+        int bytesRead = channel.read(writableBuffer().limit(length), position);
+        if (bytesRead > 0) { // Don't skipWritable if bytesRead is 0 or -1
+            skipWritableBytes(bytesRead);
+        }
+        return bytesRead;
     }
 
     @Override
@@ -375,7 +415,7 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
         checkSet(writerOffset(), length);
         int bytesRead = channel.read(writableBuffer().limit(length));
         if (bytesRead != -1) {
-            skipWritable(bytesRead);
+            skipWritableBytes(bytesRead);
         }
         return bytesRead;
     }
@@ -420,7 +460,16 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
 
     @Override
     public int bytesBefore(Buffer needle) {
-        return 0; // TODO
+        Statics.UncheckedLoadByte uncheckedLoadByte = MemSegBuffer::uncheckedLoadByte;
+        return Statics.bytesBefore(this, uncheckedLoadByte,
+                needle, needle instanceof MemSegBuffer ? uncheckedLoadByte : null);
+    }
+
+    /**
+     * Used by {@link #bytesBefore(Buffer)}.
+     */
+    private static byte uncheckedLoadByte(Buffer buffer, int offset) {
+        return ((MemSegBuffer) buffer).seg.get(JAVA_BYTE, offset);
     }
 
     @Override
@@ -673,19 +722,20 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
 
     @Override
     public <T extends ReadableComponent & ComponentIterator.Next> ComponentIterator<T> forEachReadable() {
-        return null; // TODO
+        return new SingleComponentIterator<>(acquire(), readableBytes() > 0 ? this : null);
     }
 
     @Override
     public <E extends Exception> int forEachWritable(int initialIndex, WritableComponentProcessor<E> processor)
             throws E {
-        checkWrite(writerOffset(), Math.max(1, writableBytes()));
+        checkWrite(writerOffset(), Math.max(1, writableBytes()), false);
         return processor.process(initialIndex, this)? 1 : -1;
     }
 
     @Override
     public <T extends WritableComponent & ComponentIterator.Next> ComponentIterator<T> forEachWritable() {
-        return null; // TODO
+        checkWrite(writerOffset(), writableBytes(), false);
+        return new SingleComponentIterator<>(acquire(), writableBytes() > 0 ? this : null);
     }
 
     // <editor-fold defaultstate="collapsed" desc="Primitive accessors implementation.">
@@ -775,13 +825,10 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
 
     @Override
     public Buffer writeByte(byte value) {
-        try {
-            setByteAtOffset(wseg, woff, value);
-            woff += Byte.BYTES;
-            return this;
-        } catch (IndexOutOfBoundsException e) {
-            throw checkWriteState(e);
-        }
+        checkWrite(woff, Byte.BYTES, true);
+        setByteAtOffset(wseg, woff, value);
+        woff += Byte.BYTES;
+        return this;
     }
 
     @Override
@@ -796,13 +843,10 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
 
     @Override
     public Buffer writeUnsignedByte(int value) {
-        try {
-            setByteAtOffset(wseg, woff, (byte) (value & 0xFF));
-            woff += Byte.BYTES;
-            return this;
-        } catch (IndexOutOfBoundsException e) {
-            throw checkWriteState(e);
-        }
+        checkWrite(woff, Byte.BYTES, true);
+        setByteAtOffset(wseg, woff, (byte) (value & 0xFF));
+        woff += Byte.BYTES;
+        return this;
     }
 
     @Override
@@ -831,13 +875,10 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
 
     @Override
     public Buffer writeChar(char value) {
-        try {
-            setCharAtOffset(wseg, woff, value);
-            woff += 2;
-            return this;
-        } catch (IndexOutOfBoundsException e) {
-            throw checkWriteState(e);
-        }
+        checkWrite(woff, 2, true);
+        setCharAtOffset(wseg, woff, value);
+        woff += 2;
+        return this;
     }
 
     @Override
@@ -880,13 +921,10 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
 
     @Override
     public Buffer writeShort(short value) {
-        try {
-            setShortAtOffset(wseg, woff, value);
-            woff += Short.BYTES;
-            return this;
-        } catch (IndexOutOfBoundsException e) {
-            throw checkWriteState(e);
-        }
+        checkWrite(woff, Short.BYTES, true);
+        setShortAtOffset(wseg, woff, value);
+        woff += Short.BYTES;
+        return this;
     }
 
     @Override
@@ -901,13 +939,10 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
 
     @Override
     public Buffer writeUnsignedShort(int value) {
-        try {
-            setShortAtOffset(wseg, woff, (short) (value & 0xFFFF));
-            woff += Short.BYTES;
-            return this;
-        } catch (IndexOutOfBoundsException e) {
-            throw checkWriteState(e);
-        }
+        checkWrite(woff, Short.BYTES, true);
+        setShortAtOffset(wseg, woff, (short) (value & 0xFFFF));
+        woff += Short.BYTES;
+        return this;
     }
 
     @Override
@@ -958,7 +993,7 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
 
     @Override
     public Buffer writeMedium(int value) {
-        checkWrite(woff, 3);
+        checkWrite(woff, 3, true);
         setByteAtOffset(wseg, woff, (byte) (value >> 16));
         setByteAtOffset(wseg, woff + 1, (byte) (value >> 8 & 0xFF));
         setByteAtOffset(wseg, woff + 2, (byte) (value & 0xFF));
@@ -977,7 +1012,7 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
 
     @Override
     public Buffer writeUnsignedMedium(int value) {
-        checkWrite(woff, 3);
+        checkWrite(woff, 3, true);
         setByteAtOffset(wseg, woff, (byte) (value >> 16));
         setByteAtOffset(wseg, woff + 1, (byte) (value >> 8 & 0xFF));
         setByteAtOffset(wseg, woff + 2, (byte) (value & 0xFF));
@@ -1024,13 +1059,10 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
 
     @Override
     public Buffer writeInt(int value) {
-        try {
-            setIntAtOffset(wseg, woff, value);
-            woff += Integer.BYTES;
-            return this;
-        } catch (IndexOutOfBoundsException e) {
-            throw checkWriteState(e);
-        }
+        checkWrite(woff, Integer.BYTES, true);
+        setIntAtOffset(wseg, woff, value);
+        woff += Integer.BYTES;
+        return this;
     }
 
     @Override
@@ -1045,13 +1077,10 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
 
     @Override
     public Buffer writeUnsignedInt(long value) {
-        try {
-            setIntAtOffset(wseg, woff, (int) (value & 0xFFFFFFFFL));
-            woff += Integer.BYTES;
-            return this;
-        } catch (IndexOutOfBoundsException e) {
-            throw checkWriteState(e);
-        }
+        checkWrite(woff, Integer.BYTES, true);
+        setIntAtOffset(wseg, woff, (int) (value & 0xFFFFFFFFL));
+        woff += Integer.BYTES;
+        return this;
     }
 
     @Override
@@ -1080,13 +1109,10 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
 
     @Override
     public Buffer writeFloat(float value) {
-        try {
-            setFloatAtOffset(wseg, woff, value);
-            woff += Float.BYTES;
-            return this;
-        } catch (IndexOutOfBoundsException e) {
-            throw checkWriteState(e);
-        }
+        checkWrite(woff, Float.BYTES, true);
+        setFloatAtOffset(wseg, woff, value);
+        woff += Float.BYTES;
+        return this;
     }
 
     @Override
@@ -1115,13 +1141,10 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
 
     @Override
     public Buffer writeLong(long value) {
-        try {
-            setLongAtOffset(wseg, woff, value);
-            woff += Long.BYTES;
-            return this;
-        } catch (IndexOutOfBoundsException e) {
-            throw checkWriteState(e);
-        }
+        checkWrite(woff, Long.BYTES, true);
+        setLongAtOffset(wseg, woff, value);
+        woff += Long.BYTES;
+        return this;
     }
 
     @Override
@@ -1150,13 +1173,10 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
 
     @Override
     public Buffer writeDouble(double value) {
-        try {
-            setDoubleAtOffset(wseg, woff, value);
-            woff += Double.BYTES;
-            return this;
-        } catch (IndexOutOfBoundsException e) {
-            throw checkWriteState(e);
-        }
+        checkWrite(woff, Byte.BYTES, true);
+        setDoubleAtOffset(wseg, woff, value);
+        woff += Double.BYTES;
+        return this;
     }
 
     @Override
@@ -1175,6 +1195,7 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
         var roff = this.roff;
         var woff = this.woff;
         var readOnly = readOnly();
+        int implicitCapacityLimit = this.implicitCapacityLimit;
         MemorySegment transferSegment = seg;
         MemorySegment base = this.base;
         return new Owned<MemSegBuffer>() {
@@ -1183,6 +1204,7 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
                 MemSegBuffer copy = new MemSegBuffer(base, transferSegment, control, drop);
                 copy.roff = roff;
                 copy.woff = woff;
+                copy.implicitCapacityLimit = implicitCapacityLimit;
                 if (readOnly) {
                     copy.makeReadOnly();
                 }
@@ -1212,15 +1234,15 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
         }
     }
 
-    private void checkWrite(int index, int size) {
+    private void checkWrite(int index, int size, boolean mayExpand) {
         if (index < roff || wseg.byteSize() < index + size) {
-            throw writeAccessCheckException(index);
+            handleWriteAccessBoundsFailure(index, size, mayExpand);
         }
     }
 
     private void checkSet(int index, int size) {
         if (index < 0 || wseg.byteSize() < index + size) {
-            throw writeAccessCheckException(index);
+            handleWriteAccessBoundsFailure(index, size, false);
         }
     }
 
@@ -1234,7 +1256,7 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
         return ioobe;
     }
 
-    Buffer newConstChild() {
+    MemSegBuffer newConstChild() {
         assert readOnly();
         Drop<MemSegBuffer> drop = unsafeGetDrop().fork();
         MemSegBuffer child = new MemSegBuffer(this, drop);
@@ -1249,14 +1271,24 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
         return outOfBounds(index);
     }
 
-    private RuntimeException writeAccessCheckException(int index) {
+    private void handleWriteAccessBoundsFailure(int index, int size, boolean mayExpand) {
         if (seg == CLOSED_SEGMENT) {
-            throw bufferIsClosed(this);
+            throw attachTrace(bufferIsClosed(this));
         }
         if (wseg != seg) {
-            return bufferIsReadOnly(this);
+            throw bufferIsReadOnly(this);
         }
-        return outOfBounds(index);
+        int capacity = capacity();
+        if (mayExpand && index >= 0 && index <= capacity && woff + size <= implicitCapacityLimit && isOwned()) {
+            // Grow into next power-of-two, but not beyond the implicit limit.
+            int minimumGrowth = Math.min(
+                    Math.max(roundToPowerOfTwo(capacity * 2), size),
+                    implicitCapacityLimit) - capacity;
+            ensureWritable(size, minimumGrowth, false);
+            checkSet(index, size); // Verify writing is now possible, without recursing.
+            return;
+        }
+        throw outOfBounds(index);
     }
 
     private IndexOutOfBoundsException outOfBounds(int index) {

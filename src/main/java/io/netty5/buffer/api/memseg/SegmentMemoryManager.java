@@ -110,6 +110,12 @@ public class SegmentMemoryManager implements MemoryManager {
     }
 
     @Override
+    public void clearMemory(Object memory) {
+        var segment = (MemorySegment) memory;
+        segment.fill((byte) 0);
+    }
+
+    @Override
     public String implementationName() {
         return "MemorySegment";
     }

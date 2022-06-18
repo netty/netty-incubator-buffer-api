@@ -17,7 +17,7 @@ package io.netty5.buffer.api.tests.examples;
 
 import io.netty5.buffer.api.Buffer;
 import io.netty5.buffer.api.BufferAllocator;
-import io.netty5.buffer.api.Send;
+import io.netty5.util.Send;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
