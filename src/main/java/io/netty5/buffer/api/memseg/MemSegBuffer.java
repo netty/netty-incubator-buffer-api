@@ -326,7 +326,7 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
         if (dest.isReadOnly()) {
             throw new ReadOnlyBufferException();
         }
-        copyInto(srcPos, MemorySegment.ofByteBuffer(dest.duplicate().clear()), destPos, length);
+        copyInto(srcPos, MemorySegment.ofBuffer(dest.duplicate().clear()), destPos, length);
     }
 
     private void copyInto(int srcPos, MemorySegment dest, int destPos, int length) {
