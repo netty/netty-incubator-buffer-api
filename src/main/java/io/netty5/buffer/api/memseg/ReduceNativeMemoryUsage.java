@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 The Netty Project
+ * Copyright 2022 The Netty Project
  *
  * The Netty Project licenses this file to you under the Apache License,
  * version 2.0 (the "License"); you may not use this file except in compliance
@@ -13,20 +13,24 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-import io.netty5.buffer.api.MemoryManager;
-import io.netty5.buffer.api.memseg.SegmentMemoryManager;
+package io.netty5.buffer.api.memseg;
 
-module netty.incubator.buffer.memseg {
-    requires io.netty.common;
-    requires io.netty.buffer;
+import io.netty5.buffer.api.internal.Statics;
 
-    // Optional dependencies, needed for some examples.
-    requires static java.logging;
+final class ReduceNativeMemoryUsage implements Runnable {
+    private final long size;
 
-    // Permit reflective access to non-public members.
-    // Also means we don't have to make all test methods etc. public for JUnit to access them.
-    opens io.netty.buffer.api.memseg;
+    ReduceNativeMemoryUsage(long size) {
+        this.size = size;
+    }
 
-    provides MemoryManager with
-            SegmentMemoryManager;
+    @Override
+    public void run() {
+        Statics.MEM_USAGE_NATIVE.add(-size);
+    }
+
+    @Override
+    public String toString() {
+        return "ReduceNativeMemoryUsage(by " + size + " bytes)";
+    }
 }
