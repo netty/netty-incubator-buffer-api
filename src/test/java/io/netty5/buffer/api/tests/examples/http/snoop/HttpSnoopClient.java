@@ -18,7 +18,6 @@ package io.netty5.buffer.api.tests.examples.http.snoop;
 import io.netty5.bootstrap.Bootstrap;
 import io.netty5.buffer.api.BufferAllocator;
 import io.netty5.buffer.api.DefaultBufferAllocators;
-import io.netty5.buffer.api.adaptor.ByteBufAllocatorAdaptor;
 import io.netty5.channel.Channel;
 import io.netty5.channel.ChannelOption;
 import io.netty5.channel.EventLoopGroup;
@@ -82,13 +81,12 @@ public final class HttpSnoopClient {
         try {
             Bootstrap b = new Bootstrap();
             b.group(group)
-             .option(ChannelOption.ALLOCATOR, ByteBufAllocatorAdaptor.DEFAULT_INSTANCE)
              .option(ChannelOption.BUFFER_ALLOCATOR, allocator)
              .channel(NioSocketChannel.class)
              .handler(new HttpSnoopClientInitializer(sslCtx, allocator));
 
             // Make the connection attempt.
-            Channel ch = b.connect(host, port).sync().getNow();
+            Channel ch = b.connect(host, port).asStage().sync().getNow();
 
             // Prepare the HTTP request.
             HttpRequest request = new DefaultFullHttpRequest(
@@ -108,7 +106,7 @@ public final class HttpSnoopClient {
             ch.writeAndFlush(request);
 
             // Wait for the server to close the connection.
-            ch.closeFuture().sync();
+            ch.closeFuture().asStage().sync();
         } finally {
             // Shut down executor threads to exit.
             group.shutdownGracefully();

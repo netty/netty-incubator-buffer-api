@@ -66,7 +66,7 @@ public class EchoIT {
                   });
 
             // Start the server.
-            var bind = server.bind("localhost", 0).sync().getNow();
+            var bind = server.bind("localhost", 0).asStage().sync().getNow();
             InetSocketAddress serverAddress = (InetSocketAddress) bind.localAddress();
 
             // Configure the client.
@@ -86,17 +86,17 @@ public class EchoIT {
                  });
 
                 // Start the client.
-                var channel = b.connect(serverAddress).sync().getNow();
+                var channel = b.connect(serverAddress).asStage().sync().getNow();
 
                 // Wait until the connection is closed.
-                channel.closeFuture().sync();
+                channel.closeFuture().asStage().sync();
             } finally {
                 // Shut down the event loop to terminate all threads.
                 group.shutdownGracefully();
             }
 
             // Shut down the server.
-            bind.close().sync();
+            bind.close().asStage().sync();
         } finally {
             // Shut down all event loops to terminate all threads.
             bossGroup.shutdownGracefully();
@@ -138,7 +138,7 @@ public class EchoIT {
         }
 
         @Override
-        public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
+        public void channelExceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
             // Close the connection when an exception is raised.
             ctx.close();
             throw new RuntimeException(cause);

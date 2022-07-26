@@ -17,13 +17,11 @@ package io.netty5.buffer.api.tests.examples.echo;
 
 import io.netty5.buffer.api.Buffer;
 import io.netty5.channel.ChannelHandler;
-import io.netty5.channel.ChannelHandler.Sharable;
 import io.netty5.channel.ChannelHandlerContext;
 
 /**
  * Handler implementation for the echo server.
  */
-@Sharable
 public class EchoServerHandler implements ChannelHandler {
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) {
@@ -37,7 +35,12 @@ public class EchoServerHandler implements ChannelHandler {
     }
 
     @Override
-    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
+    public boolean isSharable() {
+        return true;
+    }
+
+    @Override
+    public void channelExceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
         // Close the connection when an exception is raised.
         cause.printStackTrace();
         ctx.close();

@@ -16,7 +16,6 @@
 package io.netty5.buffer.api.tests.examples.echo;
 
 import io.netty5.bootstrap.ServerBootstrap;
-import io.netty5.buffer.api.adaptor.ByteBufAllocatorAdaptor;
 import io.netty5.channel.Channel;
 import io.netty5.channel.ChannelInitializer;
 import io.netty5.channel.ChannelOption;
@@ -58,7 +57,6 @@ public final class EchoServer {
             ServerBootstrap b = new ServerBootstrap();
             b.group(bossGroup, workerGroup)
              .channel(NioServerSocketChannel.class)
-             .childOption(ChannelOption.ALLOCATOR, ByteBufAllocatorAdaptor.DEFAULT_INSTANCE)
              .option(ChannelOption.SO_BACKLOG, 100)
              .handler(new LoggingHandler(LogLevel.INFO))
              .childHandler(new ChannelInitializer<SocketChannel>() {
@@ -74,10 +72,10 @@ public final class EchoServer {
              });
 
             // Start the server.
-            Channel channel = b.bind(PORT).sync().getNow();
+            Channel channel = b.bind(PORT).asStage().sync().getNow();
 
             // Wait until the server socket is closed.
-            channel.closeFuture().sync();
+            channel.closeFuture().asStage().sync();
         } finally {
             // Shut down all event loops to terminate all threads.
             bossGroup.shutdownGracefully();

@@ -68,7 +68,7 @@
 
   <properties>
     <javaModuleName>io.netty.incubator.buffer.memseg</javaModuleName>
-    <netty.version>5.0.0.Alpha3-SNAPSHOT</netty.version>
+    <netty.version>5.0.0.Alpha5-SNAPSHOT</netty.version>
     <netty.build.version>29</netty.build.version>
     <!-- Java version for bytecode compatibility. -->
     <java.compatibility>20</java.compatibility>
@@ -273,6 +273,15 @@
             <include>io.netty5.buffer.api.**.*Test.java</include>
             <include>io.netty5.buffer.api.**.*IT.java</include>
           </includes>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <configuration>
+          <source>18</source>
+          <target>18</target>
+          <compilerArgs>--enable-preview</compilerArgs>
         </configuration>
       </plugin>
     </plugins>
