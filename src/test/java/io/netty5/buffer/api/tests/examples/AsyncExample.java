@@ -43,6 +43,6 @@ public final class AsyncExample {
     }
 
     private static long threadId() {
-        return Thread.currentThread().getId();
+        return Thread.currentThread().threadId();
     }
 }

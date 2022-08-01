@@ -13,7 +13,7 @@ RUN ./configure --with-debug-level=fastdebug \
                 --with-toolchain-type=clang \
                 --with-vendor-name=jackalope \
                 --enable-warnings-as-errors=no
-RUN make images && mv build/linux-x86_64-server-fastdebug/images/jdk /home/jdk && rm -fr *
+RUN make images && mv build/linux-*-server-fastdebug/images/jdk /home/jdk && rm -fr *
 ENV JAVA_HOME="/home/jdk"
 
 # Prepare our own build environment
@@ -28,6 +28,9 @@ RUN git clone --depth 1 -b main https://github.com/netty/netty.git netty \
     && cd .. \
     && rm -fr netty
 
+# Make sure Maven has enough memory to keep track of all the tests we run
+ENV MAVEN_OPTS="-Xmx4g -XX:+HeapDumpOnOutOfMemoryError"
+
 # Prepare our own build
 COPY pom.xml pom.xml
 RUN mvn --version
@@ -35,7 +38,5 @@ RUN mvn install dependency:go-offline surefire:test checkstyle:check -ntp
 
 # Copy over the project code and run our build
 COPY . .
-# Make sure Maven has enough memory to keep track of all the tests we run
-ENV MAVEN_OPTS="-Xmx4g -XX:+HeapDumpOnOutOfMemoryError"
 # Run tests
 CMD mvn verify -o -B -C -T1C -fae -nsu

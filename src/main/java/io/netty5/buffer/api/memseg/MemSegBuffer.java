@@ -256,7 +256,7 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
             throw bufferIsClosed(this);
         }
         if (seg.isNative()) {
-            return seg.address().toRawLongValue() + offset;
+            return seg.address() + offset;
         }
         return 0; // This is a heap segment.
     }
