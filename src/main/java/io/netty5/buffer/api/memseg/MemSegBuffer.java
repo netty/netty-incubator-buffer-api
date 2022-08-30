@@ -18,18 +18,14 @@ package io.netty5.buffer.api.memseg;
 import io.netty5.buffer.api.AllocatorControl;
 import io.netty5.buffer.api.Buffer;
 import io.netty5.buffer.api.BufferAllocator;
+import io.netty5.buffer.api.BufferComponent;
 import io.netty5.buffer.api.BufferReadOnlyException;
 import io.netty5.buffer.api.ByteCursor;
 import io.netty5.buffer.api.ComponentIterator;
 import io.netty5.buffer.api.Drop;
 import io.netty5.buffer.api.Owned;
-import io.netty5.buffer.api.ReadableComponent;
-import io.netty5.buffer.api.ReadableComponentProcessor;
-import io.netty5.buffer.api.WritableComponent;
-import io.netty5.buffer.api.WritableComponentProcessor;
 import io.netty5.buffer.api.internal.AdaptableBuffer;
-import io.netty5.buffer.api.internal.SingleComponentIterator;
-import io.netty5.buffer.api.internal.Statics;
+import io.netty5.buffer.api.internal.InternalBufferUtils;
 
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.MemorySession;
@@ -43,15 +39,16 @@ import java.nio.channels.FileChannel;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.WritableByteChannel;
 
-import static io.netty5.buffer.api.internal.Statics.MAX_BUFFER_SIZE;
-import static io.netty5.buffer.api.internal.Statics.bufferIsClosed;
-import static io.netty5.buffer.api.internal.Statics.bufferIsReadOnly;
-import static io.netty5.buffer.api.internal.Statics.checkImplicitCapacity;
-import static io.netty5.buffer.api.internal.Statics.checkLength;
+import static io.netty5.buffer.api.internal.InternalBufferUtils.MAX_BUFFER_SIZE;
+import static io.netty5.buffer.api.internal.InternalBufferUtils.bufferIsClosed;
+import static io.netty5.buffer.api.internal.InternalBufferUtils.bufferIsReadOnly;
+import static io.netty5.buffer.api.internal.InternalBufferUtils.checkImplicitCapacity;
+import static io.netty5.buffer.api.internal.InternalBufferUtils.checkLength;
 import static io.netty5.util.internal.ObjectUtil.checkPositiveOrZero;
 import static io.netty5.util.internal.PlatformDependent.roundToPowerOfTwo;
 
-class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComponent, WritableComponent {
+class MemSegBuffer extends AdaptableBuffer<MemSegBuffer>
+        implements BufferComponent, ComponentIterator<MemSegBuffer>, ComponentIterator.Next {
     private static final ValueLayout.OfByte JAVA_BYTE =
             ValueLayout.JAVA_BYTE.withOrder(ByteOrder.BIG_ENDIAN).withBitAlignment(Byte.SIZE);
     private static final ValueLayout.OfChar JAVA_CHAR =
@@ -186,6 +183,11 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
 
     // <editor-fold defaultstate="collapsed" desc="Readable/WritableComponent implementation.">
     @Override
+    public long baseNativeAddress() {
+        return nativeAddress(0);
+    }
+
+    @Override
     public boolean hasReadableArray() {
         return false;
     }
@@ -248,6 +250,16 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
         var buffer = wseg.asByteBuffer();
         buffer = buffer.position(writerOffset()).limit(writerOffset() + writableBytes());
         return buffer;
+    }
+
+    @Override
+    public MemSegBuffer first() {
+        return this;
+    }
+
+    @Override
+    public <N extends Next & BufferComponent> N next() {
+        return null; // There is no "next" component in our external-iteration of components.
     }
     // </editor-fold>
 
@@ -360,7 +372,7 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
             return;
         }
 
-        Statics.copyToViaReverseLoop(this, srcPos, dest, destPos, length);
+        InternalBufferUtils.copyToViaReverseLoop(this, srcPos, dest, destPos, length);
     }
 
     @Override
@@ -460,8 +472,8 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
 
     @Override
     public int bytesBefore(Buffer needle) {
-        Statics.UncheckedLoadByte uncheckedLoadByte = MemSegBuffer::uncheckedLoadByte;
-        return Statics.bytesBefore(this, uncheckedLoadByte,
+        InternalBufferUtils.UncheckedLoadByte uncheckedLoadByte = MemSegBuffer::uncheckedLoadByte;
+        return InternalBufferUtils.bytesBefore(this, uncheckedLoadByte,
                 needle, needle instanceof MemSegBuffer ? uncheckedLoadByte : null);
     }
 
@@ -612,7 +624,7 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
 
         // Allocate a bigger buffer.
         long newSize = capacity() + (long) Math.max(size - writableBytes(), minimumGrowth);
-        Statics.assertValidBufferSize(newSize);
+        InternalBufferUtils.assertValidBufferSize(newSize);
         MemSegBuffer buffer = (MemSegBuffer) control.getAllocator().allocate((int) newSize);
 
         // Copy contents.
@@ -713,29 +725,10 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer> implements ReadableComp
         return writableBytes() > 0? 1 : 0;
     }
 
+    @SuppressWarnings("unchecked")
     @Override
-    public <E extends Exception> int forEachReadable(int initialIndex, ReadableComponentProcessor<E> processor)
-            throws E {
-        checkRead(readerOffset(), Math.max(1, readableBytes()));
-        return processor.process(initialIndex, this)? 1 : -1;
-    }
-
-    @Override
-    public <T extends ReadableComponent & ComponentIterator.Next> ComponentIterator<T> forEachReadable() {
-        return new SingleComponentIterator<>(acquire(), readableBytes() > 0 ? this : null);
-    }
-
-    @Override
-    public <E extends Exception> int forEachWritable(int initialIndex, WritableComponentProcessor<E> processor)
-            throws E {
-        checkWrite(writerOffset(), Math.max(1, writableBytes()), false);
-        return processor.process(initialIndex, this)? 1 : -1;
-    }
-
-    @Override
-    public <T extends WritableComponent & ComponentIterator.Next> ComponentIterator<T> forEachWritable() {
-        checkWrite(writerOffset(), writableBytes(), false);
-        return new SingleComponentIterator<>(acquire(), writableBytes() > 0 ? this : null);
+    public <T extends BufferComponent & ComponentIterator.Next> ComponentIterator<T> forEachComponent() {
+        return (ComponentIterator<T>) acquire();
     }
 
     // <editor-fold defaultstate="collapsed" desc="Primitive accessors implementation.">

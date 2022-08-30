@@ -22,7 +22,7 @@ import io.netty5.buffer.api.Drop;
 import io.netty5.buffer.api.MemoryManager;
 import io.netty5.buffer.api.StandardAllocationTypes;
 import io.netty5.buffer.api.internal.ArcDrop;
-import io.netty5.buffer.api.internal.Statics;
+import io.netty5.buffer.api.internal.InternalBufferUtils;
 import io.netty5.buffer.api.internal.WrappingAllocation;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.MemorySession;
@@ -41,7 +41,7 @@ public class SegmentMemoryManager implements MemoryManager {
     private static Buffer createHeapBuffer(
             long size, Function<Drop<Buffer>, Drop<Buffer>> adaptor, AllocatorControl control) {
         var segment = MemorySegment.ofArray(new byte[Math.toIntExact(size)]);
-        var drop = adaptor.apply(Statics.NO_OP_DROP);
+        var drop = adaptor.apply(InternalBufferUtils.NO_OP_DROP);
         return createBuffer(segment, drop, control);
     }
 
@@ -49,7 +49,7 @@ public class SegmentMemoryManager implements MemoryManager {
             long size, Function<Drop<Buffer>, Drop<Buffer>> adaptor, AllocatorControl control) {
         var session = MemorySession.openShared();
         session.addCloseAction(getCleanupAction(size));
-        Statics.MEM_USAGE_NATIVE.add(size);
+        InternalBufferUtils.MEM_USAGE_NATIVE.add(size);
         var segment = MemorySegment.allocateNative(size, session);
         var drop = adaptor.apply(drop(session));
         return createBuffer(segment, drop, control);
@@ -66,7 +66,7 @@ public class SegmentMemoryManager implements MemoryManager {
         }
         if (type instanceof WrappingAllocation allocation) {
             var seg = MemorySegment.ofArray(allocation.getArray());
-            return createBuffer(seg, adaptor.apply(Statics.NO_OP_DROP), control);
+            return createBuffer(seg, adaptor.apply(InternalBufferUtils.NO_OP_DROP), control);
         }
         throw new IllegalArgumentException("Unknown allocation type: " + type);
     }
@@ -97,7 +97,7 @@ public class SegmentMemoryManager implements MemoryManager {
     }
 
     private static MemSegBuffer createBuffer(MemorySegment segment, Drop<Buffer> drop, AllocatorControl control) {
-        Drop<MemSegBuffer> concreteDrop = Statics.convert(drop);
+        Drop<MemSegBuffer> concreteDrop = InternalBufferUtils.convert(drop);
         MemSegBuffer buffer = new MemSegBuffer(segment, segment, control, concreteDrop);
         concreteDrop.attach(buffer);
         return buffer;

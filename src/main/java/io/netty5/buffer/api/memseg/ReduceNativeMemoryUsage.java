@@ -15,7 +15,7 @@
  */
 package io.netty5.buffer.api.memseg;
 
-import io.netty5.buffer.api.internal.Statics;
+import io.netty5.buffer.api.internal.InternalBufferUtils;
 
 final class ReduceNativeMemoryUsage implements Runnable {
     private final long size;
@@ -26,7 +26,7 @@ final class ReduceNativeMemoryUsage implements Runnable {
 
     @Override
     public void run() {
-        Statics.MEM_USAGE_NATIVE.add(-size);
+        InternalBufferUtils.MEM_USAGE_NATIVE.add(-size);
     }
 
     @Override

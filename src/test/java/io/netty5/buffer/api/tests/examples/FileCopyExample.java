@@ -44,13 +44,14 @@ public final class FileCopyExample {
                 for (int i = 0; i < 1024; i++) {
                     try (Buffer in = allocator.allocate(1024)) {
                         System.out.println("in = " + in);
-                        in.forEachWritable(0, (index, component) -> {
-                            var bb = component.writableBuffer();
-                            while (bb.hasRemaining()) {
-                                input.read(bb);
+                        try (var itr = in.forEachComponent()) {
+                            for (var c = itr.firstWritable(); c != null; c = c.nextWritable()) {
+                                var bb = c.writableBuffer();
+                                while (bb.hasRemaining()) {
+                                    input.read(bb);
+                                }
                             }
-                            return true;
-                        });
+                        }
                         System.out.println("Sending " + in.readableBytes() + " bytes.");
                         queue.put(in.send());
                     }
@@ -64,13 +65,14 @@ public final class FileCopyExample {
                 while ((send = queue.take()) != done) {
                     try (Buffer out = send.receive()) {
                         System.out.println("Received " + out.readableBytes() + " bytes.");
-                        out.forEachReadable(0, (index, component) -> {
-                            var bb = component.readableBuffer();
-                            while (bb.hasRemaining()) {
-                                output.write(bb);
+                        try (var itr = out.forEachComponent()) {
+                            for (var c = itr.firstReadable(); c != null; c = c.nextReadable()) {
+                                var bb = c.readableBuffer();
+                                while (bb.hasRemaining()) {
+                                    output.write(bb);
+                                }
                             }
-                            return true;
-                        });
+                        }
                     }
                 }
                 output.force(true);
