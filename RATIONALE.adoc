@@ -101,7 +101,7 @@ If these simple rules and patterns are followed strictly, then memory leaks shou
 
 To avoid memory leaks due to bugs, like forgetting to close a buffer, buffers in the new API will always have a Cleaner attached.
 If the buffer instance gets garbage collected without being closed properly, then the Cleaner thread will eventually reclaim the memory.
-This works for both pooled and unpooled buffers, and in the case of the latter, the Cleaner will return the leaked memory to the pool.
+This works for both pooled and unpooled buffers, and in the case of the former, the Cleaner will return the leaked memory to the pool.
 
 Note, however, that the buffers are still reference counted, because this has more predictable memory usage - especially when using off-heap buffers.
 Off-heap (or direct) buffers can give the GC an inaccurate picture of memory usage, which in turn can lead to abrupt bouts of poor performance when the system is under load.
