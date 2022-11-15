@@ -24,20 +24,13 @@ import io.netty5.buffer.StandardAllocationTypes;
 import io.netty5.buffer.internal.ArcDrop;
 import io.netty5.buffer.internal.InternalBufferUtils;
 import io.netty5.buffer.internal.WrappingAllocation;
-import java.lang.foreign.MemorySegment;
-import java.lang.foreign.MemorySession;
 
-import java.util.concurrent.ConcurrentHashMap;
+import java.lang.foreign.Arena;
+import java.lang.foreign.MemorySegment;
+
 import java.util.function.Function;
 
 public class SegmentMemoryManager implements MemoryManager {
-    private static final ConcurrentHashMap<Long, Runnable> CLEANUP_ACTIONS = new ConcurrentHashMap<>();
-    private static final Function<Long, Runnable> CLEANUP_ACTION_MAKER = s -> new ReduceNativeMemoryUsage(s);
-
-    private static Runnable getCleanupAction(long size) {
-        return CLEANUP_ACTIONS.computeIfAbsent(size, CLEANUP_ACTION_MAKER);
-    }
-
     private static Buffer createHeapBuffer(
             long size, Function<Drop<Buffer>, Drop<Buffer>> adaptor, AllocatorControl control) {
         var segment = MemorySegment.ofArray(new byte[Math.toIntExact(size)]);
@@ -47,11 +40,10 @@ public class SegmentMemoryManager implements MemoryManager {
 
     private static Buffer createNativeBuffer(
             long size, Function<Drop<Buffer>, Drop<Buffer>> adaptor, AllocatorControl control) {
-        var session = MemorySession.openShared();
-        session.addCloseAction(getCleanupAction(size));
+        Arena arena = Arena.openShared();
         InternalBufferUtils.MEM_USAGE_NATIVE.add(size);
-        var segment = MemorySegment.allocateNative(size, session);
-        var drop = adaptor.apply(drop(session));
+        var segment = MemorySegment.allocateNative(size, arena.session());
+        var drop = adaptor.apply(drop(arena, size));
         return createBuffer(segment, drop, control);
     }
 
@@ -78,8 +70,8 @@ public class SegmentMemoryManager implements MemoryManager {
         return buf.newConstChild();
     }
 
-    private static Drop<Buffer> drop(MemorySession session) {
-        var drop = new MemorySessionCloseDrop(session);
+    private static Drop<Buffer> drop(Arena arena, long nativeMemoryReserved) {
+        var drop = new MemorySessionCloseDrop(arena, nativeMemoryReserved);
         // Wrap in an ArcDrop because closing the session will close all associated memory segments.
         return ArcDrop.wrap(drop);
     }
@@ -120,14 +112,11 @@ public class SegmentMemoryManager implements MemoryManager {
         return "MemorySegment";
     }
 
-    private record MemorySessionCloseDrop(MemorySession session) implements Drop<Buffer> {
-        private MemorySessionCloseDrop {
-            assert session.isCloseable();
-        }
-
+    private record MemorySessionCloseDrop(Arena arena, long nativeMemoryReserved) implements Drop<Buffer> {
         @Override
         public void drop(Buffer obj) {
-            session.close();
+            arena.close();
+            InternalBufferUtils.MEM_USAGE_NATIVE.add(-nativeMemoryReserved);
         }
 
         @Override

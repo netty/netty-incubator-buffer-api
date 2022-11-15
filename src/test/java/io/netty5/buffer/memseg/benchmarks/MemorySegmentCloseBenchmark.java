@@ -15,8 +15,6 @@
  */
 package io.netty5.buffer.memseg.benchmarks;
 
-import java.lang.foreign.MemorySegment;
-import java.lang.foreign.MemorySession;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
@@ -30,6 +28,8 @@ import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Warmup;
 
+import java.lang.foreign.Arena;
+import java.lang.foreign.MemorySegment;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -67,15 +67,15 @@ public class MemorySegmentCloseBenchmark {
 
     @Benchmark
     public MemorySegment nativeConfined() {
-        try (MemorySession scope = MemorySession.openConfined()) {
-            return MemorySegment.allocateNative(size, scope);
+        try (Arena arena = Arena.openConfined()) {
+            return MemorySegment.allocateNative(size, arena.session());
         }
     }
 
     @Benchmark
     public MemorySegment nativeShared() {
-        try (MemorySession scope = MemorySession.openShared()) {
-            return MemorySegment.allocateNative(size, scope);
+        try (Arena arena = Arena.openShared()) {
+            return MemorySegment.allocateNative(size, arena.session());
         }
     }
 }

@@ -27,11 +27,10 @@ import io.netty5.buffer.Owned;
 import io.netty5.buffer.internal.AdaptableBuffer;
 import io.netty5.buffer.internal.InternalBufferUtils;
 
-import java.lang.foreign.MemorySegment;
-import java.lang.foreign.MemorySession;
-import java.lang.foreign.ValueLayout;
-
 import java.io.IOException;
+import java.lang.foreign.Arena;
+import java.lang.foreign.MemorySegment;
+import java.lang.foreign.ValueLayout;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.ReadOnlyBufferException;
@@ -67,12 +66,8 @@ class MemSegBuffer extends AdaptableBuffer<MemSegBuffer>
     private static final MemorySegment CLOSED_SEGMENT;
 
     static {
-        try (MemorySession session = MemorySession.openShared()) {
-            // We are not allowed to allocate a zero-sized native buffer, but we *can* take a zero-sized slice from it.
-            // We need the CLOSED_SEGMENT to have a size of zero, because we'll use its size for bounds checks after
-            // the buffer is closed.
-            MemorySegment segment = MemorySegment.allocateNative(1, session);
-            CLOSED_SEGMENT = segment.asSlice(0, 0);
+        try (Arena arena = Arena.openShared()) {
+            CLOSED_SEGMENT = MemorySegment.allocateNative(0, arena.session());
         }
     }
 
