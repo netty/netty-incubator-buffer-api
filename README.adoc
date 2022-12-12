@@ -1,5 +1,11 @@
 = Netty Incubator Buffer API
 
+[NOTE]
+--
+The memory segment implementation has been merged into Netty 5: https://github.com/netty/netty/pull/13028
+Development now continue in the main Netty repository, and this incubator repository is no longer maintained.
+--
+
 This repository is incubating a new buffer API proposed for Netty 5.
 
 See the xref:RATIONALE.adoc[RATIONALE] document for more background.
